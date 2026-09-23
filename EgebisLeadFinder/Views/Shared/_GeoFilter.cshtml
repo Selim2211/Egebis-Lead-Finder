@@ -1,0 +1,129 @@
+@model GeoFilter
+@using EgebisLeadFinder.Data
+@{
+    // Bolge secimi = o bolgenin tum illeri. Tek dogru kaynak il kutucuklaridir;
+    // bolge kartlari onlari toplu isaretler (davranis: wwwroot/js/list-filter.js).
+    var selected = Model.EffectiveCities().ToHashSet();
+    int Count(string city) => Model.CityCounts.GetValueOrDefault(city);
+}
+
+@if (Model.ShowCountries)
+{
+    <section class="fd-section">
+        <div class="fd-section-head">
+            <h3>Ülke / bölge</h3>
+            <span class="fd-section-hint">Aramanın yapıldığı ülke</span>
+        </div>
+        <div class="fd-pills">
+            @foreach (var (key, count) in Model.CountryCounts.OrderByDescending(c => c.Value))
+            {
+                var region = SearchRegions.Get(key);
+                <label class="fd-pill">
+                    <input type="checkbox" name="country" value="@key" @(Model.Countries.Contains(key) ? "checked" : "") />
+                    <span>@region.Name <span class="fd-pill-count">@count</span></span>
+                </label>
+            }
+        </div>
+    </section>
+}
+
+<section class="fd-section">
+    <div class="fd-section-head">
+        <h3>Türkiye — coğrafi bölge</h3>
+        <span class="fd-section-hint">Bölge seçmek o bölgedeki tüm illeri seçer</span>
+    </div>
+    <div class="geo-regions">
+        @foreach (var region in TurkishProvinces.Regions)
+        {
+            var records = region.Value.Sum(Count);
+            <button type="button" class="geo-region" data-region="@region.Key" aria-pressed="false">
+                <span class="geo-region-check" aria-hidden="true">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                </span>
+                <span class="geo-region-name">@region.Key</span>
+                <span class="geo-region-meta">
+                    <span data-region-selected>0</span>/@region.Value.Length il
+                    @if (records > 0)
+                    {
+                        <span class="geo-region-records">· @records kayıt</span>
+                    }
+                </span>
+            </button>
+        }
+    </div>
+</section>
+
+<section class="fd-section">
+    <div class="fd-section-head">
+        <h3>Türkiye — il</h3>
+        <span class="fd-section-hint" data-geo-summary>Tüm iller</span>
+    </div>
+    <button type="button" class="geo-open" data-geo-open>
+        <span class="geo-open-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>
+        </span>
+        <span class="geo-open-text">
+            <span class="geo-open-title">Detaylı il filtresi</span>
+            <span class="geo-open-sub">81 il arasından kutucukla seçin</span>
+        </span>
+        <span class="geo-open-badge" data-geo-badge hidden>0</span>
+        <svg class="geo-open-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+    </button>
+    <div class="geo-chips" data-geo-chips></div>
+</section>
+
+@* Il secim ekrani: cekmecenin icinde saga kayan ikinci sayfa. Kutucuklar formun parcasi. *@
+<div class="geo-cities" data-geo-pane aria-hidden="true">
+    <div class="geo-cities-head">
+        <button type="button" class="fd-icon-btn" data-geo-close aria-label="Geri">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+        </button>
+        <div class="flex-grow-1">
+            <div class="geo-cities-title">Detaylı il filtresi</div>
+            <div class="geo-cities-sub"><span data-geo-count>0</span> il seçili</div>
+        </div>
+        <button type="button" class="geo-clear" data-geo-clear>Temizle</button>
+    </div>
+    <div class="geo-cities-search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+        <input type="search" placeholder="İl ara... (ör. izmir)" data-geo-search autocomplete="off" aria-label="İl ara" />
+    </div>
+    <div class="geo-cities-list" data-geo-list>
+        @foreach (var region in TurkishProvinces.Regions)
+        {
+            <div class="geo-group" data-region-group="@region.Key">
+                <div class="geo-group-head">
+                    <label class="geo-group-all">
+                        <input type="checkbox" data-region-all="@region.Key" />
+                        <span class="geo-city-box" aria-hidden="true">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                        </span>
+                        <span>@region.Key</span>
+                    </label>
+                    <span class="geo-group-count"><span data-region-selected>0</span>/@region.Value.Length</span>
+                </div>
+                <div class="geo-group-cities">
+                    @foreach (var city in region.Value.OrderBy(c => c, StringComparer.Create(new System.Globalization.CultureInfo("tr-TR"), false)))
+                    {
+                        var n = Count(city);
+                        <label class="geo-city @(n > 0 ? "has-records" : "")" data-city-name="@city">
+                            <input type="checkbox" name="city" value="@city" data-region="@region.Key" @(selected.Contains(city) ? "checked" : "") />
+                            <span class="geo-city-box" aria-hidden="true">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                            </span>
+                            <span class="geo-city-name">@city</span>
+                            @if (n > 0)
+                            {
+                                <span class="geo-city-count">@n</span>
+                            }
+                        </label>
+                    }
+                </div>
+            </div>
+        }
+        <div class="geo-empty" data-geo-empty hidden>Eşleşen il yok.</div>
+    </div>
+    <div class="geo-cities-foot">
+        <button type="button" class="btn btn-accent w-100" data-geo-close>Tamam · <span data-geo-count>0</span> il</button>
+    </div>
+</div>

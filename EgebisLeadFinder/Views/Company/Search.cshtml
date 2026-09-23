@@ -1,0 +1,576 @@
+@model CompanySearchViewModel
+@using EgebisLeadFinder.Data
+@{
+    ViewData["Title"] = "Firma Ara";
+
+    var selectedCities = (Model.Criteria.City ?? string.Empty)
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    // Gelismis ekranda hata olduysa (ör. profil adi bos) modal tekrar acik gelsin.
+    var reopenAdvanced = Model.Error is not null
+        && Model.SubmitMode is CompanySearchViewModel.ModeAdvanced or CompanySearchViewModel.ModeAdvancedSave;
+}
+
+<div class="page-head">
+    <div>
+        <h1>Firma Ara</h1>
+        <div class="page-sub">Sektöre göre üretici firma keşfet, yapay zeka ile değerlendir</div>
+    </div>
+</div>
+
+@* Daha once aranan sektorler: yazarken oneri olarak cikar. *@
+<datalist id="industryOptions">
+    @foreach (var industry in Model.Profiles
+        .Select(p => p.Industry)
+        .Where(i => !string.IsNullOrWhiteSpace(i))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Take(25))
+    {
+        <option value="@industry"></option>
+    }
+</datalist>
+
+<form method="post" asp-action="Search" class="name-search mb-4" id="nameSearchForm"
+      data-progress-start="@Url.Action("StartSearch")"
+      data-progress-title="Firma aranıyor"
+      data-progress-hint="Firmanın resmi sitesi bulunup yapay zeka ile değerlendiriliyor.">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="SubmitMode" value="@CompanySearchViewModel.ModeCompany" />
+
+    <div class="name-search-frame">
+        <div class="name-search-inner">
+            <span class="name-search-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4" /><path d="M9 9v.01M9 12v.01M9 15v.01M9 18v.01" />
+                </svg>
+            </span>
+            <div class="name-search-field">
+                <label class="name-search-label" for="companyNameInput">Belirli bir firmayı bul</label>
+                <input class="name-search-input" id="companyNameInput" name="Criteria.CompanyName"
+                       value="@Model.Criteria.CompanyName" placeholder="Firma adı yazın — ör. Toyota, Egebis, Arçelik"
+                       autocomplete="off" maxlength="150" required />
+            </div>
+            <button type="submit" class="name-search-button">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+                </svg>
+                <span>Firmayı Bul</span>
+            </button>
+        </div>
+    </div>
+    <div class="name-search-hint">
+        Sektör taraması yerine tek bir firmayı adıyla bulur · en fazla @CompanySearchViewModel.NameSearchMaxResults aday site · ~4 Serper kredisi
+    </div>
+</form>
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header">Sektöre göre arama</div>
+            <div class="card-body">
+                <form method="post" id="searchForm" asp-action="Search"
+                      data-progress-start="@Url.Action("StartSearch")"
+                      data-progress-title="Firma araştırması yapılıyor"
+                      data-progress-hint="Her firmanın sitesi okunup yapay zeka ile değerlendiriliyor. Bu birkaç dakika sürebilir; sayfayı kapatmayın.">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="SubmitMode" value="@CompanySearchViewModel.ModeBasic" />
+
+                    <div class="mb-3">
+                        <label class="form-label" for="basicIndustry">Sektör *</label>
+                        <input class="form-control" id="basicIndustry" name="Criteria.Industry" list="industryOptions"
+                               value="@Model.Criteria.Industry" placeholder="Otomotiv" required />
+                        <div class="form-text">Örnek: Otomotiv, Makina, Metal, Plastik</div>
+                    </div>
+
+                    <div class="search-scope mb-4">
+                        <div><span class="search-scope-label">Kapsam</span> @Model.Region.Name geneli</div>
+                        <div><span class="search-scope-label">Sonuç</span> en fazla @Model.MaxCompanies firma, skoru en yüksekten sıralı</div>
+                        <a class="small" asp-controller="Settings" asp-action="Index">Ayarlar'dan değiştir</a>
+                    </div>
+
+                    <button type="submit" class="btn btn-accent w-100 mb-2" id="searchButton">
+                        FİRMA ARA
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary w-100"
+                            data-bs-toggle="modal" data-bs-target="#advancedSearchModal">
+                        Gelişmiş Arama — il / bölge seç, profil kaydet
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="alert alert-secondary mt-3 small mb-0" data-flash="info" data-flash-title="Arama süresi">
+            Arama birkaç dakika sürebilir: her firmanın sitesi okunup yapay zeka ile
+            değerlendiriliyor. Sayfayı kapatmayın.
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        @if (Model.Error is not null)
+        {
+            <div class="alert alert-danger" data-flash="error" data-flash-title="Arama tamamlanamadı" data-flash-timeout="12000">
+
+                @Model.Error
+            </div>
+        }
+
+        @if (Model.Result is not null)
+        {
+            var result = Model.Result;
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Arama sonucu</span>
+                    @if (result.ProfileName is not null)
+                    {
+                        <span class="tag tag-muted">Profil: @result.ProfileName</span>
+                    }
+                </div>
+                <div class="card-body">
+                    <div class="row text-center g-3 mb-4">
+                        <div class="col">
+                            <div class="stat-value" style="font-size:1.7rem">@result.FoundBySearch</div>
+                            <div class="stat-label">bulundu</div>
+                        </div>
+                        <div class="col">
+                            <div class="stat-value" style="font-size:1.7rem">@result.Processed</div>
+                            <div class="stat-label">işlendi</div>
+                        </div>
+                        <div class="col">
+                            <div class="stat-value" style="font-size:1.7rem">@result.AlreadyKnown</div>
+                            <div class="stat-label">zaten kayıtlı</div>
+                        </div>
+                        <div class="col">
+                            <div class="stat-value @(result.Failed > 0 ? "text-warning" : "")"
+                                 style="font-size:1.7rem">@result.Failed</div>
+                            <div class="stat-label">hatalı</div>
+                        </div>
+                    </div>
+
+                    @if (result.Companies.Count == 0)
+                    {
+                        <p class="text-muted-2 mb-0">
+                            Sonuç bulunamadı. Sektör veya şehri değiştirip tekrar deneyin.
+                        </p>
+                    }
+                </div>
+
+                @if (result.Companies.Count > 0)
+                {
+                    var formId = result.ProfileId.HasValue ? "saveToProfileForm" : null;
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    @if (result.ProfileId.HasValue)
+                                    {
+                                        <th style="width:2rem">
+                                            <input type="checkbox" id="selectAllCompanies" checked title="Tümünü seç/kaldır" />
+                                        </th>
+                                    }
+                                    <th style="width:6rem">Skor</th>
+                                    <th>Firma</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var company in result.Companies)
+                            {
+                                <tr>
+                                    @if (result.ProfileId.HasValue)
+                                    {
+                                        <td>
+                                            <input type="checkbox" name="companyIds" value="@company.Id"
+                                                   class="company-select" form="@formId" checked />
+                                        </td>
+                                    }
+                                    <td><partial name="_ScoreBadge" model="company.Score" /></td>
+                                    <td>
+                                        <div class="cell-title">@company.Name</div>
+                                        <div class="cell-sub">
+                                            @company.Domain
+                                            @if (company.ProcessingError is not null)
+                                            {
+                                                <span class="text-warning">• @company.ProcessingError</span>
+                                            }
+                                        </div>
+                                    </td>
+                                    <td class="text-end">
+                                        <a class="btn btn-sm btn-outline-primary"
+                                           asp-action="Details" asp-route-id="@company.Id">İncele</a>
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if (result.ProfileId.HasValue)
+                    {
+                        <form id="saveToProfileForm" method="post" asp-action="SaveToProfile" class="card-footer">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="profileId" value="@result.ProfileId" />
+                            <button type="submit" class="btn btn-accent">
+                                Seçilenleri "@result.ProfileName" profiline kaydet
+                            </button>
+                        </form>
+                    }
+                }
+            </div>
+        }
+        else if (Model.Error is null)
+        {
+            <div class="card">
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+                            <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+                        </svg>
+                    </div>
+                    <div class="empty-title">Sonuçlar burada görünecek</div>
+                    <div>Soldaki formu doldurup aramayı başlat.</div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@* ======================= Gelişmiş arama ekranı ======================= *@
+<div class="modal fade" id="advancedSearchModal" tabindex="-1" aria-labelledby="advancedSearchTitle"
+     aria-hidden="true" data-reopen="@(reopenAdvanced ? "true" : "false")">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <form class="modal-content" method="post" id="advancedForm" asp-action="Search"
+              data-progress-start="@Url.Action("StartSearch")"
+              data-progress-title="Firma araştırması yapılıyor"
+              data-progress-hint="Seçilen illerde firmalar aranıyor, her firmanın sitesi okunup yapay zeka ile değerlendiriliyor.">
+            @Html.AntiForgeryToken()
+
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="advancedSearchTitle">Gelişmiş Arama</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="row g-4">
+                    <div class="col-lg-4">
+                        <div class="mb-3">
+                            <label class="form-label" for="advIndustry">Sektör *</label>
+                            <input class="form-control" id="advIndustry" name="Criteria.Industry" list="industryOptions"
+                                   value="@Model.Criteria.Industry" placeholder="Otomotiv" required />
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label" for="advProfileName">Arama profili adı</label>
+                            <input class="form-control" id="advProfileName" name="Criteria.ProfileName"
+                                   value="@Model.Criteria.ProfileName" placeholder="ör. Ege Otomotiv" autocomplete="off"
+                                   maxlength="150" />
+                            <div class="form-text">
+                                Aynı adla kaydederseniz mevcut profil güncellenir.
+                            </div>
+                        </div>
+
+                        <div class="form-label d-flex justify-content-between align-items-baseline">
+                            <span>Kayıtlı profiller</span>
+                            <span class="text-muted-2 small fw-normal" id="profileCount">@Model.Profiles.Count</span>
+                        </div>
+                        <div class="profile-list" id="profileList">
+                            @if (Model.Profiles.Count == 0)
+                            {
+                                <div class="profile-empty text-muted-2 small" id="profileEmpty">
+                                    Henüz kayıtlı profil yok.
+                                </div>
+                            }
+                            @foreach (var p in Model.Profiles)
+                            {
+                                <button type="button" class="profile-item" data-id="@p.Id" data-name="@p.Name"
+                                        data-industry="@p.Industry" data-city="@p.City">
+                                    <span class="profile-item-name">
+                                        @p.Name
+                                        <span class="profile-region">@SearchRegions.Get(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key).Name</span>
+                                    </span>
+                                    <span class="profile-item-meta">@p.Industry · @ProfileCityLabel(p.City)</span>
+                                    <span class="profile-item-date">Kaydedildi: @p.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+                                </button>
+                            }
+                        </div>
+                    </div>
+
+                    @if (Model.Region.HasProvinces)
+                    {
+                    <div class="col-lg-8">
+                        <div class="d-flex justify-content-between align-items-baseline mb-2">
+                            <span class="form-label mb-0">Bölge / il</span>
+                            <span class="small">
+                                <span class="tag tag-muted" id="citySelectedCount">0 il seçili</span>
+                                <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="cityClear">Temizle</button>
+                            </span>
+                        </div>
+
+                        <div class="region-chips mb-2">
+                            @foreach (var region in TurkishProvinces.Regions)
+                            {
+                                <button type="button" class="region-chip" data-region="@region.Key"
+                                        data-cities="@string.Join("|", region.Value)">
+                                    @region.Key <span class="region-chip-count">@region.Value.Length</span>
+                                </button>
+                            }
+                        </div>
+
+                        <input type="text" class="form-control mb-2" id="citySearchBox"
+                               placeholder="İl ara (ör. izm)" autocomplete="off" />
+
+                        <div class="city-picker city-picker-lg" id="cityCheckboxGrid">
+                            @foreach (var il in TurkishProvinces.All)
+                            {
+                                <label class="city-check">
+                                    <input type="checkbox" class="city-checkbox" value="@il"
+                                           checked="@(selectedCities.Contains(il) ? "checked" : null)" />
+                                    <span>@il</span>
+                                </label>
+                            }
+                        </div>
+                        <input type="hidden" name="Criteria.City" id="cityHiddenField" value="@Model.Criteria.City" />
+                        <div class="form-text">
+                            Hiç il seçmezseniz @Model.DefaultCountry geneli taranır. En fazla @Model.MaxCompanies firma
+                            getirilir (Ayarlar).
+                        </div>
+                    </div>
+                    }
+                    else
+                    {
+                        @* Türkiye dışı bölgelerde il listesi yok: şehir adları elle yazılır. *@
+                        <div class="col-lg-8">
+                            <label class="form-label" for="cityFreeText">Şehir / bölge</label>
+                            <input type="text" class="form-control" id="cityFreeText" name="Criteria.City"
+                                   value="@Model.Criteria.City" placeholder="Bavyera, Stuttgart, Köln" autocomplete="off" />
+                            <div class="form-text">
+                                Birden fazla şehri virgülle ayırın. Boş bırakırsanız @Model.Region.Name geneli taranır.
+                                Sorgular @Model.Region.Name için o ülkenin dilinde kurulur.
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="modal-footer justify-content-between">
+                <div class="small" id="profileSaveStatus" role="status"></div>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="submit" name="SubmitMode" value="@CompanySearchViewModel.ModeAdvanced"
+                            class="btn btn-outline-primary">
+                        Kaydetmeden Ara
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="saveProfileOnly"
+                            data-url="@Url.Action("SaveProfile")">
+                        Arama Profilini Kaydet
+                    </button>
+                    <button type="submit" name="SubmitMode" value="@CompanySearchViewModel.ModeAdvancedSave"
+                            class="btn btn-accent">
+                        Kaydet ve Ara
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@functions {
+    private static string ProfileCityLabel(string? city)
+    {
+        var cities = (city ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return cities.Length switch
+        {
+            0 => "tüm bölge",
+            <= 3 => string.Join(", ", cities),
+            _ => $"{string.Join(", ", cities.Take(3))} +{cities.Length - 3}"
+        };
+    }
+}
+
+@section Scripts {
+<script>
+    (function () {
+        var basicForm = document.getElementById('searchForm');
+        var basicButton = document.getElementById('searchButton');
+        var modalEl = document.getElementById('advancedSearchModal');
+        var advForm = document.getElementById('advancedForm');
+        var advIndustry = document.getElementById('advIndustry');
+        var advName = document.getElementById('advProfileName');
+        var hiddenCity = document.getElementById('cityHiddenField');
+        var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.city-checkbox'));
+        var countLabel = document.getElementById('citySelectedCount');
+        var status = document.getElementById('profileSaveStatus');
+
+        function selectedCities() {
+            return checkboxes.filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
+        }
+
+        function refreshRegionChips() {
+            var selected = selectedCities();
+            document.querySelectorAll('.region-chip').forEach(function (chip) {
+                var cities = chip.getAttribute('data-cities').split('|');
+                var all = cities.every(function (c) { return selected.indexOf(c) !== -1; });
+                chip.classList.toggle('is-active', all);
+            });
+        }
+
+        function syncCities() {
+            var selected = selectedCities();
+            hiddenCity.value = selected.join(', ');
+            countLabel.textContent = selected.length === 0 ? 'Türkiye geneli' : selected.length + ' il seçili';
+            refreshRegionChips();
+        }
+
+        function setCities(list) {
+            checkboxes.forEach(function (c) { c.checked = list.indexOf(c.value) !== -1; });
+            syncCities();
+        }
+
+        checkboxes.forEach(function (c) { c.addEventListener('change', syncCities); });
+        syncCities();
+
+        document.getElementById('cityClear').addEventListener('click', function () { setCities([]); });
+
+        // Bolge cipi: bolgenin tum illeri seciliyse kaldirir, degilse hepsini ekler.
+        document.querySelectorAll('.region-chip').forEach(function (chip) {
+            chip.addEventListener('click', function () {
+                var cities = chip.getAttribute('data-cities').split('|');
+                var on = !chip.classList.contains('is-active');
+                checkboxes.forEach(function (c) {
+                    if (cities.indexOf(c.value) !== -1) c.checked = on;
+                });
+                syncCities();
+            });
+        });
+
+        var searchBox = document.getElementById('citySearchBox');
+        searchBox.addEventListener('input', function () {
+            var term = searchBox.value.trim().toLocaleLowerCase('tr');
+            document.querySelectorAll('.city-check').forEach(function (label) {
+                var name = label.querySelector('span').textContent.toLocaleLowerCase('tr');
+                label.style.display = name.indexOf(term) === -1 ? 'none' : '';
+            });
+        });
+
+        // Kayitli profile tiklayinca kriterleri forma yukler.
+        function bindProfileItem(item) {
+            item.addEventListener('click', function () {
+                advName.value = item.getAttribute('data-name') || '';
+                advIndustry.value = item.getAttribute('data-industry') || '';
+                var city = item.getAttribute('data-city') || '';
+                setCities(city.split(',').map(function (s) { return s.trim(); }).filter(Boolean));
+                document.querySelectorAll('.profile-item').forEach(function (i) { i.classList.remove('is-active'); });
+                item.classList.add('is-active');
+            });
+        }
+        document.querySelectorAll('.profile-item').forEach(bindProfileItem);
+
+        // Acilirken temel formdaki sektoru tasi (kullanici tekrar yazmasin).
+        modalEl.addEventListener('show.bs.modal', function () {
+            var basic = document.getElementById('basicIndustry').value;
+            if (!advIndustry.value && basic) advIndustry.value = basic;
+            status.textContent = '';
+        });
+
+        advForm.addEventListener('submit', function (e) {
+            syncCities();
+            if (e.submitter && e.submitter.value === '@CompanySearchViewModel.ModeAdvancedSave' && !advName.value.trim()) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                advName.focus();
+                showStatus('Kaydetmek için profil adı girin.', true);
+            }
+        });
+
+        function showStatus(text, isError) {
+            status.textContent = text;
+            status.className = 'small ' + (isError ? 'text-danger' : 'text-success');
+        }
+
+        function formatCities(city) {
+            var list = (city || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+            if (list.length === 0) return 'Türkiye geneli';
+            if (list.length <= 3) return list.join(', ');
+            return list.slice(0, 3).join(', ') + ' +' + (list.length - 3);
+        }
+
+        function upsertProfileItem(p) {
+            var list = document.getElementById('profileList');
+            var empty = document.getElementById('profileEmpty');
+            if (empty) empty.remove();
+
+            var item = list.querySelector('.profile-item[data-id="' + p.id + '"]');
+            var isNew = !item;
+            if (isNew) {
+                item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'profile-item';
+                item.setAttribute('data-id', p.id);
+                ['profile-item-name', 'profile-item-meta', 'profile-item-date'].forEach(function (cls) {
+                    var s = document.createElement('span');
+                    s.className = cls;
+                    item.appendChild(s);
+                });
+                bindProfileItem(item);
+            }
+            item.setAttribute('data-name', p.name);
+            item.setAttribute('data-industry', p.industry || '');
+            item.setAttribute('data-city', p.city || '');
+            item.querySelector('.profile-item-name').textContent = p.name;
+            item.querySelector('.profile-item-meta').textContent = (p.industry || '') + ' · ' + formatCities(p.city);
+            item.querySelector('.profile-item-date').textContent = 'Kaydedildi: ' + p.createdAt;
+            list.prepend(item);
+
+            document.querySelectorAll('.profile-item').forEach(function (i) { i.classList.remove('is-active'); });
+            item.classList.add('is-active');
+            document.getElementById('profileCount').textContent = list.querySelectorAll('.profile-item').length;
+            return isNew;
+        }
+
+        // "Arama Profilini Kaydet": arama yapmadan sadece profili kaydeder.
+        document.getElementById('saveProfileOnly').addEventListener('click', function () {
+            syncCities();
+            if (!advIndustry.value.trim()) { advIndustry.focus(); showStatus('Sektör girin.', true); return; }
+            if (!advName.value.trim()) { advName.focus(); showStatus('Profil adı girin.', true); return; }
+
+            var button = this;
+            button.disabled = true;
+            fetch(button.getAttribute('data-url'), {
+                method: 'POST',
+                body: new FormData(advForm),
+                headers: { Accept: 'application/json' }
+            })
+                .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+                .then(function (res) {
+                    if (!res.ok) { showStatus(res.data.error || 'Profil kaydedilemedi.', true); return; }
+                    var isNew = upsertProfileItem(res.data);
+                    showStatus('"' + res.data.name + '" ' + (isNew ? 'kaydedildi' : 'güncellendi') + ' (' + res.data.createdAt + ').', false);
+                })
+                .catch(function () { showStatus('Sunucuya ulaşılamadı.', true); })
+                .finally(function () { button.disabled = false; });
+        });
+
+        basicForm.addEventListener('submit', function () {
+            if (window.EgebisProgress) return; // overlay bekleme durumunu yonetir
+            basicButton.disabled = true;
+            basicButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Aranıyor...';
+        });
+
+        if (modalEl.getAttribute('data-reopen') === 'true' && window.bootstrap) {
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+
+        var selectAll = document.getElementById('selectAllCompanies');
+        if (selectAll) {
+            selectAll.addEventListener('change', function () {
+                document.querySelectorAll('.company-select').forEach(function (c) {
+                    c.checked = selectAll.checked;
+                });
+            });
+        }
+    })();
+</script>
+}

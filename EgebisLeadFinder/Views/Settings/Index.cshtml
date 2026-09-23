@@ -1,0 +1,421 @@
+@model SettingsViewModel
+@{
+    ViewData["Title"] = "Ayarlar";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Ayarlar</h1>
+        <div class="page-sub">API anahtarları ve lead arama ünvanları</div>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert alert-success" data-flash="success">@Model.StatusMessage</div>
+}
+@if (TempData["SettingsError"] is string settingsError)
+{
+    <div class="alert alert-danger" data-flash="error">@settingsError</div>
+}
+
+<form id="smtpTestForm" method="post" asp-action="SendTestEmail" class="d-none">
+    @Html.AntiForgeryToken()
+</form>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+    <form method="post">
+        @Html.AntiForgeryToken()
+
+        <div class="card mb-4">
+            <div class="card-header">Lead Arama Ünvanları</div>
+            <div class="card-body">
+                <label class="form-label">Aranacak ünvanlar (virgülle ayırın)</label>
+                <textarea class="form-control" asp-for="LeadTitleKeywords" rows="3"
+                          placeholder="IT, Bilgi İşlem, SAP, ERP, CIO"></textarea>
+                <div class="form-text">
+                    "Lead'leri Bul" çalıştığında LinkedIn'de bu ünvanlar aranır.
+                    Boş bırakırsanız varsayılanlar kullanılır:
+                    <code>@string.Join(", ", SettingsService.DefaultTitleKeywords)</code>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">Firma Arama</div>
+            <div class="card-body row g-3">
+                <div class="col-sm-5">
+                    <label class="form-label" asp-for="SearchMaxCompanies">Azami firma</label>
+                    <input class="form-control" type="number" min="1" max="@SettingKeys.SearchMaxCompaniesUpperLimit"
+                           asp-for="SearchMaxCompanies" />
+                    <div class="form-text">
+                        Arama başına getirilecek en fazla firma; sonuçlar skoru en yüksekten sıralanır.
+                        Her yeni firma bir Gemini analizi demektir.
+                    </div>
+                </div>
+                <div class="col-sm-7">
+                    <label class="form-label" asp-for="SearchRegion">Arama bölgesi</label>
+                    <select class="form-select" asp-for="SearchRegion">
+                        @foreach (var group in SearchRegions.Grouped())
+                        {
+                            <optgroup label="@group.Key">
+                                @foreach (var region in group)
+                                {
+                                    <option value="@region.Key" selected="@(Model.SearchRegion == region.Key)">
+                                        @region.Name@(region.HasProvinces ? " (il seçimi var)" : "")
+                                    </option>
+                                }
+                            </optgroup>
+                        }
+                    </select>
+                    <div class="form-text">
+                        Aramalar bu bölgede yapılır: Google sonuçları o ülkeden gelir ve sorgular o ülkenin
+                        dilinde kurulur (ör. Almanya'da "Hersteller", İngiltere'de "manufacturers").
+                        Türkiye'de il seçimi kutucuklarla yapılır; diğer bölgelerde şehir adını elle yazarsınız.
+                    </div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label" asp-for="ExtraBlockedDomains">Elenecek ek siteler</label>
+                    <input class="form-control" asp-for="ExtraBlockedDomains"
+                           placeholder="ornek-rehber.com, ilan-sitesi.com" />
+                    <div class="form-text">
+                        Arama sonuçlarında görmek istemediğiniz siteler (virgülle ayırın). Haber siteleri,
+                        rehberler, pazaryerleri ve sosyal medya zaten eleniyor; burası ek liste.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">Lead Takibi</div>
+            <div class="card-body">
+                <label class="form-label" asp-for="FollowUpAfterDays">Takip süresi (gün)</label>
+                <input class="form-control" type="number" min="1" max="60" asp-for="FollowUpAfterDays" style="max-width:9rem" />
+                <div class="form-text">
+                    Mail attıktan sonra bu kadar gün cevap gelmezse lead "takip bekliyor" sayılır;
+                    Lead'ler ekranındaki <strong>Takip bekleyen</strong> listesinde ve üst menü rozetinde görünür.
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4" id="email-settings">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>E-posta Gönderimi</span>
+                @if (Model.SmtpConfigured)
+                {
+                    <span class="tag tag-success">etkin</span>
+                }
+                else
+                {
+                    <span class="tag tag-muted">ayarlanmadı</span>
+                }
+            </div>
+            <div class="card-body">
+                <p class="small text-muted-2 mb-3">
+                    Lead'lere giden e-postalar bu adresten gönderilir. Alıcı "Kimden" kısmında bu adı ve adresi görür.
+                </p>
+
+                <div class="row g-3">
+                    <div class="col-sm-7">
+                        <label class="form-label" asp-for="SmtpFromAddress">Gönderen e-posta adresi</label>
+                        <input class="form-control" type="email" asp-for="SmtpFromAddress" id="smtpFrom"
+                               placeholder="satis@egebis.com" autocomplete="off" />
+                    </div>
+                    <div class="col-sm-5">
+                        <label class="form-label" asp-for="SmtpFromName">Gönderen adı</label>
+                        <input class="form-control" asp-for="SmtpFromName" placeholder="Egebis Bilişim" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label" asp-for="SmtpPassword">
+                            E-posta şifresi
+                            @if (Model.SmtpPasswordSet)
+                            {
+                                <span class="tag tag-success ms-1">kayıtlı</span>
+                            }
+                        </label>
+                        <input class="form-control" type="password" asp-for="SmtpPassword" value=""
+                               autocomplete="new-password"
+                               placeholder="@(Model.SmtpPasswordSet ? "Değiştirmek için yeni şifre yazın" : "Uygulama şifresi")" />
+                        <div class="form-text" id="smtpProviderHint">
+                            Gmail ve Outlook'ta normal şifre çalışmaz; hesabınızdan <strong>uygulama şifresi</strong>
+                            oluşturup buraya yazın. Boş bırakırsanız kayıtlı şifre korunur.
+                        </div>
+                    </div>
+                </div>
+
+                <details class="mt-3" open="@(Model.SmtpConfigured ? null : "open")">
+                    <summary class="form-label" style="cursor:pointer">Sunucu ayarları</summary>
+                    <div class="row g-3 mt-1">
+                        <div class="col-sm-6">
+                            <label class="form-label" asp-for="SmtpHost">SMTP sunucusu</label>
+                            <input class="form-control" asp-for="SmtpHost" id="smtpHost" placeholder="smtp.gmail.com" />
+                        </div>
+                        <div class="col-sm-3">
+                            <label class="form-label" asp-for="SmtpPort">Port</label>
+                            <input class="form-control" type="number" min="1" max="65535" asp-for="SmtpPort" id="smtpPort" />
+                        </div>
+                        <div class="col-sm-3">
+                            <label class="form-label" asp-for="SmtpSecurity">Güvenlik</label>
+                            <select class="form-select" asp-for="SmtpSecurity" id="smtpSecurity">
+                                <option value="starttls">STARTTLS</option>
+                                <option value="ssl">SSL/TLS</option>
+                                <option value="auto">Otomatik</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" asp-for="SmtpUsername">Kullanıcı adı</label>
+                            <input class="form-control" asp-for="SmtpUsername" placeholder="Boşsa gönderen adres kullanılır" />
+                        </div>
+                    </div>
+                    <div class="form-text mt-2">
+                        Kurumsal e-posta (ör. <code>@@egebis.com</code>) Microsoft 365'teyse:
+                        <code>smtp.office365.com</code> · 587 · STARTTLS. Kendi sunucunuzsa (cPanel vb.) bilgileri
+                        hosting firmanızdan alın.
+                    </div>
+                </details>
+            </div>
+            <div class="card-footer d-flex flex-wrap gap-2 align-items-center">
+                <button class="btn btn-accent btn-sm" type="submit">Kaydet</button>
+                @if (Model.SmtpConfigured)
+                {
+                    <button class="btn btn-outline-secondary btn-sm" type="submit" form="smtpTestForm">
+                        Kendime test e-postası gönder
+                    </button>
+                }
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">API Anahtarları</div>
+            <div class="card-body">
+
+                <div class="mb-4">
+                    <label class="form-label d-flex align-items-center gap-2">
+                        Serper API Key
+                        <span class="tag tag-danger">zorunlu</span>
+                    </label>
+                    <input class="form-control font-monospace" asp-for="SerperApiKey"
+                           autocomplete="off" placeholder="@(Model.SerperFromConfig ? "(yapılandırmadan geliyor)" : "")" />
+                    <div class="form-text">
+                        Firma araması ve LinkedIn araması için zorunlu.
+                        @if (Model.SerperFromConfig)
+                        {
+                            <span class="text-success fw-semibold">Şu an User Secrets'taki değer kullanılıyor.</span>
+                        }
+                    </div>
+                </div>
+
+                <div class="mb-0">
+                    <label class="form-label">Serper toplam kredi</label>
+                    <input class="form-control" type="number" min="1" asp-for="SerperCreditLimit" style="max-width:10rem" />
+                    <div class="form-text">
+                        Yeni bir Serper API anahtarı aldığınızda (ör. ücretsiz plan 2500 kredi
+                        verir) bu değeri güncelleyip aşağıdaki "Sayacı sıfırla" butonuna basın.
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label d-flex align-items-center gap-2">
+                        Gemini API Key
+                        <span class="tag tag-danger">zorunlu</span>
+                    </label>
+                    <input class="form-control font-monospace" asp-for="GeminiApiKey"
+                           autocomplete="off" placeholder="@(Model.GeminiFromConfig ? "(yapılandırmadan geliyor)" : "")" />
+                    <div class="form-text">
+                        Firma analizi için zorunlu. Yalnızca buraya girilen anahtar kullanılır; boş bırakılırsa
+                        yapay zeka analizi çalışmaz.
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label d-flex align-items-center gap-2" for="geminiModel">
+                        Gemini modeli
+                        <span class="tag tag-muted">şu an: @Model.GeminiCurrentModel</span>
+                    </label>
+                    @if (Model.GeminiModels.Count > 0)
+                    {
+                        var current = Model.GeminiCurrentModel;
+                        <select class="form-select font-monospace" name="GeminiModel" id="geminiModel">
+                            @if (!Model.GeminiModels.Any(m => m.Id == current))
+                            {
+                                @* Kayitli model listede yoksa (kaldirilmis/erisilemiyor) yine de gorunsun. *@
+                                <option value="@current" selected>@current (listede yok)</option>
+                            }
+                            @foreach (var m in Model.GeminiModels)
+                            {
+                                <option value="@m.Id" selected="@(m.Id == current)" title="@m.Description">
+                                    @m.Id@(m.Id == Model.GeminiDefaultModel ? "  (varsayılan)" : "")@(m.DisplayName != m.Id ? $" — {m.DisplayName}" : "")
+                                </option>
+                            }
+                        </select>
+                        <div class="form-text">
+                            Liste, API anahtarınızın erişebildiği modellerden Google'dan canlı alınır.
+                            Firma analizi ve ön araştırma bu modelle yapılır. "Pro" modeller daha isabetli ama
+                            daha yavaş ve pahalıdır; "Flash" hızlı ve ucuzdur.
+                        </div>
+                    }
+                    else
+                    {
+                        <input class="form-control font-monospace" name="GeminiModel" id="geminiModel"
+                               value="@(Model.GeminiModel ?? Model.GeminiCurrentModel)" placeholder="@Model.GeminiDefaultModel" />
+                        <div class="form-text text-warning">
+                            @(Model.GeminiModelsError ?? "Model listesi alınamadı.") Model adını elle yazabilirsiniz.
+                        </div>
+                    }
+                </div>
+
+                <div class="mb-0">
+                    <label class="form-label d-flex align-items-center gap-2">
+                        Apollo API Key
+                        <span class="tag tag-muted">isteğe bağlı</span>
+                    </label>
+                    <input class="form-control font-monospace" asp-for="ApolloApiKey"
+                           autocomplete="off" placeholder="@(Model.ApolloFromConfig ? "(yapılandırmadan geliyor)" : "")" />
+                    <div class="form-text">
+                        Karar vericilerin kurumsal e-postasını bulmak için. Boşsa kişiler
+                        e-postasız kaydedilir.
+                    </div>
+                </div>
+
+            </div>
+            <div class="card-footer">
+                <button class="btn btn-accent">Kaydet</button>
+            </div>
+        </div>
+    </form>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card mb-4">
+            <div class="card-header">Serper Kredi Durumu</div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-baseline mb-2">
+                    <span class="stat-label mb-0">Kullanılan</span>
+                    <span class="cell-title">
+                        @Model.SerperCreditsUsed / @Model.SerperCreditLimit
+                        <span class="text-muted-2 fw-normal">(%@Model.SerperUsagePercent)</span>
+                    </span>
+                </div>
+
+                <div class="credit-bar" role="progressbar" aria-valuenow="@Model.SerperUsagePercent"
+                     aria-valuemin="0" aria-valuemax="100">
+                    <div class="credit-bar-fill @Model.SerperUsageCss" style="width:@(Model.SerperUsagePercent)%"></div>
+                </div>
+
+                <div class="cell-sub mt-2">
+                    Bu ay: @Model.SerperCallsThisMonth çağrı@(Model.SerperMonthlyCap > 0 ? $" / {Model.SerperMonthlyCap} tavan" : "")
+                    · aynı arama 6 saat içinde tekrarlanırsa önbellekten gelir, kredi harcanmaz.
+                </div>
+
+                <div class="cell-sub mt-2">
+                    @Model.SerperCreditsRemaining kredi kaldı
+                    @if (Model.SerperUsagePercent >= 90)
+                    {
+                        <span class="tag tag-danger ms-1">kritik — yeni anahtar alın</span>
+                    }
+                    else if (Model.SerperUsagePercent >= 70)
+                    {
+                        <span class="tag tag-amber ms-1">azalıyor</span>
+                    }
+                </div>
+
+                @if (Model.SerperUsageResetAt is not null)
+                {
+                    <div class="cell-sub mt-1">
+                        Son sıfırlama: @Model.SerperUsageResetAt.Value.ToLocalTime().ToString("d MMMM yyyy HH:mm")
+                    </div>
+                }
+            </div>
+            <div class="card-footer">
+                <form method="post" asp-action="ResetSerperUsage" class="m-0">
+                    @Html.AntiForgeryToken()
+                    <button class="btn btn-sm btn-outline-secondary" type="submit">
+                        Yeni anahtar aldım — sayacı sıfırla
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">Gemini Kullanım Durumu</div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-baseline mb-1">
+                    <span class="cell-title" style="font-size:1.5rem">@Model.GeminiCallsToday</span>
+                    <span class="stat-label mb-0">bugün</span>
+                </div>
+                <div class="cell-sub mb-3">≈ @Model.GeminiCostToday.ToString("0.00") TL</div>
+
+                <div class="row text-center g-2 mb-3">
+                    <div class="col">
+                        <div class="stat-value" style="font-size:1.2rem">@Model.GeminiCallsThisWeek</div>
+                        <div class="stat-label">bu hafta</div>
+                        <div class="cell-sub">@Model.GeminiCostThisWeek.ToString("0.00") TL</div>
+                    </div>
+                    <div class="col">
+                        <div class="stat-value" style="font-size:1.2rem">@Model.GeminiCallsThisMonth</div>
+                        <div class="stat-label">bu ay</div>
+                        <div class="cell-sub">@Model.GeminiCostThisMonth.ToString("0.00") TL</div>
+                    </div>
+                </div>
+
+                <div class="cell-sub">
+                    Kur: 1 USD = @Model.UsdTryRate.ToString("0.00") TL
+                    @if (Model.UsdTryRateIsLive)
+                    {
+                        <span class="tag tag-success ms-1">canlı</span>
+                    }
+                    else
+                    {
+                        <span class="tag tag-muted ms-1">kur alınamadı, son bilinen değer</span>
+                    }
+                </div>
+                <div class="cell-sub">Maliyet tahmini, gerçek fatura değildir.</div>
+                @if (Model.GeminiCurrentModel != Model.GeminiDefaultModel)
+                {
+                    <div class="cell-sub text-warning">
+                        Tahmin @Model.GeminiDefaultModel fiyatıyla hesaplanıyor; seçili model (@Model.GeminiCurrentModel)
+                        farklı fiyatlandırılabilir.
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // Bilinen e-posta saglayicilarinda sunucu bilgisini otomatik doldur.
+    (function () {
+        var presets = {
+            'gmail.com':      { host: 'smtp.gmail.com', port: 587, sec: 'starttls', name: 'Gmail' },
+            'googlemail.com': { host: 'smtp.gmail.com', port: 587, sec: 'starttls', name: 'Gmail' },
+            'outlook.com':    { host: 'smtp-mail.outlook.com', port: 587, sec: 'starttls', name: 'Outlook' },
+            'hotmail.com':    { host: 'smtp-mail.outlook.com', port: 587, sec: 'starttls', name: 'Outlook' },
+            'live.com':       { host: 'smtp-mail.outlook.com', port: 587, sec: 'starttls', name: 'Outlook' },
+            'yandex.com':     { host: 'smtp.yandex.com.tr', port: 465, sec: 'ssl', name: 'Yandex' },
+            'yandex.com.tr':  { host: 'smtp.yandex.com.tr', port: 465, sec: 'ssl', name: 'Yandex' },
+            'yahoo.com':      { host: 'smtp.mail.yahoo.com', port: 465, sec: 'ssl', name: 'Yahoo' },
+            'icloud.com':     { host: 'smtp.mail.me.com', port: 587, sec: 'starttls', name: 'iCloud' }
+        };
+
+        var from = document.getElementById('smtpFrom');
+        var host = document.getElementById('smtpHost');
+        var port = document.getElementById('smtpPort');
+        var sec = document.getElementById('smtpSecurity');
+        if (!from) return;
+
+        from.addEventListener('change', function () {
+            var domain = (from.value.split('@@')[1] || '').trim().toLowerCase();
+            var p = presets[domain];
+            if (!p) return;
+            host.value = p.host;
+            port.value = p.port;
+            sec.value = p.sec;
+            var details = host.closest('details');
+            if (details) details.open = true;
+        });
+    })();
+</script>
+}

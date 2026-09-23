@@ -1,0 +1,31 @@
+@model LeadWaitModel
+@{
+    // Cevap bekleme rozeti: sure esigi astiysa kirmizi, yaklasiyorsa amber.
+    var lead = Model.Lead;
+    var days = lead.WaitingDays();
+    var replied = lead.RepliedAt is not null;
+    var snoozed = lead.SnoozedUntil is not null && lead.SnoozedUntil > DateTime.UtcNow;
+    var due = lead.NeedsFollowUp(Model.AfterDays);
+}
+
+@if (replied)
+{
+    <div class="lead-fact lead-wait is-replied">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+        <span>Cevap geldi · @lead.RepliedAt!.Value.ToLocalTime().ToString("dd.MM.yyyy")</span>
+    </div>
+}
+else if (snoozed)
+{
+    <div class="lead-fact lead-wait is-snoozed">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9" /><path d="M12 7v5l3 2" /></svg>
+        <span>@lead.SnoozedUntil!.Value.ToLocalTime().ToString("dd.MM") tarihine ertelendi</span>
+    </div>
+}
+else if (days is not null && lead.Status != LeadStatus.Ilgilenmedi)
+{
+    <div class="lead-fact lead-wait @(due ? "is-due" : days >= Model.AfterDays - 2 ? "is-soon" : "")">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+        <span>@(days == 0 ? "Bugün temas edildi" : $"{days} gündür cevap yok")</span>
+    </div>
+}

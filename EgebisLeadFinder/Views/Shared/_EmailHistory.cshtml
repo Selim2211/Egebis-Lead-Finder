@@ -1,0 +1,52 @@
+@model IEnumerable<SentEmail>
+
+<div class="email-history">
+    @foreach (var mail in Model.OrderByDescending(m => m.SentAt))
+    {
+        <details class="email-item">
+            <summary class="email-item-head">
+                <span class="email-item-icon @(mail.Method == SentEmailMethod.Manual ? "is-manual" : "")" aria-hidden="true">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" />
+                    </svg>
+                </span>
+                <span class="email-item-main">
+                    <span class="email-item-subject">@(string.IsNullOrWhiteSpace(mail.Subject) ? "(konu yok)" : mail.Subject)</span>
+                    <span class="email-item-meta">
+                        @mail.SentAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @mail.ToAddress
+                        @if (!string.IsNullOrWhiteSpace(mail.TemplateName))
+                        {
+                            <span>· @mail.TemplateName</span>
+                        }
+                    </span>
+                </span>
+                <span class="email-item-badge @(mail.Method == SentEmailMethod.Manual ? "is-manual" : "")">
+                    @(mail.Method == SentEmailMethod.Manual ? "Dışarıdan" : "Gönderildi")
+                </span>
+                <svg class="email-item-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            </summary>
+            <div class="email-item-body">
+                <div class="email-item-fromto">
+                    <div><span>Kimden</span> @(mail.FromAddress ?? "—")</div>
+                    <div><span>Kime</span> @mail.ToAddress</div>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(mail.BodyHtml))
+                {
+                    @* Kayit sirasinda EmailHtml.Sanitize'dan gecti. *@
+                    <div class="email-item-text email-item-html">@Html.Raw(mail.BodyHtml)</div>
+                }
+                else
+                {
+                    <pre class="email-item-text">@mail.Body</pre>
+                }
+                @if (!string.IsNullOrWhiteSpace(mail.ImageNames))
+                {
+                    <div class="email-item-images">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="9" cy="9" r="2" /><path d="m21 15-5-5L5 21" /></svg>
+                        Görseller: @mail.ImageNames
+                    </div>
+                }
+            </div>
+        </details>
+    }
+</div>

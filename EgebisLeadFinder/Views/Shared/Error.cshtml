@@ -1,0 +1,34 @@
+@model ErrorViewModel
+@{
+    ViewData["Title"] = "Hata";
+}
+
+<div class="card">
+    <div class="card-body text-center py-5">
+        <div class="empty-icon mb-3" style="color:var(--eg-danger)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" /><path d="M12 7v6M12 16.5v.01" />
+            </svg>
+        </div>
+        <h1 class="h4">Bir hata oluştu</h1>
+        <p class="text-muted-2">İsteğiniz işlenirken beklenmeyen bir sorun çıktı.</p>
+
+        @if (Model.ShowRequestId)
+        {
+            <p class="small text-muted-2 mb-4">
+                İstek numarası: <code>@Model.RequestId</code>
+            </p>
+        }
+
+        <a class="btn btn-primary" asp-controller="Home" asp-action="Index">Panele dön</a>
+    </div>
+</div>
+
+<div class="alert alert-secondary small mt-4 mb-0">
+    <div class="fw-semibold mb-1">Geliştirici notu</div>
+    Ayrıntılı hata bilgisi için <code>ASPNETCORE_ENVIRONMENT</code> değişkenini
+    <code>Development</code> yapıp uygulamayı yeniden başlatın. Bu ortam yayına
+    alınmış uygulamalarda açık bırakılmamalıdır: istisna içeriği hassas bilgi
+    gösterebilir.
+</div>

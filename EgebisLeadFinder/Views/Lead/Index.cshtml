@@ -1,0 +1,379 @@
+@model LeadListViewModel
+@{
+    ViewData["Title"] = "Lead'ler";
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var req = Context.Request;
+
+    string StatusUrl(LeadStatus? status) => QueryUrl.With(req, "status", status?.ToString());
+    int StatusCount(LeadStatus s) => Model.StatusCounts.TryGetValue(s, out var n) ? n : 0;
+
+    var sortLabel = LeadSort.Options.First(o => o.Key == Model.Sort).Label;
+
+    var chips = new List<(string Label, string Url)>();
+    if (!string.IsNullOrWhiteSpace(Model.Query)) chips.Add(($"“{Model.Query}”", QueryUrl.Without(req, "q")));
+    if (Model.Contact == "yes") chips.Add(("İletişim kuruldu", QueryUrl.Without(req, "contact")));
+    if (Model.Contact == "no") chips.Add(("İletişim kurulmadı", QueryUrl.Without(req, "contact")));
+    if (Model.Email == "open") chips.Add(("E-postası açık", QueryUrl.Without(req, "email")));
+    if (Model.Email == "closed") chips.Add(("E-postası kapalı", QueryUrl.Without(req, "email")));
+    foreach (var k in Model.Geo.Countries) chips.Add((SearchRegions.Get(k).Name, QueryUrl.Without(req, "country", k)));
+    foreach (var r in Model.Geo.Regions) chips.Add(($"{r} bölgesi", QueryUrl.Without(req, "region", r)));
+    foreach (var c in Model.Geo.Cities) chips.Add((c, QueryUrl.Without(req, "city", c)));
+}
+
+<div class="page-head">
+    <div>
+        <h1>Lead'ler</h1>
+        <div class="page-sub">Kişi bazlı satış fırsatları ve iletişim takibi</div>
+    </div>
+    <div class="lead-summary">
+        <div class="lead-summary-item">
+            <span class="lead-summary-value">@Model.Total</span>
+            <span class="lead-summary-label">lead</span>
+        </div>
+        <div class="lead-summary-item">
+            <span class="lead-summary-value text-contacted">@Model.ContactedCount</span>
+            <span class="lead-summary-label">iletişim kuruldu</span>
+        </div>
+        <div class="lead-summary-item">
+            <span class="lead-summary-value text-mailed">@StatusCount(LeadStatus.Gonderildi)</span>
+            <span class="lead-summary-label">mail atıldı</span>
+        </div>
+    </div>
+</div>
+
+@if (TempData["LeadSuccess"] is string ok)
+{
+    <div class="alert alert-success" data-flash="success">@ok</div>
+}
+@if (TempData["LeadInfo"] is string info)
+{
+    <div class="alert alert-secondary" data-flash="info">@info</div>
+}
+@if (TempData["LeadError"] is string err)
+{
+    <div class="alert alert-danger" data-flash="error">@err</div>
+}
+
+<div class="list-toolbar">
+    <form method="get" class="list-search" role="search">
+        @foreach (var kv in req.Query.Where(kv => kv.Key is not ("q" or "page")))
+        {
+            foreach (var v in kv.Value)
+            {
+                <input type="hidden" name="@kv.Key" value="@v" />
+            }
+        }
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+        <input type="search" name="q" value="@Model.Query" placeholder="Kişi adı, ünvan, firma veya e-posta ara..." aria-label="Lead ara" />
+        <kbd class="list-search-kbd">Enter</kbd>
+    </form>
+
+    <button type="button" class="list-filter-btn @(Model.ActiveFilterCount > 0 ? "has-filters" : "")" data-bs-toggle="offcanvas" data-bs-target="#filterDrawer" aria-controls="filterDrawer">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18M6 12h12M10 19h4" /></svg>
+        Detaylı filtre
+        @if (Model.ActiveFilterCount > 0)
+        {
+            <span class="list-filter-count">@Model.ActiveFilterCount</span>
+        }
+    </button>
+
+    <button type="button" class="list-sort-btn" data-bs-toggle="offcanvas" data-bs-target="#filterDrawer" data-focus-sort>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 16 4 4 4-4M7 20V4M21 8l-4-4-4 4M17 4v16" /></svg>
+        <span class="list-sort-label">@sortLabel</span>
+    </button>
+</div>
+
+@if (chips.Count > 0)
+{
+    <div class="filter-chips">
+        @foreach (var chip in chips)
+        {
+            <a class="filter-chip" href="@chip.Url" title="Filtreyi kaldır">
+                @chip.Label
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+            </a>
+        }
+        <a class="filter-chip-clear" href="@Url.Action("Index", new { status = Model.Status })">Tümünü temizle</a>
+    </div>
+}
+
+<nav class="stage-chips mb-4" aria-label="Lead durumu filtresi">
+    <a class="stage-chip chip-all @(Model.Status is null && !Model.Due ? "is-active" : "")" href="@StatusUrl(null)">
+        Tümü <span class="stage-chip-count">@Model.Total</span>
+    </a>
+    <a class="stage-chip chip-due @(Model.Due ? "is-active" : "")"
+       href="@(Model.Due ? QueryUrl.Without(req, "due") : QueryUrl.With(req, "due", "true"))"
+       title="@Model.FollowUpAfterDays gündür cevap gelmeyen lead'ler">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+        Takip bekleyen <span class="stage-chip-count">@Model.DueCount</span>
+    </a>
+    @foreach (var s in Enum.GetValues<LeadStatus>())
+    {
+        <a class="stage-chip @LeadStatusDisplay.Css(s) @(Model.Status == s ? "is-active" : "")" href="@StatusUrl(s)">
+            @LeadStatusDisplay.Label(s) <span class="stage-chip-count">@StatusCount(s)</span>
+        </a>
+    }
+</nav>
+
+@* ---------- Detayli filtre cekmecesi ---------- *@
+<div class="offcanvas offcanvas-end filter-drawer" tabindex="-1" id="filterDrawer" aria-labelledby="filterDrawerTitle">
+    <form method="get" asp-action="Index" class="fd-form" data-list-filter>
+        <div class="fd-head">
+            <span class="fd-head-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18M6 12h12M10 19h4" /></svg>
+            </span>
+            <div class="flex-grow-1">
+                <h2 class="fd-title" id="filterDrawerTitle">Detaylı filtre</h2>
+                <div class="fd-sub">@Model.Pager.TotalItems lead bu filtrede</div>
+            </div>
+            <button type="button" class="fd-icon-btn" data-bs-dismiss="offcanvas" aria-label="Kapat">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+            </button>
+        </div>
+
+        <div class="fd-body">
+            <section class="fd-section" id="fdSort">
+                <div class="fd-section-head"><h3>Sıralama</h3></div>
+                <div class="fd-sort-grid">
+                    @foreach (var o in LeadSort.Options)
+                    {
+                        <label class="fd-radio">
+                            <input type="radio" name="sort" value="@o.Key" @(Model.Sort == o.Key ? "checked" : "") />
+                            <span>@o.Label</span>
+                        </label>
+                    }
+                </div>
+            </section>
+
+            <section class="fd-section">
+                <div class="fd-section-head"><h3>Arama</h3></div>
+                <div class="fd-input">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+                    <input type="search" name="q" value="@Model.Query" placeholder="Kişi adı, ünvan, firma veya e-posta" />
+                </div>
+            </section>
+
+            <section class="fd-section">
+                <div class="fd-section-head"><h3>Durum</h3></div>
+                <div class="fd-pills">
+                    <label class="fd-pill">
+                        <input type="radio" name="status" value="" @(Model.Status is null ? "checked" : "") />
+                        <span>Tümü</span>
+                    </label>
+                    @foreach (var s in Enum.GetValues<LeadStatus>())
+                    {
+                        <label class="fd-pill">
+                            <input type="radio" name="status" value="@s" @(Model.Status == s ? "checked" : "") />
+                            <span>@LeadStatusDisplay.Label(s)</span>
+                        </label>
+                    }
+                </div>
+            </section>
+
+            <section class="fd-section">
+                <div class="fd-section-head"><h3>İletişim</h3></div>
+                <div class="fd-segment">
+                    <label><input type="radio" name="contact" value="" @(Model.Contact is null ? "checked" : "") /><span>Tümü</span></label>
+                    <label><input type="radio" name="contact" value="yes" @(Model.Contact == "yes" ? "checked" : "") /><span>Kuruldu</span></label>
+                    <label><input type="radio" name="contact" value="no" @(Model.Contact == "no" ? "checked" : "") /><span>Kurulmadı</span></label>
+                </div>
+            </section>
+
+            <section class="fd-section">
+                <div class="fd-section-head"><h3>E-posta adresi</h3></div>
+                <div class="fd-segment">
+                    <label><input type="radio" name="email" value="" @(Model.Email is null ? "checked" : "") /><span>Tümü</span></label>
+                    <label><input type="radio" name="email" value="open" @(Model.Email == "open" ? "checked" : "") /><span>Açık</span></label>
+                    <label><input type="radio" name="email" value="closed" @(Model.Email == "closed" ? "checked" : "") /><span>Kapalı</span></label>
+                </div>
+            </section>
+
+            <partial name="_GeoFilter" model="Model.Geo" />
+        </div>
+
+        <div class="fd-foot">
+            <a class="btn btn-light" asp-action="Index">Temizle</a>
+            <button type="submit" class="btn btn-accent flex-grow-1">Sonuçları göster</button>
+        </div>
+    </form>
+</div>
+
+<form id="leadActionForm" method="post" class="d-none">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="returnUrl" value="@returnUrl" />
+</form>
+
+@if (Model.Leads.Count == 0)
+{
+    <div class="card">
+        <div class="empty-state">
+            <div class="empty-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6" />
+                </svg>
+            </div>
+            <div class="empty-title">@(Model.HasFilter ? "Bu filtrede lead yok" : "Henüz lead yok")</div>
+            <div class="mb-3">Firma detayında kişi seçip "Lead oluştur" ile başlayabilirsiniz.</div>
+            <a class="btn btn-sm btn-primary" asp-controller="Company" asp-action="Index">Firmalara git</a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="lead-grid">
+        @foreach (var lead in Model.Leads)
+        {
+            var person = PersonDisplay.DisplayName(lead.Contact);
+            var hasEmail = !string.IsNullOrWhiteSpace(lead.Contact?.Email);
+            var canReveal = !hasEmail && !string.IsNullOrWhiteSpace(lead.Contact?.ApolloId);
+            var tenure = lead.Contact?.TenureText();
+
+            <article class="lead-card">
+                <a class="lead-card-main" asp-action="Details" asp-route-id="@lead.Id">
+                    <div class="lead-card-top">
+                        <span class="avatar avatar-lg avatar-hue-@PersonDisplay.Hue(person)">@PersonDisplay.Initials(person)</span>
+                        <div class="lead-card-titles">
+                            <div class="lead-card-name">@person</div>
+                            <div class="lead-card-title">@(lead.Contact?.Title ?? "Ünvan bilinmiyor")</div>
+                        </div>
+                        <span class="lead-status @LeadStatusDisplay.Css(lead.Status)">@LeadStatusDisplay.Label(lead.Status)</span>
+                    </div>
+
+                    <div class="lead-card-company">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4" />
+                        </svg>
+                        <span>@lead.Company?.Name</span>
+                        @if (!string.IsNullOrWhiteSpace(lead.Company?.City))
+                        {
+                            <span class="text-muted-2">· @lead.Company.City</span>
+                        }
+                    </div>
+
+                    <div class="lead-card-facts">
+                        <div class="lead-fact">
+                            <span class="dot @(hasEmail ? "dot-ok" : "dot-off")"></span>
+                            <span class="text-truncate">@(hasEmail ? lead.Contact!.Email : "E-posta kapalı")</span>
+                        </div>
+                        @if (tenure is not null)
+                        {
+                            <div class="lead-fact">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+                                </svg>
+                                <span>@tenure bu şirkette</span>
+                            </div>
+                        }
+                        @if (Model.EmailCounts.TryGetValue(lead.Id, out var mailCount))
+                        {
+                            <div class="lead-fact text-mailed">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" />
+                                </svg>
+                                <span>@mailCount e-posta gönderildi</span>
+                            </div>
+                        }
+                        <partial name="_LeadWait" model="new LeadWaitModel(lead, Model.FollowUpAfterDays)" />
+                    </div>
+                </a>
+
+                <div class="lead-card-actions">
+                    <button type="submit" form="leadActionForm"
+                            formaction="@Url.Action("Toggle", new { id = lead.Id, what = "contacted" })"
+                            class="action-btn action-contacted @(lead.ContactedAt is not null ? "is-active" : "")"
+                            data-lead-toggle aria-pressed="@(lead.ContactedAt is not null ? "true" : "false")">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z" />
+                        </svg>
+                        <span class="action-label">İletişim kuruldu</span>
+                        <span class="action-date">@(lead.ContactedAt?.ToLocalTime().ToString("dd.MM"))</span>
+                    </button>
+                    <button type="submit" form="leadActionForm"
+                            formaction="@Url.Action("Toggle", new { id = lead.Id, what = "mailed" })"
+                            class="action-btn action-mailed @(lead.SentAt is not null ? "is-active" : "")"
+                            data-lead-toggle aria-pressed="@(lead.SentAt is not null ? "true" : "false")">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-10 6L2 7" />
+                        </svg>
+                        <span class="action-label">Mail atıldı</span>
+                        <span class="action-date">@(lead.SentAt?.ToLocalTime().ToString("dd.MM"))</span>
+                    </button>
+                    @if (canReveal)
+                    {
+                        <button type="submit" form="leadActionForm"
+                                formaction="@Url.Action("RevealEmail", new { id = lead.Id })"
+                                class="action-btn action-reveal" data-reveal
+                                title="Apollo'dan e-postayı açar (1 kredi harcar)"
+                                data-confirm="Kişinin e-postası Apollo'dan açılacak; bunun için 1 kredi harcanır."
+                                data-confirm-title="E-posta getirilsin mi?" data-confirm-subject="@PersonDisplay.DisplayName(lead.Contact)"
+                                data-confirm-ok="1 kredi harca ve getir" data-confirm-tone="credit">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                            </svg>
+                            <span class="action-label">E-postayı aç</span>
+                        </button>
+                    }
+                    else if (hasEmail)
+                    {
+                        <a class="action-btn action-compose" asp-controller="Email" asp-action="Compose" asp-route-leadId="@lead.Id">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                            </svg>
+                            <span class="action-label">E-posta yaz</span>
+                        </a>
+                    }
+                </div>
+            </article>
+        }
+    </div>
+    <partial name="_Pager" model="Model.Pager" />
+}
+
+@section Scripts {
+<script src="~/js/list-filter.js" asp-append-version="true"></script>
+<script>
+    (function () {
+        var tokenInput = document.querySelector('#leadActionForm input[name="__RequestVerificationToken"]');
+        var token = tokenInput ? tokenInput.value : '';
+
+        // Iletisim / mail isaretleri sayfa yenilemeden degisir.
+        document.querySelectorAll('[data-lead-toggle]').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                if (btn.disabled) return;
+                btn.disabled = true;
+
+                var body = new FormData();
+                body.append('__RequestVerificationToken', token);
+
+                fetch(btn.getAttribute('formaction'), { method: 'POST', body: body, headers: { Accept: 'application/json' } })
+                    .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+                    .then(function (d) {
+                        btn.classList.toggle('is-active', d.active);
+                        btn.setAttribute('aria-pressed', d.active ? 'true' : 'false');
+                        btn.querySelector('.action-date').textContent = d.active ? d.at.slice(0, 5) : '';
+                        var pill = btn.closest('.lead-card').querySelector('.lead-status');
+                        pill.textContent = d.statusLabel;
+                        pill.className = 'lead-status ' + d.statusCss;
+                        btn.classList.add('just-toggled');
+                        setTimeout(function () { btn.classList.remove('just-toggled'); }, 450);
+                    })
+                    .catch(function () { egToast.error('İşlem kaydedilemedi, sayfayı yenileyip tekrar deneyin.'); })
+                    .finally(function () { btn.disabled = false; });
+            });
+        });
+
+        // E-posta acma kredi harcar: onay penceresi data-confirm ile (site.js).
+        // Bu dinleyici yalnizca onay verildikten sonraki gonderimde calisir.
+        document.getElementById('leadActionForm')?.addEventListener('submit', function (e) {
+            var btn = e.submitter;
+            if (!btn || !btn.hasAttribute('data-reveal')) return;
+            setTimeout(function () {
+                btn.disabled = true;
+                btn.querySelector('.action-label').textContent = 'Açılıyor...';
+            }, 0);
+        });
+    })();
+</script>
+}

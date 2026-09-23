@@ -1,0 +1,177 @@
+@model CompanyDetailViewModel
+@{
+    ViewData["Title"] = $"{Model.Company.Name} — rapor";
+    var c = Model.Company;
+    var a = Model.Analysis;
+    var rating = Model.Rating;
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+}
+
+<div class="report">
+    <div class="report-actions no-print">
+        <a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@c.Id">← Firma detayı</a>
+        <button type="button" class="btn btn-sm btn-accent" onclick="window.print()">Yazdır / PDF</button>
+    </div>
+
+    <header class="report-head">
+        <img class="report-logo" src="~/img/logo.png" asp-append-version="true" width="46" height="46" alt="" />
+        <div class="report-head-main">
+            <h1>@c.Name</h1>
+            <div class="report-meta">
+                @if (!string.IsNullOrWhiteSpace(c.Domain))
+                {
+                    <span>@c.Domain</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(c.Industry))
+                {
+                    <span>@c.Industry</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(c.City))
+                {
+                    <span>@c.City</span>
+                }
+            </div>
+        </div>
+        <div class="report-score">
+            <div class="report-score-value">@c.Score</div>
+            <div class="report-score-label">lead puanı</div>
+            @if (RatingSignalDisplay.HasSignal(c.RatingSignal))
+            {
+                <div class="report-signal">
+                    <span class="signal-pip @RatingSignalDisplay.PipCss(c.RatingSignal)"></span>
+                    @RatingSignalDisplay.Label(c.RatingSignal)
+                </div>
+            }
+        </div>
+    </header>
+
+    <section class="report-section">
+        <h2>Puan dökümü</h2>
+        @if (Model.Breakdown?.DisqualifiedReason is not null)
+        {
+            <p class="report-note">Firma elendi: @Model.Breakdown.DisqualifiedReason</p>
+        }
+        else if (Model.Breakdown is null || Model.Breakdown.Items.Count == 0)
+        {
+            <p class="report-note">Puan dökümü yok.</p>
+        }
+        else
+        {
+            <ul class="report-list">
+                @foreach (var item in Model.Breakdown.Items)
+                {
+                    <li><span>@item.Reason</span><strong>@(item.Points > 0 ? "+" : "")@item.Points</strong></li>
+                }
+                <li class="report-total"><span>Toplam</span><strong>@Model.Breakdown.Total</strong></li>
+            </ul>
+        }
+    </section>
+
+    <section class="report-section">
+        <h2>Yapay zeka analizi</h2>
+        @if (a is null)
+        {
+            <p class="report-note">Bu firma için analiz yapılamadı.</p>
+        }
+        else
+        {
+            <div class="report-tags">
+                <span class="tag tag-muted">@(a.Sap switch { "yes" => "SAP kullanıyor", "likely" => "SAP ihtimali yüksek", "no" => "SAP kullanmıyor", _ => "SAP durumu bilinmiyor" })</span>
+                @if (a.Manufacturer)
+                {
+                    <span class="tag tag-muted">Üretici</span>
+                }
+                @if (a.SapVendor)
+                {
+                    <span class="tag tag-muted">SAP satıcısı (rakip)</span>
+                }
+            </div>
+            @if (!string.IsNullOrWhiteSpace(a.Reason))
+            {
+                <p>@a.Reason</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(a.SapEvidence))
+            {
+                <blockquote class="report-quote">@a.SapEvidence</blockquote>
+            }
+            @if (a.Products.Count > 0)
+            {
+                <p class="report-note"><strong>Ürünler:</strong> @string.Join(", ", a.Products)</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(a.EmployeeSizeHint))
+            {
+                <p class="report-note"><strong>Çalışan sayısı:</strong> @a.EmployeeSizeHint</p>
+            }
+        }
+    </section>
+
+    <section class="report-section">
+        <h2>Ön araştırma</h2>
+        @if (rating is null)
+        {
+            <p class="report-note">Bu firma henüz araştırılmadı.</p>
+        }
+        else
+        {
+            <p class="report-note">
+                Sinyal: <strong>@RatingSignalDisplay.Label(c.RatingSignal)</strong>
+                @if (rating.RatedAt is not null)
+                {
+                    <span>· @rating.RatedAt.Value.ToLocalTime().ToString("d MMMM yyyy", tr)</span>
+                }
+                @if (rating.Confidence is not null)
+                {
+                    <span>· güven %@rating.Confidence</span>
+                }
+            </p>
+            @if (!string.IsNullOrWhiteSpace(rating.Rating.Summary))
+            {
+                <p>@rating.Rating.Summary</p>
+            }
+            @if (rating.Notes.Count > 0)
+            {
+                <ul class="report-bullets">
+                    @foreach (var note in rating.Notes)
+                    {
+                        <li>@note.Reason</li>
+                    }
+                </ul>
+            }
+        }
+    </section>
+
+    <section class="report-section">
+        <h2>Kişiler (@c.Contacts.Count)</h2>
+        @if (c.Contacts.Count == 0)
+        {
+            <p class="report-note">Kayıtlı kişi yok.</p>
+        }
+        else
+        {
+            <table class="report-table">
+                <thead>
+                    <tr><th>Ad</th><th>Ünvan</th><th>E-posta</th><th>Telefon</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var contact in c.Contacts.Take(15))
+                    {
+                        <tr>
+                            <td>@PersonDisplay.DisplayName(contact)</td>
+                            <td>@contact.Title</td>
+                            <td>@contact.Email</td>
+                            <td>@contact.Phone</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+
+    <footer class="report-foot">
+        Egebis Lead Finder · @DateTime.Now.ToString("d MMMM yyyy HH:mm", tr)
+        @if (!string.IsNullOrWhiteSpace(c.Website))
+        {
+            <span>· @c.Website</span>
+        }
+    </footer>
+</div>

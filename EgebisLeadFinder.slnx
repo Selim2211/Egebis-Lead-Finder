@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="EgebisLeadFinder.Tests/EgebisLeadFinder.Tests.csproj" />
+  <Project Path="EgebisLeadFinder/EgebisLeadFinder.csproj" />
+</Solution>

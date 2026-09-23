@@ -1,0 +1,289 @@
+@model DashboardViewModel
+@{
+    ViewData["Title"] = "Panel";
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+
+    // Grafikler kutuphanesiz; yuzdeler burada hesaplanir.
+    int Pct(int value, int max) => max <= 0 || value <= 0 ? 0 : Math.Max(3, (int)Math.Round(100.0 * value / max));
+
+    var leadCount = Model.Funnel.FirstOrDefault(f => f.Label == "Lead açıldı")?.Count ?? 0;
+    var repliedCount = Model.Funnel.FirstOrDefault(f => f.Label == "Cevap geldi")?.Count ?? 0;
+}
+
+<div class="page-head">
+    <div>
+        <h1>Panel</h1>
+        <div class="page-sub">Satış hunisi, bugünün işleri ve son hareketler</div>
+    </div>
+    <a class="btn btn-accent" asp-controller="Company" asp-action="Search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" class="me-1 align-text-bottom" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+        </svg>
+        Firma Ara
+    </a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <a class="stat-card stat-link" asp-controller="Company" asp-action="Index">
+            <div class="stat-label">Toplam Firma</div>
+            <div class="stat-value">@Model.TotalCompanies</div>
+            <div class="stat-note">@Model.PotentialLeads puanlı aday</div>
+        </a>
+    </div>
+    <div class="col-6 col-lg-3">
+        <a class="stat-card stat-link is-success" asp-controller="Lead" asp-action="Index">
+            <div class="stat-label">Lead açılan firma</div>
+            <div class="stat-value">@leadCount</div>
+            <div class="stat-note">@Model.Sent lead'e mail atıldı</div>
+        </a>
+    </div>
+    <div class="col-6 col-lg-3">
+        <a class="stat-card stat-link is-amber" asp-controller="Lead" asp-action="Index" asp-route-due="true">
+            <div class="stat-label">Takip bekleyen</div>
+            <div class="stat-value">@Model.DueLeads</div>
+            <div class="stat-note">@Model.FollowUpAfterDays gündür cevap yok</div>
+        </a>
+    </div>
+    <div class="col-6 col-lg-3">
+        <a class="stat-card stat-link is-info" asp-controller="Lead" asp-action="Index" asp-route-status="@LeadStatus.Ilgilendi">
+            <div class="stat-label">Cevap gelen</div>
+            <div class="stat-value">@repliedCount</div>
+            <div class="stat-note">@Model.EmailReady e-posta hazır</div>
+        </a>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        @* ---------- Satış hunisi ---------- *@
+        <div class="card mb-4">
+            <div class="card-header">Satış hunisi</div>
+            <div class="card-body">
+                <div class="funnel">
+                    @foreach (var step in Model.Funnel)
+                    {
+                        var first = Model.Funnel[0].Count;
+                        <a class="funnel-row" href="@step.Url">
+                            <span class="funnel-label">@step.Label</span>
+                            <span class="funnel-track">
+                                <span class="funnel-bar" style="width:@(Pct(step.Count, Model.FunnelMax))%"></span>
+                            </span>
+                            <span class="funnel-value">
+                                @step.Count
+                                @if (first > 0 && step.Count > 0)
+                                {
+                                    <span class="funnel-pct">%@(Math.Round(100.0 * step.Count / first))</span>
+                                }
+                            </span>
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* ---------- 7 günlük aktivite ---------- *@
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span>Son 7 gün</span>
+                <span class="chart-legend">
+                    <span class="legend-dot legend-mail"></span> gönderilen mail
+                    <span class="legend-dot legend-company"></span> eklenen firma
+                </span>
+            </div>
+            <div class="card-body">
+                @if (Model.ActivityMax == 0)
+                {
+                    <div class="text-muted-2 small">Son 7 günde hareket yok.</div>
+                }
+                else
+                {
+                    <div class="spark">
+                        @foreach (var day in Model.Activity)
+                        {
+                            <div class="spark-day" title="@day.Day.ToString("d MMMM", tr): @day.Mails mail, @day.Companies firma">
+                                <div class="spark-bars">
+                                    <span class="spark-bar spark-mail" style="height:@(Pct(day.Mails, Model.ActivityMax))%"></span>
+                                    <span class="spark-bar spark-company" style="height:@(Pct(day.Companies, Model.ActivityMax))%"></span>
+                                </div>
+                                <div class="spark-label">@day.Day.ToString("ddd", tr)</div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* ---------- En yüksek puanlı firmalar ---------- *@
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>En yüksek puanlı firmalar</span>
+                <a class="small fw-semibold" asp-controller="Company" asp-action="Index">Tümünü gör →</a>
+            </div>
+            @if (Model.TopCompanies.Count == 0)
+            {
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-5h6v5" />
+                        </svg>
+                    </div>
+                    <div class="empty-title">Henüz kayıtlı firma yok</div>
+                    <div class="mb-3">Sektör ve şehir seçip ilk aramanızı yapın.</div>
+                    <a class="btn btn-primary btn-sm" asp-controller="Company" asp-action="Search">Firma Ara</a>
+                </div>
+            }
+            else
+            {
+                <div class="top-list">
+                    @foreach (var company in Model.TopCompanies)
+                    {
+                        <a class="top-item" asp-controller="Company" asp-action="Details" asp-route-id="@company.Id">
+                            <partial name="_ScoreBadge" model="company.Score" />
+                            <span class="top-item-main">
+                                <span class="top-item-name">@company.Name</span>
+                                <span class="top-item-sub">
+                                    @company.Industry
+                                    @if (!string.IsNullOrWhiteSpace(company.City))
+                                    {
+                                        <span>· @company.City</span>
+                                    }
+                                </span>
+                            </span>
+                            @if (RatingSignalDisplay.HasSignal(company.RatingSignal))
+                            {
+                                <span class="signal-pip @RatingSignalDisplay.PipCss(company.RatingSignal)"
+                                      title="@RatingSignalDisplay.Label(company.RatingSignal)"></span>
+                            }
+                        </a>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        @* ---------- Bugün yapılacaklar ---------- *@
+        <div class="card mb-4">
+            <div class="card-header">Bugün yapılacaklar</div>
+            <div class="card-body">
+                @if (!Model.HasTodo)
+                {
+                    <div class="todo-empty">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+                        Bekleyen iş yok. Yeni firma araması yapabilirsiniz.
+                    </div>
+                }
+                else
+                {
+                    <div class="todo-list">
+                        @if (Model.DueLeads > 0)
+                        {
+                            <a class="todo-item is-due" asp-controller="Lead" asp-action="Index" asp-route-due="true">
+                                <span class="todo-count">@Model.DueLeads</span>
+                                <span class="todo-text">
+                                    <strong>lead takip bekliyor</strong>
+                                    <span>@Model.FollowUpAfterDays gündür cevap gelmedi</span>
+                                </span>
+                                <span class="todo-go" aria-hidden="true">→</span>
+                            </a>
+                        }
+                        @if (Model.ToReview > 0)
+                        {
+                            <a class="todo-item is-success" asp-controller="Company" asp-action="Index"
+                               asp-route-minScore="40" asp-route-onlyWithoutLead="true">
+                                <span class="todo-count">@Model.ToReview</span>
+                                <span class="todo-text">
+                                    <strong>firma lead bekliyor</strong>
+                                    <span>Puanı yüksek ama kimseyle lead açılmamış</span>
+                                </span>
+                                <span class="todo-go" aria-hidden="true">→</span>
+                            </a>
+                        }
+                        @if (Model.LeadsWithoutEmail > 0)
+                        {
+                            <a class="todo-item is-info" asp-controller="Lead" asp-action="Index" asp-route-email="closed">
+                                <span class="todo-count">@Model.LeadsWithoutEmail</span>
+                                <span class="todo-text">
+                                    <strong>lead'in e-postası kapalı</strong>
+                                    <span>Apollo'dan açılabilir (kredi harcar)</span>
+                                </span>
+                                <span class="todo-go" aria-hidden="true">→</span>
+                            </a>
+                        }
+                        @if (Model.UnresearchedCompanies > 0)
+                        {
+                            <a class="todo-item" asp-controller="Company" asp-action="Index" asp-route-signal="none">
+                                <span class="todo-count">@Model.UnresearchedCompanies</span>
+                                <span class="todo-text">
+                                    <strong>firma araştırılmamış</strong>
+                                    <span>Ticari sağlık sinyali yok</span>
+                                </span>
+                                <span class="todo-go" aria-hidden="true">→</span>
+                            </a>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* ---------- Ön araştırma sinyalleri ---------- *@
+        <div class="card mb-4">
+            <div class="card-header">Ön araştırma sinyalleri</div>
+            <div class="card-body">
+                @if (Model.SignalTotal == 0)
+                {
+                    <div class="text-muted-2 small">Henüz firma yok.</div>
+                }
+                else
+                {
+                    <div class="signal-bar" role="img" aria-label="Sinyal dağılımı">
+                        @foreach (var slice in Model.Signals.Where(s => s.Count > 0))
+                        {
+                            <span class="signal-seg seg-@slice.Key"
+                                  style="width:@(Math.Round(100.0 * slice.Count / Model.SignalTotal, 2).ToString(System.Globalization.CultureInfo.InvariantCulture))%"
+                                  title="@slice.Label: @slice.Count"></span>
+                        }
+                    </div>
+                    <div class="signal-legend">
+                        @foreach (var slice in Model.Signals)
+                        {
+                            <a class="signal-legend-item" asp-controller="Company" asp-action="Index" asp-route-signal="@slice.Key">
+                                <span class="signal-dot seg-@slice.Key"></span>
+                                <span>@slice.Label</span>
+                                <strong>@slice.Count</strong>
+                            </a>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* ---------- Son hareketler ---------- *@
+        <div class="card">
+            <div class="card-header">Son hareketler</div>
+            @if (Model.Recent.Count == 0)
+            {
+                <div class="card-body text-muted-2 small">Henüz hareket yok.</div>
+            }
+            else
+            {
+                <div class="feed">
+                    @foreach (var e in Model.Recent)
+                    {
+                        <a class="feed-item feed-@e.Kind" href="@e.Url">
+                            <span class="feed-dot"></span>
+                            <span class="feed-body">
+                                <span class="feed-title">@e.Title</span>
+                                <span class="feed-subject">@e.Subject</span>
+                            </span>
+                            <span class="feed-date">@e.At.ToLocalTime().ToString("dd.MM HH:mm")</span>
+                        </a>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>

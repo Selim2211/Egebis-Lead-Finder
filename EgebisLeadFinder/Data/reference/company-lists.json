@@ -1,0 +1,144 @@
+{
+  "_hakkinda": "Elle güncellenen referans listesi. İSO 500 / İSO 1000, Capital 500, Fortune 500 Türkiye ve TİM 1000 (ihracatçı) listelerinde yer alan firmalar. On araştırmada firma adı bu listeyle eşleştirilir; eşleşirse 'büyük ölçekli / köklü / ihracatçı' sinyali üretilir. Kesin sıra numarası yerine bant (ilk 5 / ilk 20 / ilk 100 / listede) kullanılır; listeler yılda bir güncellenir. Bu dosyayı kod değiştirmeden genişletebilirsiniz.",
+  "guncellenme": "2024",
+  "firmalar": [
+    {
+      "ad": "Ford Otomotiv Sanayi A.Ş.",
+      "diğer_adlar": [ "Ford Otosan" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "ilk 3", "not": "üretimden satışlar bazında Türkiye'nin en büyük sanayi kuruluşlarından" },
+        { "liste": "TİM 1000", "yıl": 2023, "bant": "ilk 5", "not": "otomotiv ihracat lideri" }
+      ]
+    },
+    {
+      "ad": "Tofaş Türk Otomobil Fabrikası A.Ş.",
+      "diğer_adlar": [ "Tofaş" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "ilk 10", "not": "büyük ölçekli otomobil üreticisi" },
+        { "liste": "TİM 1000", "yıl": 2023, "bant": "ilk 20", "not": "önde gelen otomotiv ihracatçısı" }
+      ]
+    },
+    {
+      "ad": "Oyak Renault Otomobil Fabrikaları A.Ş.",
+      "diğer_adlar": [ "Oyak Renault" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "ilk 10", "not": "büyük ölçekli otomobil üreticisi" },
+        { "liste": "TİM 1000", "yıl": 2023, "bant": "ilk 10", "not": "önde gelen otomotiv ihracatçısı" }
+      ]
+    },
+    {
+      "ad": "Toyota Otomotiv Sanayi Türkiye A.Ş.",
+      "diğer_adlar": [ "Toyota Türkiye" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "ilk 20", "not": "büyük ölçekli otomobil üreticisi" },
+        { "liste": "TİM 1000", "yıl": 2023, "bant": "ilk 10", "not": "yüksek hacimli ihracatçı" }
+      ]
+    },
+    {
+      "ad": "Arçelik A.Ş.",
+      "diğer_adlar": [ "Arçelik" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "ilk 10", "not": "büyük ölçekli beyaz eşya üreticisi" },
+        { "liste": "Fortune 500 Türkiye", "yıl": 2023, "bant": "ilk 20", "not": "" }
+      ]
+    },
+    {
+      "ad": "Vestel Elektronik Sanayi ve Ticaret A.Ş.",
+      "diğer_adlar": [ "Vestel" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "ilk 20", "not": "büyük ölçekli elektronik/beyaz eşya üreticisi" }
+      ]
+    },
+    {
+      "ad": "Türkiye Şişe ve Cam Fabrikaları A.Ş.",
+      "diğer_adlar": [ "Şişecam" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "ilk 10", "not": "cam ve kimya alanında büyük ölçekli üretici grup" }
+      ]
+    },
+    {
+      "ad": "Trakya Cam Sanayii A.Ş.",
+      "diğer_adlar": [ "Trakya Cam" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "ilk 50", "not": "Şişecam grubu düz cam üreticisi" }
+      ]
+    },
+    {
+      "ad": "Ereğli Demir ve Çelik Fabrikaları T.A.Ş.",
+      "diğer_adlar": [ "Erdemir" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "ilk 5", "not": "entegre yassı çelik üreticisi" }
+      ]
+    },
+    {
+      "ad": "Kardemir Karabük Demir Çelik Sanayi ve Ticaret A.Ş.",
+      "diğer_adlar": [ "Kardemir" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "ilk 30", "not": "entegre uzun çelik üreticisi" }
+      ]
+    },
+    {
+      "ad": "İçdaş Çelik Enerji Tersane ve Ulaşım Sanayi A.Ş.",
+      "diğer_adlar": [ "İçdaş" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "ilk 20", "not": "büyük ölçekli çelik üreticisi" }
+      ]
+    },
+    {
+      "ad": "Çolakoğlu Metalurji A.Ş.",
+      "diğer_adlar": [ "Çolakoğlu" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "ilk 20", "not": "büyük ölçekli çelik üreticisi" }
+      ]
+    },
+    {
+      "ad": "Kroman Çelik Sanayii A.Ş.",
+      "diğer_adlar": [ "Kroman Çelik" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "ilk 100", "not": "inşaat/otomotiv çeliği üreticisi" }
+      ]
+    },
+    {
+      "ad": "Kordsa Teknik Tekstil A.Ş.",
+      "diğer_adlar": [ "Kordsa" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "ilk 150", "not": "lastik güçlendirme / kompozit üreticisi" }
+      ]
+    },
+    {
+      "ad": "Brisa Bridgestone Sabancı Lastik Sanayi ve Ticaret A.Ş.",
+      "diğer_adlar": [ "Brisa" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "ilk 50", "not": "büyük ölçekli lastik üreticisi" }
+      ]
+    },
+    {
+      "ad": "Beyçelik Gestamp Otomotiv Sanayi A.Ş.",
+      "diğer_adlar": [ "Beyçelik Gestamp" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "ilk 150", "not": "otomotiv metal şasi/pres parça üreticisi" }
+      ]
+    },
+    {
+      "ad": "Coşkunöz Metal Form Makina Endüstri ve Ticaret A.Ş.",
+      "diğer_adlar": [ "Coşkunöz" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "listede", "not": "otomotiv sac metal / kalıp üreticisi" }
+      ]
+    },
+    {
+      "ad": "Farplas Oto Yedek Parça İmalat ve Ticaret A.Ş.",
+      "diğer_adlar": [ "Farplas" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "listede", "not": "otomotiv plastik enjeksiyon parça üreticisi" }
+      ]
+    },
+    {
+      "ad": "Habaş Sınai ve Tıbbi Gazlar İstihsal Endüstrisi A.Ş.",
+      "diğer_adlar": [ "Habaş" ],
+      "üyelikler": [
+        { "liste": "İSO 500", "yıl": 2023, "bant": "ilk 10", "not": "çelik ve endüstriyel gaz üreticisi" }
+      ]
+    }
+  ]
+}

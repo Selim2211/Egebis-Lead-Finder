@@ -1,0 +1,13 @@
+@model int
+@{
+    // Renk esigi: 70+ sicak, 40+ orta, 1+ zayif, 0 elenmis.
+    var css = Model switch
+    {
+        >= 70 => "score-hot",
+        >= 40 => "score-warm",
+        > 0 => "score-cold",
+        _ => "score-out"
+    };
+    var label = Model == 0 ? "Elendi" : Model.ToString();
+}
+<span class="score @css">@label</span>

@@ -1,0 +1,235 @@
+@model EmailViewModel
+@{
+    ViewData["Title"] = "E-mail";
+    var recommended = Model.Templates.FirstOrDefault(t =>
+        string.Equals(t.Key, Model.RecommendedTemplateKey, StringComparison.OrdinalIgnoreCase));
+}
+
+<div class="page-head">
+    <div>
+        <h1>E-mail Hazırla</h1>
+        <div class="page-sub">Şablondan üretilen metni gözden geçirip gönderin</div>
+    </div>
+    <a class="btn btn-sm btn-outline-secondary" asp-controller="Lead" asp-action="Index">← Lead'ler</a>
+</div>
+
+@if (Model.StatusMessage is not null)
+{
+    <div class="alert @(Model.IsError ? "alert-danger" : "alert-success")" data-flash="@(Model.IsError ? "error" : "success")">
+        @Model.StatusMessage
+    </div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card mb-4">
+            <div class="card-header">Lead özeti</div>
+            <div class="card-body">
+                <div class="stat-label">Firma</div>
+                <div class="cell-title mb-3">
+                    <a asp-controller="Company" asp-action="Details" asp-route-id="@Model.Company.Id">
+                        @Model.Company.Name
+                    </a>
+                </div>
+
+                <div class="stat-label">Alıcı (lead)</div>
+                <a class="cell-title d-block" asp-controller="Lead" asp-action="Details" asp-route-id="@Model.Lead.Id">
+                    @PersonDisplay.DisplayName(Model.Contact)
+                </a>
+                <div class="cell-sub mb-2">@Model.Contact?.Title</div>
+                @if (Model.SalutationName is null)
+                {
+                    <div class="alert alert-warning small py-2 mb-3" data-flash="warning" data-flash-title="Hitap: Sayın Yetkili" data-flash-timeout="8000">
+                        Kişinin adı bilinmediği için hitapta <strong>"Sayın Yetkili"</strong> kullanıldı.
+                        Metinde düzeltebilirsiniz.
+                    </div>
+                }
+                else
+                {
+                    <div class="small text-muted-2 mb-3">Hitap: <strong>Sayın @Model.SalutationName</strong></div>
+                }
+
+                <div class="d-flex align-items-center gap-4">
+                    <div>
+                        <div class="stat-label mb-1">Skor</div>
+                        <partial name="_ScoreBadge" model="Model.Lead.Score" />
+                    </div>
+                    <div>
+                        <div class="stat-label mb-1">Durum</div>
+                        <span class="lead-status @LeadStatusDisplay.Css(Model.Lead.Status)">@LeadStatusDisplay.Label(Model.Lead.Status)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (recommended is not null)
+        {
+            <div class="card">
+                <div class="card-body">
+                    <div class="stat-label">@(Model.IsFollowUp ? "Takip önerisi" : "Yapay zeka önerisi")</div>
+                    <div class="d-flex align-items-center gap-2 my-2">
+                        <span class="tag @(Model.IsFollowUp ? "tag-amber" : "tag-success")">@recommended.Name</span>
+                    </div>
+                    @if (Model.IsFollowUp)
+                    {
+                        <div class="small text-muted-2">
+                            Bu kişiye daha önce @Model.History.Count e-posta gönderildi
+                            (son: @Model.History[0].SentAt.ToLocalTime().ToString("dd.MM.yyyy")).
+                            Takip şablonu seçildi; yukarıdan değiştirebilirsiniz.
+                        </div>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(Model.RecommendationReason))
+                    {
+                        <div class="small text-muted-2">@Model.RecommendationReason</div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header">Şablon</div>
+            <div class="card-body">
+                <form method="post" asp-action="Compose">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="leadId" value="@Model.Lead.Id" />
+
+                    <div class="input-group">
+                        <select class="form-select" name="templateId">
+                            @foreach (var template in Model.Templates)
+                            {
+                                <option value="@template.Id" selected="@(template.Id == Model.SelectedTemplateId)">
+                                    @template.Name
+                                    @(template.Key == Model.RecommendedTemplateKey ? " (önerilen)" : "")
+                                </option>
+                            }
+                        </select>
+                        <button class="btn btn-outline-secondary">Uygula</button>
+                    </div>
+                    <div class="form-text">
+                        Şablon değiştirmek aşağıdaki metni yeniden oluşturur, düzenlemeleriniz kaybolur.
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Mesaj</div>
+            <div class="card-body">
+                <form method="post" asp-action="Send" id="sendForm">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="leadId" value="@Model.Lead.Id" />
+                    <input type="hidden" name="templateId" value="@Model.SelectedTemplateId" />
+
+                    <div class="mb-3">
+                        <label class="form-label">Gönderen</label>
+                        @if (Model.SenderDisplay is not null)
+                        {
+                            <div class="sender-line">
+                                <span class="dot @(Model.SmtpEnabled ? "dot-ok" : "dot-off")"></span>
+                                <span>@Model.SenderDisplay</span>
+                                <a class="small ms-auto" asp-controller="Settings" asp-action="Index" asp-fragment="email-settings">değiştir</a>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="sender-line sender-line-missing">
+                                <span class="dot dot-off"></span>
+                                <span>Gönderen adres ayarlanmadı.</span>
+                                <a class="small ms-auto fw-semibold" asp-controller="Settings" asp-action="Index" asp-fragment="email-settings">Ayarlardan ekle →</a>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Alıcı</label>
+                        <input class="form-control" name="toAddress" id="toAddress" value="@Model.ToAddress"
+                               placeholder="ornek@firma.com" />
+                        @if (string.IsNullOrWhiteSpace(Model.ToAddress))
+                        {
+                            <div class="form-text text-warning">
+                                Bu firma için e-posta adresi bulunamadı, elle girmeniz gerekiyor.
+                            </div>
+                        }
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Konu</label>
+                        <input class="form-control" name="subject" id="subject" value="@Model.Subject" />
+                    </div>
+
+                    <partial name="_MailEditor" model="new MailEditorModel(Model.BodyHtml, Model.Body, Model.Images)" />
+                    @if (!Model.SmtpEnabled)
+                    {
+                        <div class="form-text mt-n2 mb-3">KOPYALA metni görselleriyle birlikte kopyalar; Outlook'a yapıştırabilirsiniz.</div>
+                    }
+
+                    <div class="d-flex gap-2 flex-wrap align-items-center">
+                        <button type="button" class="btn btn-outline-primary" id="copyButton">
+                            KOPYALA
+                        </button>
+
+                        @if (Model.SmtpEnabled)
+                        {
+                            <button type="submit" class="btn btn-accent" id="sendButton">GÖNDER</button>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-accent" disabled
+                                    title="Gönderen e-posta ayarlanmamış">GÖNDER</button>
+                        }
+
+                        @* Ayni formun metni (alici/konu/govde) lead gecmisine yazilsin diye formaction. *@
+                        <button type="submit" class="btn btn-sm btn-outline-secondary ms-auto"
+                                formaction="@Url.Action("MarkSent")" formnovalidate>
+                            Dışarıdan gönderdim, kaydet
+                        </button>
+                    </div>
+                </form>
+
+                @if (!Model.SmtpEnabled)
+                {
+                    <div class="alert alert-secondary small mt-3 mb-0" data-flash="info" data-flash-title="Gönderen adres ayarlı değil" data-flash-timeout="9000">
+                        Uygulamadan göndermek için
+                        <a asp-controller="Settings" asp-action="Index" asp-fragment="email-settings">Ayarlar → E-posta Gönderimi</a>
+                        bölümüne gönderen adresinizi girin. O zamana kadar metni kopyalayıp Outlook'tan gönderebilir,
+                        sonra "Dışarıdan gönderdim, kaydet" ile lead geçmişine ekleyebilirsiniz.
+                    </div>
+                }
+
+                <div class="alert alert-warning small mt-3 mb-0" data-flash="info" data-flash-title="KVKK ve ticari elektronik ileti" data-flash-timeout="8000">
+
+                    Bu araç toplu gönderim yapmaz; her e-posta tek tek gözden geçirilip
+                    gönderilir. Kişisel verilerin işlenmesi ve ticari elektronik ileti
+                    gönderimi (İYS kaydı dâhil) yükümlülükleri gönderen tarafa aittir.
+                </div>
+            </div>
+        </div>
+
+        @if (Model.History.Count > 0)
+        {
+            <div class="card mt-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Bu kişiye daha önce gönderilenler</span>
+                    <span class="tag tag-muted">@Model.History.Count e-posta</span>
+                </div>
+                <partial name="_EmailHistory" model="Model.History" />
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+<script src="~/js/mail-editor.js" asp-append-version="true"></script>
+<script>
+    // Cift tiklamada ayni e-posta iki kez gitmesin.
+    document.getElementById('sendForm').addEventListener('submit', function (e) {
+        var b = document.getElementById('sendButton');
+        if (b && e.submitter === b) {
+            b.disabled = true;
+            b.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Gönderiliyor...';
+        }
+    });
+</script>
+}

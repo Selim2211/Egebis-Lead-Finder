@@ -1,0 +1,330 @@
+@model TemplateEditorViewModel
+@{
+    ViewData["Title"] = "Taslak Düzenleyici";
+    var c = Model.Current;
+    var aiLabels = EmailTemplate.AiKeys.ToDictionary(k => k.Key, k => k.Label);
+}
+
+<div class="page-head">
+    <div>
+        <h1>Taslak Düzenleyici</h1>
+        <div class="page-sub">E-posta taslaklarınızı düzenleyin; değişkenler her lead için otomatik doldurulur</div>
+    </div>
+    <a class="btn btn-accent d-inline-flex align-items-center gap-2" asp-action="Index" asp-route-create="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        Yeni taslak
+    </a>
+</div>
+
+@if (TempData["TemplateSaved"] is string saved)
+{
+    <div class="alert alert-success" data-flash="success">@saved</div>
+}
+@if (TempData["TemplateError"] is string tErr)
+{
+    <div class="alert alert-danger" data-flash="error">@tErr</div>
+}
+@if (Model.Error is not null)
+{
+    <div class="alert alert-danger" data-flash="error">@Model.Error</div>
+}
+
+<div class="tpl-layout">
+    <aside class="tpl-side">
+        <div class="tpl-search">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+            <input type="search" id="tplSearch" placeholder="Taslak ara..." autocomplete="off" aria-label="Taslak ara" />
+        </div>
+
+        <div class="tpl-count">@Model.Templates.Count taslak</div>
+
+        <nav class="tpl-list" id="tplList">
+            @if (Model.IsNew)
+            {
+                <div class="tpl-item is-current is-draft">
+                    <span class="tpl-item-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg></span>
+                    <span class="tpl-item-main">
+                        <span class="tpl-item-name">@(string.IsNullOrWhiteSpace(c.Name) ? "Yeni taslak" : c.Name)</span>
+                        <span class="tpl-item-sub">Kaydedilmedi</span>
+                    </span>
+                </div>
+            }
+            @foreach (var t in Model.Templates)
+            {
+                var sent = Model.SentCounts.GetValueOrDefault(t.Id);
+                <a class="tpl-item @(t.Id == c.Id ? "is-current" : "") @(t.Active ? "" : "is-inactive")"
+                   asp-action="Index" asp-route-id="@t.Id"
+                   data-search="@(t.Name + " " + t.Subject)">
+                    <span class="tpl-item-icon avatar-hue-@PersonDisplay.Hue(t.Name)">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
+                    </span>
+                    <span class="tpl-item-main">
+                        <span class="tpl-item-name">@t.Name</span>
+                        <span class="tpl-item-sub">@t.Subject</span>
+                        <span class="tpl-item-meta">
+                            @if (!t.Active)
+                            {
+                                <span class="tpl-pill is-muted">Pasif</span>
+                            }
+                            @if (t.Key is not null && aiLabels.ContainsKey(t.Key))
+                            {
+                                <span class="tpl-pill is-ai" title="Yapay zeka bu firmalar için önerir">AI · @aiLabels[t.Key]</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(t.BodyHtml) && t.BodyHtml.Contains("<img"))
+                            {
+                                <span class="tpl-pill" title="Görsel içeriyor">görselli</span>
+                            }
+                            @if (sent > 0)
+                            {
+                                <span class="tpl-pill">@sent gönderim</span>
+                            }
+                        </span>
+                    </span>
+                </a>
+            }
+            <div class="tpl-empty" id="tplEmpty" hidden>Eşleşen taslak yok.</div>
+        </nav>
+    </aside>
+
+    <section class="tpl-main">
+        <form method="post" asp-action="Save" id="tplForm" class="tpl-card" autocomplete="off">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@c.Id" />
+
+            <div class="tpl-card-head">
+                <div class="tpl-title-wrap">
+                    <input class="tpl-title" name="name" id="tplName" value="@c.Name" maxlength="150"
+                           placeholder="Taslak adı" aria-label="Taslak adı" required />
+                    <div class="tpl-title-meta">
+                        @if (Model.IsNew)
+                        {
+                            <span>Yeni taslak</span>
+                        }
+                        else if (c.UpdatedAt is not null)
+                        {
+                            <span>Son düzenleme @c.UpdatedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+                        }
+                        else
+                        {
+                            <span>Başlangıç taslağı</span>
+                        }
+                        <span class="tpl-dirty" id="tplDirty" hidden>· kaydedilmemiş değişiklik</span>
+                    </div>
+                </div>
+
+                <label class="tpl-switch" title="Pasif taslaklar e-posta ekranındaki listede görünmez">
+                    <input type="checkbox" name="active" value="true" @(c.Active ? "checked" : "") />
+                    <span class="tpl-switch-track"><span class="tpl-switch-thumb"></span></span>
+                    <span class="tpl-switch-label">Aktif</span>
+                </label>
+            </div>
+
+            <div class="tpl-card-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-8">
+                        <label class="form-label" for="tplSubject">Konu</label>
+                        <input class="form-control" name="subject" id="tplSubject" value="@c.Subject" maxlength="300"
+                               placeholder="ör. {COMPANY_NAME} için SAP çözümleri" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="tplKey">Yapay zeka eşlemesi</label>
+                        <select class="form-select" name="key" id="tplKey">
+                            <option value="">Yok (elle seçilir)</option>
+                            @foreach (var k in EmailTemplate.AiKeys)
+                            {
+                                <option value="@k.Key" selected="@(c.Key == k.Key)">@k.Label</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div class="tpl-mode" role="tablist" aria-label="Görünüm">
+                    <button type="button" class="tpl-mode-btn is-on" data-mode="edit" role="tab" aria-selected="true">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                        Düzenle
+                    </button>
+                    <button type="button" class="tpl-mode-btn" data-mode="preview" role="tab" aria-selected="false">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>
+                        Önizleme
+                    </button>
+                </div>
+
+                <div id="tplEditPane">
+                    <partial name="_MailEditor" model='new MailEditorModel(Model.BodyHtml, c.Body, Model.Images, Label: "Metin", ShowPlaceholders: true)' />
+                </div>
+
+                <div id="tplPreviewPane" hidden>
+                    <div class="tpl-preview">
+                        <div class="tpl-preview-head">
+                            <div class="tpl-preview-row"><span>Kimden</span> Egebis Bilişim</div>
+                            <div class="tpl-preview-row"><span>Kime</span> Ahmet Yılmaz · Örnek Makine A.Ş.</div>
+                            <div class="tpl-preview-subject" id="tplPreviewSubject"></div>
+                        </div>
+                        <div class="tpl-preview-body" id="tplPreviewBody"></div>
+                    </div>
+                    <div class="form-text">Değişkenler örnek bir lead ile dolduruldu. Vurgulu alanlar her lead için değişir.</div>
+                </div>
+
+                <div class="tpl-vars">
+                    <span class="stat-label">Değişkenler</span>
+                    @foreach (var p in EmailTemplate.Placeholders)
+                    {
+                        <button type="button" class="tpl-var" data-token="@p.Token" title="@p.Token — örnek: @p.Sample">@p.Label</button>
+                    }
+                    <span class="tpl-vars-hint">Tıklayınca imlecin olduğu yere (konu veya metin) eklenir</span>
+                </div>
+            </div>
+
+            <div class="tpl-actionbar">
+                @if (!Model.IsNew)
+                {
+                    <button type="submit" form="tplDuplicateForm" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>
+                        Kopyasını oluştur
+                    </button>
+                    <button type="submit" form="tplDeleteForm" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"
+                            data-confirm="Taslak kalıcı olarak silinecek. Daha önce gönderilen e-postalar lead geçmişinde kalır. Saklamak istiyorsanız silmek yerine Aktif anahtarını kapatabilirsiniz."
+                            data-confirm-title="Taslak silinsin mi?" data-confirm-subject="@c.Name"
+                            data-confirm-ok="Evet, sil" data-confirm-tone="danger">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="m19 6-1 14H6L5 6" /></svg>
+                        Sil
+                    </button>
+                }
+                <span class="ms-auto tpl-shortcut"><kbd>Ctrl</kbd>+<kbd>S</kbd></span>
+                @if (!Model.IsNew)
+                {
+                    <a class="btn btn-sm btn-light" asp-action="Index" asp-route-id="@c.Id" id="tplRevert">Vazgeç</a>
+                }
+                <button type="submit" class="btn btn-accent d-inline-flex align-items-center gap-2" id="tplSave">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /><path d="M17 21v-8H7v8M7 3v5h8" /></svg>
+                    @(Model.IsNew ? "Taslağı oluştur" : "Kaydet")
+                </button>
+            </div>
+        </form>
+
+        @if (!Model.IsNew)
+        {
+            <form method="post" asp-action="Duplicate" asp-route-id="@c.Id" id="tplDuplicateForm"></form>
+
+            <form method="post" asp-action="Delete" asp-route-id="@c.Id" id="tplDeleteForm"></form>
+        }
+    </section>
+</div>
+
+@section Scripts {
+<script src="~/js/mail-editor.js" asp-append-version="true"></script>
+<script>
+    (function () {
+        var form = document.getElementById('tplForm');
+        var subject = document.getElementById('tplSubject');
+        var editor = window.mailEditor;
+        var dirtyLabel = document.getElementById('tplDirty');
+        var samples = @Json.Serialize(EmailTemplate.Placeholders.ToDictionary(p => p.Token, p => p.Sample));
+        var dirty = false;
+        var saving = false;
+        var lastTarget = 'body';
+
+        // ---- liste arama ----
+        var search = document.getElementById('tplSearch');
+        search.addEventListener('input', function () {
+            var q = search.value.toLocaleLowerCase('tr').trim();
+            var shown = 0;
+            document.querySelectorAll('#tplList a.tpl-item').forEach(function (a) {
+                var hit = !q || a.dataset.search.toLocaleLowerCase('tr').indexOf(q) >= 0;
+                a.hidden = !hit;
+                if (hit) shown++;
+            });
+            document.getElementById('tplEmpty').hidden = shown > 0;
+        });
+
+        // ---- kaydedilmemis degisiklik takibi ----
+        function markDirty() {
+            if (dirty) return;
+            dirty = true;
+            dirtyLabel.hidden = false;
+            form.classList.add('is-dirty');
+        }
+        form.addEventListener('input', markDirty);
+        form.addEventListener('change', markDirty);
+        editor.element.addEventListener('input', markDirty);
+        new MutationObserver(markDirty).observe(editor.element, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'width'] });
+
+        // Kaydet, kopyala veya sil: sayfadan ayrilma uyarisi cikmasin.
+        document.addEventListener('submit', function () { saving = true; });
+        window.addEventListener('beforeunload', function (e) {
+            if (dirty && !saving) { e.preventDefault(); e.returnValue = ''; }
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                form.requestSubmit(document.getElementById('tplSave'));
+            }
+        });
+
+        // ---- degisken ekleme (konu veya metin; son odaklanilan alana) ----
+        subject.addEventListener('focus', function () { lastTarget = 'subject'; });
+        editor.element.addEventListener('focus', function () { lastTarget = 'body'; });
+
+        function insertToken(token) {
+            var active = document.activeElement;
+            if (active === subject) lastTarget = 'subject';
+            else if (editor.element.contains(active)) lastTarget = 'body';
+
+            if (lastTarget === 'subject') {
+                var s = subject.selectionStart ?? subject.value.length;
+                var e = subject.selectionEnd ?? s;
+                subject.setRangeText(token, s, e, 'end');
+                subject.focus();
+                markDirty();
+            } else {
+                editor.insertText(token);
+            }
+            renderPreview();
+        }
+
+        document.querySelectorAll('[data-token]').forEach(function (btn) {
+            btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+            btn.addEventListener('pointerdown', function () {
+                // Odak henuz butona gecmeden hangi alanda oldugumuzu yakala.
+                var active = document.activeElement;
+                if (active === subject) lastTarget = 'subject';
+                else if (editor.element.contains(active)) lastTarget = 'body';
+            });
+            btn.addEventListener('click', function () { insertToken(btn.dataset.token); });
+        });
+
+        // ---- onizleme ----
+        function fill(text, html) {
+            return Object.keys(samples).reduce(function (acc, token) {
+                var value = samples[token];
+                var rep = html ? '<mark class="tpl-sample">' + value + '</mark>' : value;
+                return acc.split(token).join(rep);
+            }, text);
+        }
+
+        function renderPreview() {
+            document.getElementById('tplPreviewSubject').textContent = fill(subject.value || '(konu yok)', false);
+            var clone = editor.element.cloneNode(true);
+            clone.querySelectorAll('.is-selected').forEach(function (n) { n.classList.remove('is-selected'); });
+            document.getElementById('tplPreviewBody').innerHTML = fill(clone.innerHTML, true);
+        }
+
+        var editPane = document.getElementById('tplEditPane');
+        var previewPane = document.getElementById('tplPreviewPane');
+        document.querySelectorAll('.tpl-mode-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var preview = btn.dataset.mode === 'preview';
+                if (preview) renderPreview();
+                editPane.hidden = preview;
+                previewPane.hidden = !preview;
+                document.querySelectorAll('.tpl-mode-btn').forEach(function (b) {
+                    var on = b === btn;
+                    b.classList.toggle('is-on', on);
+                    b.setAttribute('aria-selected', on);
+                });
+            });
+        });
+    })();
+</script>
+}

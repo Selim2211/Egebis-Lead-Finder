@@ -1,0 +1,431 @@
+@model CompanyListViewModel
+@{
+    ViewData["Title"] = "Firmalar";
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var req = Context.Request;
+
+    int Count(string key) => Model.StageCounts.TryGetValue(key, out var n) ? n : 0;
+    string StageUrl(string? stage) => QueryUrl.With(req, "stage", stage);
+
+    var stages = new (string? Key, string Label, string Css)[]
+    {
+        (null, "Tümü", "chip-all"),
+        (CompanyStage.Untouched, "Temas yok", "chip-untouched"),
+        (CompanyStage.Contacted, "İletişim kuruldu", "chip-contacted"),
+        (CompanyStage.Mailed, "Mail atıldı", "chip-mailed"),
+        (CompanyStage.Project, "Proje başladı", "chip-project")
+    };
+
+    var signals = new (string? Key, string Label, string Pip)[]
+    {
+        (null, "Tümü", ""),
+        ("guclu", "Güçlü", "pip-guclu"),
+        ("incelenmeli", "İncelenmeli", "pip-incelenmeli"),
+        ("riskli", "Riskli", "pip-riskli"),
+        ("none", "Araştırılmamış", "pip-none")
+    };
+
+    var sortLabel = CompanySort.Options.First(o => o.Key == Model.Sort).Label;
+    var profile = Model.Profiles.FirstOrDefault(p => p.Id == Model.ProfileId);
+
+    // Aktif filtre cipleri (x ile tek tek kaldirilir).
+    var chips = new List<(string Label, string Url)>();
+    if (!string.IsNullOrWhiteSpace(Model.Search)) chips.Add(($"“{Model.Search}”", QueryUrl.Without(req, "search")));
+    if (profile is not null) chips.Add(($"Profil: {profile.Name} ({SearchRegions.Get(profile.RegionKey ?? SearchRegions.ByCountry(profile.Country)?.Key).Name})", QueryUrl.Without(req, "profileId")));
+    if (Model.MinScore > 0) chips.Add(($"Skor ≥ {Model.MinScore}", QueryUrl.Without(req, "minScore")));
+    if (Model.OnlyWithoutLead) chips.Add(("Lead açılmamış", QueryUrl.Without(req, "onlyWithoutLead")));
+    if (Model.Signal is not null) chips.Add(($"AI: {signals.First(s => s.Key == Model.Signal).Label}", QueryUrl.Without(req, "signal")));
+    foreach (var k in Model.Geo.Countries) chips.Add((SearchRegions.Get(k).Name, QueryUrl.Without(req, "country", k)));
+    foreach (var r in Model.Geo.Regions) chips.Add(($"{r} bölgesi", QueryUrl.Without(req, "region", r)));
+    foreach (var c in Model.Geo.Cities) chips.Add((c, QueryUrl.Without(req, "city", c)));
+}
+
+<div class="page-head">
+    <div>
+        <h1>Firmalar</h1>
+        <div class="page-sub">Keşfedilen firmalar ve satış takibi</div>
+    </div>
+    <a class="btn btn-accent" asp-action="Search">Firma Ara</a>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(TempData["SettingsSaved"] as string))
+{
+    <div class="alert alert-success" data-flash="success">@TempData["SettingsSaved"]</div>
+}
+
+<div class="list-toolbar">
+    <form method="get" class="list-search" role="search">
+        @foreach (var kv in req.Query.Where(kv => kv.Key is not ("search" or "page")))
+        {
+            foreach (var v in kv.Value)
+            {
+                <input type="hidden" name="@kv.Key" value="@v" />
+            }
+        }
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+        <input type="search" name="search" value="@Model.Search" placeholder="Firma adı, sektör veya alan adı ara..." aria-label="Firma ara" />
+        <kbd class="list-search-kbd">Enter</kbd>
+    </form>
+
+    <button type="button" class="list-filter-btn @(Model.ActiveFilterCount > 0 ? "has-filters" : "")" data-bs-toggle="offcanvas" data-bs-target="#filterDrawer" aria-controls="filterDrawer">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18M6 12h12M10 19h4" /></svg>
+        Detaylı filtre
+        @if (Model.ActiveFilterCount > 0)
+        {
+            <span class="list-filter-count">@Model.ActiveFilterCount</span>
+        }
+    </button>
+
+    <button type="button" class="list-sort-btn" data-bs-toggle="offcanvas" data-bs-target="#filterDrawer" data-focus-sort>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 16 4 4 4-4M7 20V4M21 8l-4-4-4 4M17 4v16" /></svg>
+        <span class="list-sort-label">@sortLabel</span>
+    </button>
+</div>
+
+@if (chips.Count > 0)
+{
+    <div class="filter-chips">
+        @foreach (var chip in chips)
+        {
+            <a class="filter-chip" href="@chip.Url" title="Filtreyi kaldır">
+                @chip.Label
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+            </a>
+        }
+        <a class="filter-chip-clear" href="@Url.Action("Index", new { stage = Model.Stage })">Tümünü temizle</a>
+        @if (profile is not null && !string.IsNullOrWhiteSpace(profile.Industry))
+        {
+            @* Profilin kriterleriyle yeni arama: zaten kayitli firmalar tekrar islenmez. *@
+            <form method="post" class="d-inline-flex m-0"
+                  data-progress-start="@Url.Action("StartSearch")"
+                  data-progress-title="@profile.Name profili yeniden çalıştırılıyor"
+                  data-progress-hint="Yalnızca yeni bulunan firmalar işlenir; kayıtlı firmalar atlanır.">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="SubmitMode" value="@CompanySearchViewModel.ModeAdvancedSave" />
+                <input type="hidden" name="Criteria.Industry" value="@profile.Industry" />
+                <input type="hidden" name="Criteria.City" value="@profile.City" />
+                <input type="hidden" name="Criteria.ProfileName" value="@profile.Name" />
+                <button type="submit" class="filter-chip-action">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 3v6h-6" />
+                    </svg>
+                    Profili yeniden çalıştır
+                </button>
+            </form>
+        }
+        @if (profile is not null)
+        {
+            <button type="submit" form="deleteProfileForm" class="filter-chip-danger ms-auto"
+                    data-confirm="Firmalar silinmez; yalnızca bu profil ve firmalardaki profil etiketi kaldırılır."
+                    data-confirm-title="Arama profili silinsin mi?" data-confirm-subject="@profile.Name"
+                    data-confirm-ok="Profili sil" data-confirm-tone="danger">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="m19 6-1 14H6L5 6" /></svg>
+                Profili sil
+            </button>
+        }
+    </div>
+}
+
+@if (Model.ProfileId.HasValue)
+{
+    <form id="deleteProfileForm" method="post" asp-action="DeleteProfile" class="d-none">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="profileId" value="@Model.ProfileId" />
+    </form>
+}
+
+<nav class="stage-chips mb-4" aria-label="Satış aşaması filtresi">
+    @foreach (var s in stages)
+    {
+        <a class="stage-chip @s.Css @(Model.Stage == s.Key ? "is-active" : "")" href="@StageUrl(s.Key)">
+            @s.Label <span class="stage-chip-count">@Count(s.Key ?? "")</span>
+        </a>
+    }
+</nav>
+
+@* ---------- Detayli filtre cekmecesi ---------- *@
+<div class="offcanvas offcanvas-end filter-drawer" tabindex="-1" id="filterDrawer" aria-labelledby="filterDrawerTitle">
+    <form method="get" asp-action="Index" class="fd-form" data-list-filter>
+        @if (!string.IsNullOrEmpty(Model.Stage))
+        {
+            <input type="hidden" name="stage" value="@Model.Stage" />
+        }
+
+        <div class="fd-head">
+            <span class="fd-head-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18M6 12h12M10 19h4" /></svg>
+            </span>
+            <div class="flex-grow-1">
+                <h2 class="fd-title" id="filterDrawerTitle">Detaylı filtre</h2>
+                <div class="fd-sub">@Model.Pager.TotalItems firma bu filtrede</div>
+            </div>
+            <button type="button" class="fd-icon-btn" data-bs-dismiss="offcanvas" aria-label="Kapat">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+            </button>
+        </div>
+
+        <div class="fd-body">
+            <section class="fd-section" id="fdSort">
+                <div class="fd-section-head"><h3>Sıralama</h3></div>
+                <div class="fd-sort-grid">
+                    @foreach (var o in CompanySort.Options)
+                    {
+                        <label class="fd-radio">
+                            <input type="radio" name="sort" value="@o.Key" @(Model.Sort == o.Key ? "checked" : "") />
+                            <span>@o.Label</span>
+                        </label>
+                    }
+                </div>
+            </section>
+
+            <section class="fd-section">
+                <div class="fd-section-head"><h3>Arama</h3></div>
+                <div class="fd-input">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+                    <input type="search" name="search" value="@Model.Search" placeholder="Firma adı, sektör veya alan adı" />
+                </div>
+            </section>
+
+            <section class="fd-section">
+                <div class="fd-section-head"><h3>Arama profili</h3></div>
+                <select class="form-select" name="profileId">
+                    <option value="">Tüm firmalar</option>
+                    @foreach (var p in Model.Profiles)
+                    {
+                        <option value="@p.Id" selected="@(Model.ProfileId == p.Id)">
+                            @p.Name — @SearchRegions.Get(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key).Name — @p.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")
+                        </option>
+                    }
+                </select>
+            </section>
+
+            <section class="fd-section">
+                <div class="fd-section-head"><h3>Asgari skor</h3></div>
+                <div class="fd-segment">
+                    @foreach (var value in new[] { 0, 1, 40, 70 })
+                    {
+                        <label>
+                            <input type="radio" name="minScore" value="@value" @(Model.MinScore == value ? "checked" : "") />
+                            <span>@(value == 0 ? "Tümü" : $"{value}+")</span>
+                        </label>
+                    }
+                </div>
+            </section>
+
+            <section class="fd-section">
+                <div class="fd-section-head"><h3>AI ön araştırma sinyali</h3></div>
+                <div class="fd-pills">
+                    @foreach (var s in signals)
+                    {
+                        <label class="fd-pill">
+                            <input type="radio" name="signal" value="@(s.Key ?? "")" @(Model.Signal == s.Key ? "checked" : "") />
+                            <span>
+                                @if (s.Pip != "")
+                                {
+                                    <span class="fd-pip @s.Pip"></span>
+                                }
+                                @s.Label
+                            </span>
+                        </label>
+                    }
+                </div>
+            </section>
+
+            <section class="fd-section">
+                <label class="fd-toggle">
+                    <span>
+                        <span class="fd-toggle-title">Sadece lead açılmamış firmalar</span>
+                        <span class="fd-toggle-sub">Henüz kimseyle lead oluşturulmamış firmaları göster</span>
+                    </span>
+                    <input type="checkbox" name="onlyWithoutLead" value="true" @(Model.OnlyWithoutLead ? "checked" : "") />
+                    <span class="tpl-switch-track"><span class="tpl-switch-thumb"></span></span>
+                </label>
+            </section>
+
+            <partial name="_GeoFilter" model="Model.Geo" />
+        </div>
+
+        <div class="fd-foot">
+            <a class="btn btn-light" href="@Url.Action("Index", new { stage = Model.Stage })">Temizle</a>
+            <button type="submit" class="btn btn-accent flex-grow-1">Sonuçları göster</button>
+        </div>
+    </form>
+</div>
+
+
+@* Tek gizli form: kart butonlari formaction ile buraya gonderir (JS kapaliyken de calisir). *@
+<form id="stageForm" method="post" class="d-none">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="returnUrl" value="@returnUrl" />
+</form>
+
+@if (Model.Companies.Count == 0)
+{
+    <div class="card">
+        <div class="empty-state">
+            <div class="empty-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-5h6v5" />
+                </svg>
+            </div>
+            <div class="empty-title">Kayıt bulunamadı</div>
+            <div>Filtreyi gevşetin veya yeni bir arama yapın.</div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="company-grid">
+        @foreach (var company in Model.Companies)
+        {
+            var actions = new (string Stage, string Label, DateTime? At, string Css)[]
+            {
+                (CompanyStage.Contacted, "İletişim kuruldu", company.ContactedAt, "action-contacted"),
+                (CompanyStage.Mailed, "Mail atıldı", company.EmailSentAt, "action-mailed"),
+                (CompanyStage.Project, "Proje başladı", company.ProjectStartedAt, "action-project")
+            };
+
+            <article class="company-card @(company.ProjectStartedAt is not null ? "is-project" : "")" data-company-id="@company.Id">
+                <a class="company-card-main" asp-action="Details" asp-route-id="@company.Id">
+                    <div class="company-card-top">
+                        <span class="company-logo avatar-hue-@PersonDisplay.Hue(company.Name)">@PersonDisplay.Initials(company.Name)</span>
+                        <div class="company-card-titles">
+                            <div class="company-card-name">@company.Name</div>
+                            <div class="company-card-domain">@company.Domain</div>
+                        </div>
+                        <div class="company-card-score">
+                            <partial name="_ScoreBadge" model="company.Score" />
+                        </div>
+                    </div>
+
+                    <div class="company-card-meta">
+                        @if (!string.IsNullOrWhiteSpace(company.Industry))
+                        {
+                            <span class="meta-chip">@company.Industry</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(company.City))
+                        {
+                            <span class="meta-chip meta-chip-city">@company.City</span>
+                        }
+                        <span class="meta-chip meta-chip-muted">@company.Contacts.Count kişi</span>
+                        @if (company.Leads.Count > 0)
+                        {
+                            <span class="meta-chip meta-chip-lead">@company.Leads.Count lead</span>
+                        }
+                        @if (RatingSignalDisplay.HasSignal(company.RatingSignal))
+                        {
+                            <span class="meta-chip meta-chip-muted">
+                                <span class="signal-pip @RatingSignalDisplay.PipCss(company.RatingSignal)"></span>
+                                @RatingSignalDisplay.Label(company.RatingSignal)
+                            </span>
+                        }
+                    </div>
+                </a>
+
+                <div class="company-card-actions">
+                    @foreach (var a in actions)
+                    {
+                        <button type="submit" form="stageForm"
+                                formaction="@Url.Action("ToggleStage", new { id = company.Id, stage = a.Stage })"
+                                class="action-btn @a.Css @(a.At is not null ? "is-active" : "")"
+                                data-stage-toggle aria-pressed="@(a.At is not null ? "true" : "false")"
+                                title="@(a.At is not null ? $"{a.Label} · {a.At.Value.ToLocalTime():dd.MM.yyyy} — geri almak için tıklayın" : a.Label)">
+                            @switch (a.Stage)
+                            {
+                                case CompanyStage.Contacted:
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z" />
+                                    </svg>
+                                    break;
+                                case CompanyStage.Mailed:
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-10 6L2 7" />
+                                    </svg>
+                                    break;
+                                default:
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M4.5 16.5c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.7-.8.7-2.1-.1-2.9a2.2 2.2 0 0 0-2.9-.1z" />
+                                        <path d="m12 15-3-3a22 22 0 0 1 2-3.9A12.9 12.9 0 0 1 22 2c0 2.7-.8 7.5-6 11a22.4 22.4 0 0 1-4 2z" />
+                                        <path d="M9 12H4s.6-3 2-4c1.6-1.1 5 0 5 0M12 15v5s3-.6 4-2c1.1-1.6 0-5 0-5" />
+                                    </svg>
+                                    break;
+                            }
+                            <span class="action-label">@a.Label</span>
+                            <span class="action-date">@(a.At?.ToLocalTime().ToString("dd.MM"))</span>
+                        </button>
+                    }
+                    <button type="button" class="action-btn action-delete" title="Firmayı sil"
+                            data-delete-company="@company.Id" data-company-name="@company.Name">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" />
+                        </svg>
+                        <span class="action-label">Sil</span>
+                    </button>
+                </div>
+            </article>
+        }
+    </div>
+    <partial name="_Pager" model="Model.Pager" />
+}
+
+<form method="post" id="deleteCompanyForm" class="d-none">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="returnUrl" value="@returnUrl" />
+</form>
+
+@section Scripts {
+<script src="~/js/list-filter.js" asp-append-version="true"></script>
+<script>
+    (function () {
+        var token = document.querySelector('#stageForm input[name="__RequestVerificationToken"]').value;
+
+        // Asama butonlari: sayfa yenilemeden isaretle / geri al.
+        document.querySelectorAll('[data-stage-toggle]').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                if (btn.disabled) return;
+                btn.disabled = true;
+
+                var body = new FormData();
+                body.append('__RequestVerificationToken', token);
+
+                fetch(btn.getAttribute('formaction'), { method: 'POST', body: body, headers: { Accept: 'application/json' } })
+                    .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+                    .then(function (d) {
+                        btn.classList.toggle('is-active', d.active);
+                        btn.setAttribute('aria-pressed', d.active ? 'true' : 'false');
+                        btn.querySelector('.action-date').textContent = d.active ? d.at.slice(0, 5) : '';
+                        var label = btn.querySelector('.action-label').textContent;
+                        btn.title = d.active ? label + ' · ' + d.at + ' — geri almak için tıklayın' : label;
+                        if (btn.classList.contains('action-project')) {
+                            btn.closest('.company-card').classList.toggle('is-project', d.active);
+                        }
+                        btn.classList.add('just-toggled');
+                        setTimeout(function () { btn.classList.remove('just-toggled'); }, 450);
+                    })
+                    .catch(function () { egToast.error('İşlem kaydedilemedi, sayfayı yenileyip tekrar deneyin.'); })
+                    .finally(function () { btn.disabled = false; });
+            });
+        });
+
+        // Silme: onay penceresi (site.js egDialog).
+        var form = document.getElementById('deleteCompanyForm');
+        document.querySelectorAll('[data-delete-company]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                egDialog.confirm({
+                    tone: 'danger',
+                    title: 'Firma silinsin mi?',
+                    subject: btn.getAttribute('data-company-name'),
+                    message: 'Firma; kişileri, lead\'leri ve e-posta geçmişiyle birlikte kalıcı olarak silinecek. Bu işlem geri alınamaz.',
+                    okText: 'Evet, sil'
+                }).then(function (ok) {
+                    if (!ok) return;
+                    form.action = '@Url.Action("DeleteCompany")/' + btn.getAttribute('data-delete-company');
+                    form.submit();
+                });
+            });
+        });
+    })();
+</script>
+}

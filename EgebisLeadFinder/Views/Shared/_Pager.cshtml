@@ -1,0 +1,73 @@
+@model PagerModel
+@{
+    // Mevcut filtreler korunur, sadece "page" degisir.
+    string PageUrl(int page)
+    {
+        var parts = Context.Request.Query
+            .Where(kv => !string.Equals(kv.Key, "page", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(kv => kv.Value.Select(v => $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(v ?? "")}"))
+            .ToList();
+        if (page > 1) parts.Add($"page={page}");
+        return Context.Request.Path + (parts.Count > 0 ? "?" + string.Join("&", parts) : "");
+    }
+}
+
+@if (Model.TotalItems > 0)
+{
+    <nav class="pager" aria-label="Sayfalar">
+        <div class="pager-info">
+            <strong>@Model.From–@Model.To</strong> / @Model.TotalItems kayıt
+        </div>
+
+        @if (Model.TotalPages > 1)
+        {
+            <div class="pager-pages">
+                @if (Model.Page > 1)
+                {
+                    <a class="pager-btn pager-step" href="@PageUrl(Model.Page - 1)" rel="prev" aria-label="Önceki sayfa">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+                        <span>Önceki</span>
+                    </a>
+                }
+                else
+                {
+                    <span class="pager-btn pager-step is-disabled" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+                        <span>Önceki</span>
+                    </span>
+                }
+
+                @foreach (var p in Model.Window())
+                {
+                    if (p is null)
+                    {
+                        <span class="pager-gap" aria-hidden="true">…</span>
+                    }
+                    else if (p == Model.Page)
+                    {
+                        <span class="pager-btn is-current" aria-current="page">@p</span>
+                    }
+                    else
+                    {
+                        <a class="pager-btn" href="@PageUrl(p.Value)">@p</a>
+                    }
+                }
+
+                @if (Model.Page < Model.TotalPages)
+                {
+                    <a class="pager-btn pager-step" href="@PageUrl(Model.Page + 1)" rel="next" aria-label="Sonraki sayfa">
+                        <span>Sonraki</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                    </a>
+                }
+                else
+                {
+                    <span class="pager-btn pager-step is-disabled" aria-hidden="true">
+                        <span>Sonraki</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                    </span>
+                }
+            </div>
+        }
+    </nav>
+}

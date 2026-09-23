@@ -1,0 +1,97 @@
+@model MailEditorModel
+@* E-posta editoru (Compose + Taslak Duzenleyici). Davranis: wwwroot/js/mail-editor.js *@
+
+<div class="mb-3">
+    <label class="form-label" for="bodyEditor">@Model.Label</label>
+    <div class="mail-editor" id="mailEditor"
+         data-upload-url="@Url.Action("UploadImage", "Email")"
+         data-remove-url="@Url.Action("RemoveFromLibrary", "Email")">
+        <div class="mail-toolbar" role="toolbar" aria-label="Biçim">
+            <button type="button" class="mt-btn" data-cmd="bold" title="Kalın (Ctrl+B)"><b>B</b></button>
+            <button type="button" class="mt-btn" data-cmd="italic" title="İtalik (Ctrl+I)"><i>I</i></button>
+            <button type="button" class="mt-btn" data-cmd="underline" title="Altı çizili (Ctrl+U)"><u>U</u></button>
+            <span class="mt-sep"></span>
+            <label class="mt-btn mt-btn-wide" title="Bilgisayardan görsel ekle">
+                <input type="file" accept="image/png,image/jpeg,image/gif" id="inlineFile" hidden />
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="9" cy="9" r="2" /><path d="m21 15-5-5L5 21" /></svg>
+                Görsel ekle
+            </label>
+            @if (Model.ShowPlaceholders)
+            {
+                <span class="mt-sep"></span>
+                <div class="dropdown">
+                    <button type="button" class="mt-btn mt-btn-wide dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Lead'e göre otomatik dolan alan ekle">
+                        <span class="mt-var-glyph">{ }</span> Değişken
+                    </button>
+                    <ul class="dropdown-menu mt-var-menu">
+                        @foreach (var p in EmailTemplate.Placeholders)
+                        {
+                            <li>
+                                <button type="button" class="dropdown-item" data-token="@p.Token">
+                                    <span>@p.Label</span>
+                                    <code>@p.Token</code>
+                                </button>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+            <span class="mt-hint">Görseli buraya <kbd>Ctrl</kbd>+<kbd>V</kbd> ile yapıştırın veya sürükleyin</span>
+        </div>
+
+        <div class="mail-canvas" id="bodyEditor" contenteditable="true" spellcheck="true"
+             role="textbox" aria-multiline="true">@Html.Raw(Model.BodyHtml)</div>
+
+        <div class="img-bar" id="imgBar" hidden>
+            <button type="button" data-align="left" title="Sola yasla, metin sağından aksın">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="8" height="8" rx="1" /><path d="M15 6h6M15 10h6M3 17h18" /></svg>
+            </button>
+            <button type="button" data-align="center" title="Ortala">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="7" y="4" width="10" height="9" rx="1" /><path d="M3 17h18M6 21h12" /></svg>
+            </button>
+            <button type="button" data-align="right" title="Sağa yasla, metin solundan aksın">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="13" y="5" width="8" height="8" rx="1" /><path d="M3 6h6M3 10h6M3 17h18" /></svg>
+            </button>
+            <button type="button" data-align="inline" title="Satır içi (yazıyla aynı satırda)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h4" /><rect x="9" y="8" width="6" height="8" rx="1" /><path d="M17 12h4" /></svg>
+            </button>
+            <span class="img-bar-sep"></span>
+            <button type="button" data-size="-1" title="Küçült">−</button>
+            <span class="img-bar-size" id="imgBarSize">160px</span>
+            <button type="button" data-size="1" title="Büyüt">+</button>
+            <span class="img-bar-sep"></span>
+            <button type="button" data-action="remove" class="is-danger" title="Görseli metinden çıkar">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="m19 6-1 14H6L5 6" /></svg>
+            </button>
+        </div>
+        <div class="img-handle" id="imgHandle" hidden title="Sürükleyerek boyutlandırın"></div>
+        <div class="mail-drop" id="mailDrop" hidden>Görseli bırakın</div>
+    </div>
+    <input type="hidden" name="body" id="bodyText" value="@Model.Body" />
+    <input type="hidden" name="bodyHtml" id="bodyHtml" />
+    <div class="form-text">
+        Görsele tıklayınca konum ve boyut araçları çıkar; köşesinden tutup büyütebilir, sürükleyip metinde başka yere taşıyabilirsiniz.
+    </div>
+    <div class="alert alert-danger small py-2 mt-2 mb-0" id="imgError" hidden></div>
+</div>
+
+<div class="mb-3">
+    <div class="stat-label mb-2">Kayıtlı görseller <span class="text-muted-2 fw-normal text-lowercase">— tıklayınca imlecin olduğu yere eklenir</span></div>
+    <div class="img-lib" id="imgLib">
+        @foreach (var image in Model.Images)
+        {
+            <div class="img-chip" data-id="@image.Id" data-name="@image.Name" data-url="@Url.Action("Image", "Email", new { id = image.Id })">
+                <button type="button" class="img-chip-insert" title="Metne ekle">
+                    <span class="img-chip-thumb"><img src="@Url.Action("Image", "Email", new { id = image.Id })" alt="" /></span>
+                    <span class="img-chip-name">@image.Name</span>
+                </button>
+                <button type="button" class="img-chip-del" title="Listeden kaldır" aria-label="Listeden kaldır">×</button>
+            </div>
+        }
+        <label class="img-chip img-chip-add" title="Logo gibi sık kullanılan görseli kaydedin">
+            <input type="file" accept="image/png,image/jpeg,image/gif" id="libFile" hidden />
+            <span class="img-chip-thumb">+</span>
+            <span class="img-chip-name">Logo kaydet</span>
+        </label>
+    </div>
+</div>

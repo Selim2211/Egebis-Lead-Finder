@@ -1,0 +1,489 @@
+@model CompanyDetailViewModel
+@{
+    ViewData["Title"] = Model.Company.Name;
+    var analysis = Model.Analysis;
+
+    // SAP durumunu okunabilir etikete cevir.
+    var (sapLabel, sapCss) = analysis?.Sap switch
+    {
+        "yes" => ("SAP kullanıyor", "tag-success"),
+        "likely" => ("SAP kullanma ihtimali yüksek", "tag-amber"),
+        "no" => ("SAP kullanmıyor", "tag-muted"),
+        _ => ("SAP durumu bilinmiyor", "tag-muted")
+    };
+}
+
+<div class="page-head">
+    <div>
+        <h1>@Model.Company.Name</h1>
+        <div class="page-sub hstack-dot d-flex flex-wrap align-items-center">
+            @if (!string.IsNullOrWhiteSpace(Model.Company.Website))
+            {
+                <a href="@Model.Company.Website" target="_blank" rel="noopener noreferrer">@Model.Company.Domain</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.Company.Industry))
+            {
+                <span>@Model.Company.Industry</span>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.Company.City))
+            {
+                <span>@Model.Company.City</span>
+            }
+        </div>
+    </div>
+    <div class="d-flex align-items-center gap-3">
+        <a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+           asp-action="Report" asp-route-id="@Model.Company.Id" target="_blank" rel="noopener">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M6 9V2h12v7" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><path d="M6 14h12v8H6z" />
+            </svg>
+            Rapor
+        </a>
+        <div class="text-end score-xl">
+            <partial name="_ScoreBadge" model="Model.Company.Score" />
+        </div>
+    </div>
+</div>
+
+@if (Model.Company.ProcessingError is not null)
+{
+    <div class="alert alert-warning" data-flash="warning" data-flash-title="İşleme uyarısı" data-flash-timeout="10000">
+        @Model.Company.ProcessingError
+    </div>
+}
+
+<nav class="detail-tabs" role="tablist" aria-label="Firma detayı bölümleri">
+    <button type="button" class="detail-tab is-on" data-tab-btn="ozet" role="tab" aria-selected="true">Özet</button>
+    <button type="button" class="detail-tab" data-tab-btn="arastirma" role="tab" aria-selected="false">Ön araştırma</button>
+    <button type="button" class="detail-tab" data-tab-btn="kisiler" role="tab" aria-selected="false">Kişiler & Lead'ler<span class="detail-tab-count">@(Model.Company.Contacts.Count)</span></button>
+</nav>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card mb-4" data-tab="ozet">
+            <div class="card-header d-flex justify-content-between align-items-center gap-2">
+                <span>Yapay Zeka Analizi</span>
+
+                @* Site okuma + Gemini analizi tek firma icin tekrar denenir. Ilk
+                   aramada Gemini kotasi/gecici hata yuzunden analiz basarisiz
+                   kaldiysa (Company.ProcessingError) kullanici burada yeniler. *@
+                <form method="post" asp-action="ReanalyzeAi" asp-route-id="@Model.Company.Id" id="reanalyzeForm">
+                    @Html.AntiForgeryToken()
+                    <button class="btn btn-sm @(analysis is null ? "btn-accent" : "btn-outline-primary")"
+                            id="reanalyzeButton" type="submit">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                             aria-hidden="true" class="me-1">
+                            <path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>
+                        Yeniden Analiz Et
+                    </button>
+                </form>
+            </div>
+            <div class="card-body">
+                @if (analysis is null)
+                {
+                    <p class="text-muted-2 mb-0">
+                        Bu firma için analiz yapılamadı. Puan yalnızca iletişim bilgilerine dayanıyor.
+                    </p>
+                }
+                else
+                {
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <span class="tag @sapCss">@sapLabel</span>
+                        @if (analysis.Manufacturer)
+                        {
+                            <span class="tag tag-navy">Üretici</span>
+                        }
+                        @if (analysis.SapVendor)
+                        {
+                            <span class="tag tag-danger">SAP satıcısı (rakip)</span>
+                        }
+                        @if (!analysis.Potential)
+                        {
+                            <span class="tag tag-dark">Hedef dışı</span>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(analysis.SapEvidence))
+                    {
+                        <div class="mb-3">
+                            <div class="stat-label mb-2">SAP kanıtı</div>
+                            <blockquote class="evidence">@analysis.SapEvidence</blockquote>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(analysis.Reason))
+                    {
+                        <div class="mb-3">
+                            <div class="stat-label mb-2">Değerlendirme</div>
+                            <div>@analysis.Reason</div>
+                        </div>
+                    }
+
+                    @if (analysis.Products.Count > 0)
+                    {
+                        <div class="mb-3">
+                            <div class="stat-label mb-2">Ana ürünler</div>
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var product in analysis.Products)
+                                {
+                                    <span class="tag tag-muted">@product</span>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(analysis.EmployeeSizeHint))
+                    {
+                        <div class="small text-muted-2">Çalışan sayısı: @analysis.EmployeeSizeHint</div>
+                    }
+                }
+            </div>
+        </div>
+
+        @{ ViewData["CompanyId"] = Model.Company.Id; }
+
+        @if (TempData["ResearchSuccess"] is string researchOk)
+        {
+            <div class="alert alert-success" data-flash="success">@researchOk</div>
+        }
+        @if (TempData["ResearchInfo"] is string researchInfo)
+        {
+            <div class="alert alert-secondary" data-flash="info" data-flash-title="Ön araştırma atlandı">@researchInfo</div>
+        }
+        @if (TempData["ResearchError"] is string researchErr)
+        {
+            <div class="alert alert-danger" data-flash="error">@researchErr</div>
+        }
+
+        <div data-tab="arastirma">
+            <partial name="_RatingCard" model="Model.Rating" />
+        </div>
+
+        @if (TempData["EnrichSuccess"] is string enrichOk)
+        {
+            <div class="alert alert-success" data-flash="success">@enrichOk</div>
+        }
+        @if (TempData["EnrichInfo"] is string enrichInfo)
+        {
+            <div class="alert alert-secondary" data-flash="info">@enrichInfo</div>
+        }
+        @if (TempData["EnrichError"] is string enrichError)
+        {
+            <div class="alert alert-danger" data-flash="error">@enrichError</div>
+        }
+
+        <div class="card" data-tab="kisiler">
+            <div class="card-header d-flex justify-content-between align-items-center gap-2">
+                <span>Kişiler (@Model.Company.Contacts.Count)</span>
+
+                @* Ikinci adim: karar vericileri LinkedIn + Apollo ile ara.
+                   Arama sirasinda otomatik calismaz, kullanici bilerek tetikler. *@
+                <form method="post" asp-action="Enrich" asp-route-id="@Model.Company.Id" id="enrichForm">
+                    @Html.AntiForgeryToken()
+                    <button class="btn btn-sm btn-outline-primary" id="enrichButton">
+                        Lead'leri Bul
+                    </button>
+                </form>
+            </div>
+            @if (Model.Company.Contacts.Count == 0)
+            {
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6" />
+                        </svg>
+                    </div>
+                    <div class="empty-title">İletişim kişisi bulunamadı</div>
+                    <div>"Lead'leri Bul" ile LinkedIn üzerinden karar verici arayabilirsiniz.</div>
+                </div>
+            }
+            else
+            {
+                <ul class="list-group list-group-flush">
+                @foreach (var contact in Model.Company.Contacts.OrderByDescending(c => c.TitleScore))
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-start gap-3">
+                        <div class="min-w-0">
+                            <div class="cell-title d-flex flex-wrap align-items-center gap-2">
+                                <span>@(string.IsNullOrWhiteSpace(contact.Name) ? "(isim yok)" : contact.Name)</span>
+                                @if (Model.BestContact?.Id == contact.Id)
+                                {
+                                    <span class="tag tag-success">Önerilen muhatap</span>
+                                }
+                                @* Verinin nereden geldigi seffaf olsun: firma sitesi mi,
+                                   Apollo araması mı, LinkedIn araması mı? *@
+                                @if (contact.Source == ContactSource.ApolloSearch)
+                                {
+                                    <span class="tag tag-navy">Apollo</span>
+                                }
+                                else if (contact.Source == ContactSource.LinkedInApollo)
+                                {
+                                    <span class="tag tag-info">LinkedIn</span>
+                                }
+                            </div>
+                            @* Unvan tam gorunmeli: uzun olsa da kirpilmaz, alt satira sarar. *@
+                            <div class="contact-title">@contact.Title</div>
+                            @if (!string.IsNullOrWhiteSpace(contact.Email))
+                            {
+                                <div class="small mt-1"><a href="mailto:@contact.Email">@contact.Email</a></div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(contact.Phone))
+                            {
+                                <div class="cell-sub">@contact.Phone</div>
+                            }
+                            @if (string.IsNullOrWhiteSpace(contact.Email) && !string.IsNullOrWhiteSpace(contact.ApolloId))
+                            {
+                                <div class="small mt-1 text-muted-2">E-postası henüz açılmadı</div>
+                            }
+                        </div>
+                        <div class="d-flex flex-column align-items-end gap-2 flex-shrink-0">
+                            <span class="tag tag-muted" title="Ünvan puanı">@contact.TitleScore</span>
+                            @* Apollo listelemesi kredisizdir; e-posta acma (kredi harcar) sadece
+                               kullanici bilerek bu butona bastiginda tetiklenir. *@
+                            @if (string.IsNullOrWhiteSpace(contact.Email) && !string.IsNullOrWhiteSpace(contact.ApolloId))
+                            {
+                                <form method="post" asp-action="RevealContactEmail" asp-route-id="@Model.Company.Id"
+                                      asp-route-contactId="@contact.Id" class="m-0 reveal-email-form"
+                                      data-confirm="Kişinin e-postası Apollo'dan açılacak; bunun için 1 kredi harcanır."
+                                      data-confirm-title="E-posta getirilsin mi?" data-confirm-subject="@PersonDisplay.DisplayName(contact)"
+                                      data-confirm-ok="1 kredi harca ve getir" data-confirm-tone="credit">
+                                    @Html.AntiForgeryToken()
+                                    <button class="btn btn-sm btn-outline-primary reveal-email-button" type="submit">
+                                        E-postayı Aç
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    </li>
+                }
+                </ul>
+            }
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card mb-4" data-tab="ozet">
+            <div class="card-header">Puan Dökümü</div>
+            <div class="card-body">
+                @if (Model.Breakdown?.DisqualifiedReason is not null)
+                {
+                    <div class="alert alert-secondary mb-0" data-flash="info" data-flash-title="Firma elendi">
+
+                        @Model.Breakdown.DisqualifiedReason
+                    </div>
+                }
+                else if (Model.Breakdown is null || Model.Breakdown.Items.Count == 0)
+                {
+                    <p class="text-muted-2 mb-0">Puan kalemi yok.</p>
+                }
+                else
+                {
+                    <div>
+                    @foreach (var item in Model.Breakdown.Items)
+                    {
+                        <div class="score-row">
+                            <span>@item.Reason</span>
+                            <span class="points">+@item.Points</span>
+                        </div>
+                    }
+                    </div>
+
+                    @if (Model.Breakdown.Unverified)
+                    {
+                        <div class="alert alert-warning small mt-3 mb-0" data-flash="warning" data-flash-title="Puan sınırlandırıldı">
+                            AI analizi yapılamadığı için puan sınırlandırıldı.
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        @{
+            var leadContactIds = Model.Leads.Where(l => l.ContactId != null).Select(l => l.ContactId!.Value).ToHashSet();
+        }
+        <div class="card lead-builder" data-tab="kisiler">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Lead'ler</span>
+                <span class="tag tag-muted">@Model.Leads.Count lead</span>
+            </div>
+
+            @if (Model.Leads.Count > 0)
+            {
+                <div class="lead-mini-list">
+                    @foreach (var lead in Model.Leads)
+                    {
+                        var person = PersonDisplay.DisplayName(lead.Contact);
+                        <a class="lead-mini" asp-controller="Lead" asp-action="Details" asp-route-id="@lead.Id">
+                            <span class="avatar avatar-sm avatar-hue-@PersonDisplay.Hue(person)">@PersonDisplay.Initials(person)</span>
+                            <span class="lead-mini-body">
+                                <span class="lead-mini-name">@person</span>
+                                <span class="lead-mini-title">@lead.Contact?.Title</span>
+                            </span>
+                            <span class="lead-status @LeadStatusDisplay.Css(lead.Status)">@LeadStatusDisplay.Label(lead.Status)</span>
+                        </a>
+                    }
+                </div>
+            }
+
+            <div class="card-body">
+                <div class="lead-builder-title">Yeni lead oluştur</div>
+
+                @if (Model.Company.Contacts.Count == 0)
+                {
+                    <div class="lead-builder-empty">
+                        Bu firmada henüz kişi yok. Önce <strong>Lead'leri Bul</strong> ile karar vericileri listeleyin.
+                    </div>
+                }
+                else
+                {
+                    <form method="post" asp-action="CreateLead" asp-route-id="@Model.Company.Id" id="leadBuilderForm">
+                        @Html.AntiForgeryToken()
+
+                        <div class="search-input mb-2">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                                <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+                            </svg>
+                            <input type="search" class="form-control" id="leadPickerSearch"
+                                   placeholder="Kişi ara: isim, ünvan, e-posta" autocomplete="off" />
+                        </div>
+
+                        <div class="lead-picker" role="radiogroup" aria-label="Muhatap seçin">
+                            @foreach (var contact in Model.Company.Contacts.OrderByDescending(c => c.TitleScore))
+                            {
+                                var person = PersonDisplay.DisplayName(contact);
+                                var hasLead = leadContactIds.Contains(contact.Id);
+                                <label class="lead-option"
+                                       data-search="@($"{contact.Name} {contact.Title} {contact.Email}")">
+                                    <input type="radio" name="contactId" value="@contact.Id"
+                                           checked="@(Model.BestContact?.Id == contact.Id)" />
+                                    <span class="avatar avatar-hue-@PersonDisplay.Hue(person)">@PersonDisplay.Initials(person)</span>
+                                    <span class="lead-option-body">
+                                        <span class="lead-option-name">@person</span>
+                                        <span class="lead-option-title">@contact.Title</span>
+                                        <span class="lead-option-meta">
+                                            @if (!string.IsNullOrWhiteSpace(contact.Email))
+                                            {
+                                                <span class="dot dot-ok"></span>@contact.Email
+                                            }
+                                            else
+                                            {
+                                                <span class="dot dot-off"></span>@("E-posta kapalı")
+                                            }
+                                        </span>
+                                    </span>
+                                    @if (hasLead)
+                                    {
+                                        <span class="lead-option-badge">Lead var</span>
+                                    }
+                                </label>
+                            }
+                            <div class="lead-picker-empty" hidden>Aramayla eşleşen kişi yok.</div>
+                        </div>
+
+                        <button class="btn btn-lead w-100 mt-3" type="submit">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+                                <path d="M19 8v6M22 11h-6" />
+                            </svg>
+                            Seçili kişiyle lead oluştur
+                        </button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a class="btn btn-sm btn-outline-secondary" asp-action="Index">← Firma listesine dön</a>
+</div>
+
+@section Scripts {
+<script>
+    // Sekmeler: kartlar data-tab ile isaretli, secim adres cubugunda (#) tutulur.
+    (function () {
+        var tabs = document.querySelectorAll('[data-tab-btn]');
+        var panes = document.querySelectorAll('[data-tab]');
+
+        function show(name) {
+            panes.forEach(function (p) { p.hidden = p.dataset.tab !== name; });
+            tabs.forEach(function (t) {
+                var on = t.dataset.tabBtn === name;
+                t.classList.toggle('is-on', on);
+                t.setAttribute('aria-selected', on);
+            });
+        }
+
+        tabs.forEach(function (t) {
+            t.addEventListener('click', function () {
+                show(t.dataset.tabBtn);
+                history.replaceState(null, '', '#' + t.dataset.tabBtn);
+            });
+        });
+
+        var initial = location.hash.replace('#', '');
+        show(['ozet', 'arastirma', 'kisiler'].indexOf(initial) >= 0 ? initial : 'ozet');
+    })();
+
+    // Lead arama LinkedIn + Apollo isteklerini icerir, birkac saniye surer.
+    // Cift gonderimi engelle ve bekledigini goster.
+    document.getElementById('enrichForm')?.addEventListener('submit', function () {
+        var button = document.getElementById('enrichButton');
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Aranıyor...';
+    });
+
+    // Lead olusturucu: kisi listesini yazildikca filtreler.
+    (function () {
+        var box = document.getElementById('leadPickerSearch');
+        if (!box) return;
+        var options = Array.prototype.slice.call(document.querySelectorAll('.lead-option'));
+        var empty = document.querySelector('.lead-picker-empty');
+        box.addEventListener('input', function () {
+            var term = box.value.trim().toLocaleLowerCase('tr');
+            var shown = 0;
+            options.forEach(function (o) {
+                var hit = !term || (o.getAttribute('data-search') || '').toLocaleLowerCase('tr').indexOf(term) !== -1;
+                o.hidden = !hit;
+                if (hit) shown++;
+            });
+            empty.hidden = shown > 0;
+        });
+    })();
+
+    // Site okuma + Gemini cagrisi birkac saniye surer; cift gonderimi engelle.
+    document.getElementById('reanalyzeForm')?.addEventListener('submit', function () {
+        var button = document.getElementById('reanalyzeButton');
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Analiz ediliyor...';
+    });
+
+    // Tek kisilik e-posta acma: hizli ama yine de cift tiklamayi engelle.
+    document.querySelectorAll('form.reveal-email-form').forEach(function (form) {
+        form.addEventListener('submit', function () {
+            var button = form.querySelector('.reveal-email-button');
+            if (!button) return;
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Açılıyor...';
+        });
+    });
+
+    // On arastirma arka planda calisir; ilerleme gostergesi (progress-overlay.js)
+    // devreye girer. JS'in overlay parcasi yuklenmediyse butonu bekleme moduna al.
+    document.querySelectorAll('form.research-form').forEach(function (form) {
+        form.addEventListener('submit', function () {
+            if (window.EgebisProgress) return;
+            var button = form.querySelector('.research-button');
+            if (!button) return;
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Araştırılıyor...';
+        });
+    });
+</script>
+}
