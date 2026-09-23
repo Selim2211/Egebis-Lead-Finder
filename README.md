@@ -28,7 +28,34 @@ Serper HTTP  Gemini   (saf C#)       (saf C#)
 Yapay zeka yalnızca **firma analizinde** kullanılır. Puanlama ve e-mail üretimi
 deterministik C# kodudur: daha ucuz, test edilebilir ve yanlış bilgi üretmez.
 
-## Kurulum
+## Sunucu kurulumu (Docker)
+
+Sunucuda yalnızca Docker (Compose eklentisiyle) gerekir. Uygulama **8091** portundan yayın yapar.
+
+```bash
+git clone https://github.com/Selim2211/Egebis-Lead-Finder.git
+cd Egebis-Lead-Finder
+cp .env.example .env        # POSTGRES_PASSWORD'u değiştirin
+docker compose up -d --build
+```
+
+Ardından `http://SUNUCU_IP:8091` adresini açın.
+
+- PostgreSQL de compose içinde ayağa kalkar; veriler `pgdata` volume'unda kalıcıdır.
+- Tablolar uygulama açılırken otomatik kurulur/güncellenir (elle migration gerekmez).
+- API anahtarları (Serper, Gemini, Apollo), SMTP, IMAP ve Salesforce bilgileri uygulamadaki
+  **Ayarlar** ekranından girilir ve veritabanında saklanır.
+- Sağlık kontrolü: `http://SUNUCU_IP:8091/health`
+- Güncelleme: `git pull && docker compose up -d --build`
+- Loglar: `docker compose logs -f app`
+- Salesforce bağlantısı için Ayarlar'daki "Uygulamanın dış adresi" alanına sunucunun
+  HTTPS adresini yazın ve Salesforce'taki Callback URL'yi `https://ALAN_ADI/Salesforce/Callback` yapın.
+- Mevcut yerel veriyi taşımak için: yerelde `pg_dump -U postgres --no-owner egebisleadfinder > yedek.sql`;
+  sunucuda önce yalnız veritabanını başlatın (`docker compose up -d db`), yedeği yükleyin
+  (`docker compose exec -T db psql -U egebis egebisleadfinder < yedek.sql`), sonra
+  `docker compose up -d --build` ile uygulamayı başlatın.
+
+## Kurulum (geliştirme)
 
 ### Gereksinimler
 - .NET SDK 10

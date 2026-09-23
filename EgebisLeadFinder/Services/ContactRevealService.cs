@@ -17,14 +17,20 @@ public class ContactRevealService
     private readonly ApplicationDbContext _db;
     private readonly IPersonEmailFinder _emailFinder;
     private readonly LeadScoringService _scoring;
+    private readonly EmailVerificationService _verifier;
+    private readonly IcpService _icp;
     private readonly ILogger<ContactRevealService> _logger;
 
     public ContactRevealService(
         ApplicationDbContext db,
         IPersonEmailFinder emailFinder,
         LeadScoringService scoring,
+        EmailVerificationService verifier,
+        IcpService icp,
         ILogger<ContactRevealService> logger)
     {
+        _icp = icp;
+        _verifier = verifier;
         _db = db;
         _emailFinder = emailFinder;
         _scoring = scoring;
@@ -65,13 +71,16 @@ public class ContactRevealService
 
             StringLengthGuard.Apply(contact);
 
+            // Kredi harcanarak acilan adres hemen dogrulanir; kullanici sonucu aninda gorsun.
+            await _verifier.ApplyAsync(contact, ct);
+
             // "E-posta bulundu" kriteri artik karsilanabilir; puan yeniden hesaplanir.
             var company = contact.Company;
-            var analysis = CompanyController.ParseAnalysis(company.AiAnalysis);
-            company.Score = _scoring.ScoreCompany(analysis, site: null, company.Contacts).Total;
+            await _icp.ScoreAsync(company, CompanyController.ParseAnalysis(company.AiAnalysis), site: null, ct);
 
             await _db.SaveChangesAsync(ct);
-            return new RevealOutcome(true, $"{contact.Name} için e-posta açıldı: {contact.Email}");
+            var status = EmailStatusDisplay.Label(contact.EmailStatus, contact.Email);
+            return new RevealOutcome(true, $"{contact.Name} için e-posta açıldı: {contact.Email} ({status})");
         }
         catch (MissingApiKeyException ex)
         {

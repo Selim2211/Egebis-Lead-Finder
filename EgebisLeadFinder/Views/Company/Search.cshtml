@@ -29,6 +29,11 @@
     {
         <option value="@industry"></option>
     }
+    @* NACE bolum adlari: secilen ad aramaya sektor olarak girer. *@
+    @foreach (var d in NaceCatalog.Divisions.Where(d => string.CompareOrdinal(d.Code, "10") >= 0 && string.CompareOrdinal(d.Code, "33") <= 0))
+    {
+        <option value="@d.Name.Split('(')[0].Trim()" label="NACE @d.Code"></option>
+    }
 </datalist>
 
 <form method="post" asp-action="Search" class="name-search mb-4" id="nameSearchForm"

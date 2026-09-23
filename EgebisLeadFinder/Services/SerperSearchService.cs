@@ -374,7 +374,8 @@ public class SerperSearchService : ISearchService
                 {
                     Title = o.Title!,
                     Url = o.Link!,
-                    Snippet = o.Snippet
+                    Snippet = o.Snippet,
+                    Date = o.Date
                 })
                 .ToList();
         }
@@ -515,5 +516,8 @@ public class SerperSearchService : ISearchService
 
         [JsonPropertyName("snippet")]
         public string? Snippet { get; set; }
+
+        [JsonPropertyName("date")]
+        public string? Date { get; set; }
     }
 }

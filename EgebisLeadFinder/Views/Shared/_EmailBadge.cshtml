@@ -1,0 +1,7 @@
+@model Contact
+@* E-posta dogrulama rozeti; e-postasi olmayan kiside hicbir sey cizmez. *@
+@if (!string.IsNullOrWhiteSpace(Model.Email))
+{
+    <span class="tag email-badge @EmailStatusDisplay.Css(Model.EmailStatus)"
+          title="@(Model.EmailStatusReason ?? "Doğrulama bekleniyor (MX düzeyinde kontrol)")">@EmailStatusDisplay.Label(Model.EmailStatus, Model.Email)</span>
+}

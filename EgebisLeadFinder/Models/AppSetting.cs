@@ -72,6 +72,9 @@ public static class SettingKeys
 
     public const int DefaultFollowUpAfterDays = 5;
 
+    /// <summary>Ideal musteri profili (IcpProfile) JSON olarak.</summary>
+    public const string IcpProfile = "Icp:Profile";
+
     // --- E-posta gonderimi (SMTP). Anahtarlar appsettings "Smtp" bolumuyle ayni:
     // ekranda bos birakilirsa yapilandirmadaki degere dusulur. ---
     public const string SmtpFromAddress = "Smtp:FromAddress";
@@ -84,6 +87,49 @@ public static class SettingKeys
     /// <summary>"starttls" | "ssl" | "auto".</summary>
     public const string SmtpSecurity = "Smtp:Security";
 
+    // --- Otomatik mail dizileri ve cevap algilama (IMAP) ---
+    public const string SequenceDailyCap = "Sequence:DailyCap";
+    public const int DefaultSequenceDailyCap = 50;
+    public const string ImapHost = "Imap:Host";
+    public const string ImapPort = "Imap:Port";
+    public const string ImapUsername = "Imap:Username";
+    public const string ImapPassword = "Imap:Password";
+
+    /// <summary>Son okunan mesajin UID'si ve klasorun UIDVALIDITY degeri ("validity:uid").</summary>
+    public const string ImapCursor = "Imap:Cursor";
+    public const string ImapLastCheck = "Imap:LastCheck";
+    public const string ImapLastError = "Imap:LastError";
+
+    // --- Salesforce CRM entegrasyonu. Username-Password OAuth flow: sunucu
+    // taraflı, kullanici etkilesimi gerektirmez. Anahtarlar appsettings
+    // "Salesforce" bolumuyle ayni. ---
+    public const string SalesforceConsumerKey = "Salesforce:ConsumerKey";
+    public const string SalesforceConsumerSecret = "Salesforce:ConsumerSecret";
+    public const string SalesforceUsername = "Salesforce:Username";
+    public const string SalesforcePassword = "Salesforce:Password";
+
+    /// <summary>Kullanici sifresinin sonuna eklenir (Setup &gt; Reset My Security Token).</summary>
+    public const string SalesforceSecurityToken = "Salesforce:SecurityToken";
+
+    /// <summary>ör. https://login.salesforce.com veya https://test.salesforce.com (sandbox).</summary>
+    public const string SalesforceLoginUrl = "Salesforce:LoginUrl";
+
+    public const string DefaultSalesforceLoginUrl = "https://login.salesforce.com";
+
+    // --- Salesforce OAuth (Authorization Code flow): "Salesforce'a Bağlan" akışında
+    // elde edilir. Kullanici sifresini bilmemize gerek kalmaz; refresh token kalici
+    // saklanir, access token bundan tazelenir. Username/Password alanlari (yukarida)
+    // eski/yedek yontem olarak kalir. ---
+    public const string SalesforceRefreshToken = "Salesforce:RefreshToken";
+    public const string SalesforceInstanceUrl = "Salesforce:InstanceUrl";
+
+    /// <summary>
+    /// Uygulamanin disaridan erisilen adresi (ör. https://app.egebis.com veya ngrok adresi).
+    /// Doluysa OAuth callback her zaman bu adresle kurulur; "Bağlan" localhost'tan
+    /// baslatilsa bile once buraya yonlendirilir. Bos ise istegin geldigi adres kullanilir.
+    /// </summary>
+    public const string SalesforcePublicBaseUrl = "Salesforce:PublicBaseUrl";
+
     public const int DefaultSearchMaxCompanies = 100;
     public const int SearchMaxCompaniesUpperLimit = 200;
     public const string DefaultSearchCountry = "Türkiye";
@@ -92,13 +138,18 @@ public static class SettingKeys
     public static readonly string[] All =
     {
         LeadTitleKeywords, SerperApiKey, GeminiApiKey, GeminiModel, ApolloApiKey, SerperCreditLimit,
-        GeminiCostPerCallTry, LastKnownUsdTryRate, SearchMaxCompanies, SearchDefaultCountry, SearchRegion, FollowUpAfterDays, ExtraBlockedDomains,
-        SmtpFromAddress, SmtpFromName, SmtpHost, SmtpPort, SmtpUsername, SmtpPassword, SmtpSecurity
+        GeminiCostPerCallTry, LastKnownUsdTryRate, SearchMaxCompanies, SearchDefaultCountry, SearchRegion, FollowUpAfterDays, IcpProfile, ExtraBlockedDomains,
+        SmtpFromAddress, SmtpFromName, SmtpHost, SmtpPort, SmtpUsername, SmtpPassword, SmtpSecurity,
+        SalesforceConsumerKey, SalesforceConsumerSecret, SalesforceUsername, SalesforcePassword,
+        SalesforceSecurityToken, SalesforceLoginUrl, SalesforceRefreshToken, SalesforceInstanceUrl,
+        SalesforcePublicBaseUrl, SequenceDailyCap, ImapHost, ImapPort, ImapUsername, ImapPassword,
+        ImapCursor, ImapLastCheck, ImapLastError
     };
 
     /// <summary>Deger gizlenmeli mi? API anahtarlari ve e-posta sifresi ekranda maskeli gosterilir.</summary>
     public static bool IsSecret(string key) =>
-        key is SerperApiKey or GeminiApiKey or ApolloApiKey or SmtpPassword;
+        key is SerperApiKey or GeminiApiKey or ApolloApiKey or SmtpPassword or ImapPassword
+            or SalesforceConsumerSecret or SalesforcePassword or SalesforceSecurityToken or SalesforceRefreshToken;
 
     /// <summary>
     /// Yalnizca Ayarlar ekranindan okunan anahtarlar: bos birakilirsa User Secrets /

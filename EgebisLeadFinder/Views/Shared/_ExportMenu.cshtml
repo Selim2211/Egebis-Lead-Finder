@@ -1,0 +1,10 @@
+@model string
+@* Listedeki mevcut filtrelerle disa aktarim. Model: export action yolu. *@
+<details class="export-menu">
+    <summary class="btn btn-outline-secondary btn-sm">Dışa aktar ▾</summary>
+    <div class="export-menu-list">
+        <a href="@QueryUrl.WithPath(Context.Request, Model, "format", "xlsx")">Excel (.xlsx)</a>
+        <a href="@QueryUrl.WithPath(Context.Request, Model, "format", "csv")">CSV (.csv)</a>
+        <div class="export-menu-hint">Ekrandaki filtreler uygulanır.</div>
+    </div>
+</details>

@@ -45,6 +45,24 @@ public class Lead
     /// <summary>Bu tarihe kadar takip listesinde gosterilmez ("ertele").</summary>
     public DateTime? SnoozedUntil { get; set; }
 
+    // --- CRM (Salesforce) senkronu. Null = hic gonderilmedi. ---
+
+    /// <summary>Salesforce'taki karsilik gelen Lead kaydinin Id'si.</summary>
+    [MaxLength(30)]
+    public string? SalesforceId { get; set; }
+
+    public DateTime? SalesforceSyncedAt { get; set; }
+
+    /// <summary>Son senkron denemesinin sonucu (basarili ise null; hata varsa mesaj).</summary>
+    [MaxLength(500)]
+    public string? SalesforceSyncError { get; set; }
+
+    /// <summary>Son gonderimden sonra degisti mi? Arka plan senkronu bunlari gonderir.</summary>
+    public bool SalesforceDirty { get; set; }
+
+    /// <summary>Son senkron denemesi (basarili/basarisiz); hatali kayit hemen tekrar denenmesin diye.</summary>
+    public DateTime? SalesforceAttemptAt { get; set; }
+
     /// <summary>Bu lead'e atilan e-postalar (en yenisi SentAt'e gore).</summary>
     public List<SentEmail> SentEmails { get; set; } = new();
 

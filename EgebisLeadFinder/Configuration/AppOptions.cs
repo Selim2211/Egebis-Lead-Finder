@@ -115,6 +115,28 @@ public class SmtpOptions
     public string FromAddress { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// Salesforce CRM entegrasyonu. Anahtarlarin tamami Ayarlar ekranindan (AppSetting)
+/// okunur; buradaki degerler yalnizca varsayilan/fallback icindir.
+/// </summary>
+public class SalesforceOptions
+{
+    public const string Section = "Salesforce";
+    public string ConsumerKey { get; set; } = string.Empty;
+    public string ConsumerSecret { get; set; } = string.Empty;
+    public string Username { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+    public string SecurityToken { get; set; } = string.Empty;
+
+    /// <summary>Uretimde https://login.salesforce.com, sandbox'ta https://test.salesforce.com.</summary>
+    public string LoginUrl { get; set; } = "https://login.salesforce.com";
+
+    public int TimeoutSeconds { get; set; } = 20;
+
+    /// <summary>API versiyonu (ör. v61.0). Bos ise en son surumu kullanmayi dener.</summary>
+    public string ApiVersion { get; set; } = "v61.0";
+}
+
 public class ApolloOptions
 {
     public const string Section = "Apollo";
@@ -176,7 +198,51 @@ public class ResearchOptions
     public const string Section = "Research";
 
     /// <summary>Haber/itibar taramasinda calistirilacak azami sorgu sayisi.</summary>
-    public int MaxNewsQueries { get; set; } = 6;
+    public int MaxNewsQueries { get; set; } = 13;
+
+    /// <summary>Derin analizde tam metni okunacak haber sayfasi sayisi (0 = yalnizca snippet).</summary>
+    public int MaxArticlesToFetch { get; set; } = 8;
+
+    /// <summary>Haber sayfasindan alinacak azami metin.</summary>
+    public int ArticleMaxChars { get; set; } = 1500;
+
+    /// <summary>Firma sitesinde okunacak azami sayfa.</summary>
+    public int MaxWebsitePages { get; set; } = 8;
+
+    /// <summary>Firma sitesi sayfa basina azami metin.</summary>
+    public int WebsitePageMaxChars { get; set; } = 2500;
+
+    /// <summary>Firma sitesinde denenecek yollar (sirayla; ilk bulunanlar okunur).</summary>
+    public List<string> WebsitePaths { get; set; } = new()
+    {
+        "/", "/hakkimizda", "/kurumsal", "/about", "/about-us", "/tarihce",
+        "/urunler", "/products", "/hizmetler", "/services",
+        "/referanslar", "/references", "/musterilerimiz", "/cozum-ortaklarimiz",
+        "/kariyer", "/careers", "/insan-kaynaklari",
+        "/haberler", "/news", "/basin", "/duyurular",
+        "/yatirimci-iliskileri", "/investor-relations", "/yonetim", "/yonetim-kurulu",
+        "/sertifikalar", "/kalite", "/tesislerimiz", "/uretim"
+    };
+
+    /// <summary>Gemini'ye giden derin analiz metninin azami uzunlugu.</summary>
+    public int MaxAiInputChars { get; set; } = 40000;
+
+    /// <summary>Derin analiz Gemini cagrisi icin zaman asimi (sn).</summary>
+    public int AiTimeoutSeconds { get; set; } = 90;
+
+    /// <summary>Yonetim/karar verici haberlerini ayirmak icin kelimeler.</summary>
+    public List<string> ManagementKeywords { get; set; } = new()
+    {
+        "genel müdür", "ceo", "cfo", "cio", "bilgi işlem müdürü", "it müdürü",
+        "yönetim kurulu", "atandı", "görevine", "kurucu", "ortak"
+    };
+
+    /// <summary>Teknoloji/IT sinyali kelimeleri.</summary>
+    public List<string> TechnologyKeywords { get; set; } = new()
+    {
+        "sap", "erp", "dijital dönüşüm", "logo yazılım", "netsis", "microsoft dynamics",
+        "oracle", "mes", "yazılım", "otomasyon", "endüstri 4.0", "bulut"
+    };
 
     /// <summary>Her sorgu icin Serper'dan istenecek organik sonuc sayisi.</summary>
     public int ResultsPerQuery { get; set; } = 8;

@@ -1,0 +1,211 @@
+@model SequenceIndexViewModel
+@{
+    ViewData["Title"] = "Mail Dizileri";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Otomatik Mail Dizileri</h1>
+        <div class="page-sub">İlk mail ve takipler kendiliğinden gider; cevap gelince ya da mail geri dönünce dizi durur</div>
+    </div>
+</div>
+
+@if (TempData["SettingsSaved"] is string saved)
+{
+    <div class="alert alert-success" data-flash="success">@saved</div>
+}
+@if (TempData["SettingsError"] is string err)
+{
+    <div class="alert alert-danger" data-flash="error">@err</div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="stat-label">Bugün gönderilen</div>
+            <div class="stat-value">@Model.SentToday <span class="cell-sub">/ @Model.DailyCap tavan</span></div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="stat-label">Bugün sırası gelecek</div>
+            <div class="stat-value">@Model.DueToday</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="stat-label">Durum</div>
+            <div class="stat-value" style="font-size:1rem">
+                @if (Model.InWindow)
+                {
+                    <span class="tag tag-success">Gönderim penceresi açık</span>
+                }
+                else
+                {
+                    <span class="tag tag-muted">Pencere kapalı (hafta içi 09-18)</span>
+                }
+                @if (!Model.ImapReady)
+                {
+                    <span class="tag tag-amber" title="Cevap algılama için gelen kutusu ayarı gerekli">Cevap algılama kapalı</span>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Yeni dizi</div>
+    <div class="card-body">
+        <form method="post" asp-action="Create" class="d-flex gap-2 flex-wrap">
+            @Html.AntiForgeryToken()
+            <input class="form-control" style="max-width:360px" name="name" placeholder="ör. Otomotiv — SAP tanıtım" required maxlength="120" />
+            <button class="btn btn-accent">Dizi oluştur</button>
+        </form>
+        <div class="form-text">3 adımlı hazır iskeletle başlar: ilk mail, 3 gün sonra takip, 5 gün sonra son takip. Lead'leri Lead'ler ekranından veya lead detayından eklersiniz.</div>
+    </div>
+</div>
+
+@foreach (var seq in Model.Sequences)
+{
+    var steps = seq.Steps.OrderBy(s => s.Order).ToList();
+    var rows = steps.Count < 10 ? steps.Count + 1 : steps.Count;
+    <div class="card mb-4 @(seq.Active ? "" : "opacity-75")" id="seq-@seq.Id">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span>
+                @seq.Name
+                @if (!seq.Active) { <span class="tag tag-muted ms-1">pasif</span> }
+            </span>
+            <span class="d-flex gap-2 flex-wrap">
+                <span class="tag tag-success">@Model.Count(seq.Id, LeadSequenceStatus.Active) aktif</span>
+                <span class="tag tag-muted">@Model.Count(seq.Id, LeadSequenceStatus.Completed) tamamlandı</span>
+                <span class="tag tag-muted">@(Model.Replied.TryGetValue(seq.Id, out var r) ? r : 0) cevap</span>
+                <span class="tag tag-muted">@Model.Count(seq.Id, LeadSequenceStatus.Stopped) durdu</span>
+            </span>
+        </div>
+        <div class="card-body">
+            <form method="post" asp-action="SaveSteps" asp-route-id="@seq.Id">
+                @Html.AntiForgeryToken()
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <input class="form-control" name="name" value="@seq.Name" maxlength="120" />
+                    </div>
+                    <div class="col-md-6 d-flex align-items-center">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="active" value="true" id="active-@seq.Id" checked="@seq.Active" />
+                            <input type="hidden" name="active" value="false" />
+                            <label class="form-check-label" for="active-@seq.Id">Aktif</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle seq-steps">
+                        <thead>
+                            <tr><th>Adım</th><th>Bekleme</th><th>Yazım</th><th>Şablon</th></tr>
+                        </thead>
+                        <tbody>
+                            @for (var i = 0; i < rows; i++)
+                            {
+                                var step = i < steps.Count ? steps[i] : null;
+                                <tr class="@(step is null ? "seq-step-new" : "")">
+                                    <td>@(step is null ? "+ yeni" : (i + 1).ToString())</td>
+                                    <td>
+                                        <div class="input-group input-group-sm" style="max-width:150px">
+                                            <input class="form-control" type="number" min="0" max="60" name="delay" value="@(step?.DelayDays ?? 3)" />
+                                            <span class="input-group-text">gün</span>
+                                        </div>
+                                        <div class="form-text">@(i == 0 ? "diziye eklendikten sonra" : "önceki adımdan sonra")</div>
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm" name="mode">
+                                            <option value="ai" selected="@(step?.UseAi ?? false)">AI kişiye özel yazar</option>
+                                            <option value="template" selected="@(step is null or { UseAi: false })">Şablonu olduğu gibi gönder</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm" name="template">
+                                            <option value="">@(step is null ? "(adım ekleme)" : "(şablon yok)")</option>
+                                            @foreach (var t in Model.Templates)
+                                            {
+                                                <option value="@t.Id" selected="@(step?.TemplateId == t.Id)">@t.Name</option>
+                                            }
+                                        </select>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="form-text mb-3">
+                    AI modunda şablon; ton, hizmetler ve imza için örnek olarak kullanılır, mail firma analizine göre kişiye özel yazılır.
+                    AI başarısız olursa şablon gönderilir. Bir adımı silmek için şablonunu boşaltıp yazımı "Şablonu olduğu gibi gönder" yapın.
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-primary btn-sm">Kaydet</button>
+                    <a class="btn btn-outline-secondary btn-sm" asp-controller="Lead" asp-action="Index" asp-route-email="open">Lead ekle →</a>
+                    @if (seq.Active)
+                    {
+                        <button type="submit" form="del-@seq.Id" class="btn btn-link btn-sm text-danger ms-auto"
+                                data-confirm="Aktif lead'lerin dizisi durur; gönderim geçmişi korunur." data-confirm-title="Dizi pasife alınsın mı?"
+                                data-confirm-subject="@seq.Name" data-confirm-ok="Pasife al" data-confirm-tone="danger">Pasife al</button>
+                    }
+                </div>
+            </form>
+            <form id="del-@seq.Id" method="post" asp-action="Delete" asp-route-id="@seq.Id" class="d-none">@Html.AntiForgeryToken()</form>
+        </div>
+    </div>
+}
+
+<div class="card mb-4" id="settings">
+    <div class="card-header">Gönderim ve cevap algılama ayarları</div>
+    <div class="card-body">
+        <form method="post" asp-action="SaveSettings">
+            @Html.AntiForgeryToken()
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Günlük gönderim tavanı</label>
+                    <input class="form-control" type="number" min="0" max="1000" name="dailyCap" value="@Model.DailyCap" />
+                    <div class="form-text">Spam sayılmamak için yeni hesaplarda 30-50 önerilir.</div>
+                </div>
+                <div class="col-md-9">
+                    <div class="row g-3">
+                        <div class="col-md-5">
+                            <label class="form-label">IMAP sunucusu</label>
+                            <input class="form-control" name="imapHost" value="@Model.ImapHost" placeholder="imap.gmail.com / outlook.office365.com" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Port</label>
+                            <input class="form-control" type="number" name="imapPort" value="@Model.ImapPort" placeholder="993" />
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Kullanıcı adı</label>
+                            <input class="form-control" name="imapUsername" value="@Model.ImapUsername" placeholder="boşsa gönderen (SMTP) hesabı" />
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Şifre</label>
+                            <input class="form-control" type="password" name="imapPassword" autocomplete="new-password"
+                                   placeholder="@(Model.ImapHasPassword ? "kayıtlı — değiştirmek için yazın" : "boşsa SMTP şifresi kullanılır")" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-text mt-2">
+                Gelen kutusu 5 dakikada bir okunur; mailler okunmuş işaretlenmez veya taşınmaz. Cevap gelen lead'in dizisi durur,
+                geri dönen mailin adresi "Geçersiz" olur. Otomatik yanıtlar (izin/ofis dışı) diziyi durdurmaz.
+                @if (Model.ImapLastCheck is not null)
+                {
+                    <span>Son kontrol: @Model.ImapLastCheck.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm").</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(Model.ImapLastError))
+                {
+                    <span class="text-danger">Son hata: @Model.ImapLastError</span>
+                }
+            </div>
+            <div class="d-flex gap-2 flex-wrap mt-3">
+                <button class="btn btn-primary btn-sm">Kaydet</button>
+                <button class="btn btn-outline-secondary btn-sm" formaction="@Url.Action("TestImap")">Bağlantıyı test et</button>
+                <button class="btn btn-outline-secondary btn-sm" formaction="@Url.Action("CheckNow")">Gelen kutusunu şimdi kontrol et</button>
+            </div>
+        </form>
+    </div>
+</div>

@@ -41,6 +41,9 @@ public class IntelSnippet
     public string Text { get; init; } = string.Empty;
     public string? SourceUrl { get; init; }
     public IntelKind Kind { get; init; } = IntelKind.Genel;
+
+    /// <summary>Kaynagin yayin tarihi (Google'in verdigi haliyle); yoksa bos.</summary>
+    public string? Date { get; init; }
 }
 
 /// <summary>"Kendin ac" turu kaynak linki.</summary>
@@ -57,5 +60,8 @@ public enum IntelKind
     Finansal = 2,
     Risk = 3,
     Buyume = 4,
-    Kayit = 5
+    Kayit = 5,
+    Site = 6,
+    Yonetim = 7,
+    Teknoloji = 8
 }

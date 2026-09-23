@@ -17,8 +17,30 @@ public class LeadScoringService
 
     /// <summary>Firma icin 0-100 arasi lead puani hesaplar.</summary>
     public ScoreBreakdown ScoreCompany(CompanyAnalysis? analysis, ScrapedSite? site, IEnumerable<Contact>? contacts)
+        => ScoreCompany(analysis, site, contacts, icp: null, company: null);
+
+    /// <summary>
+    /// ICP tanimliysa hedef sektor/NACE, konum ve buyukluk ICP'ye gore puanlanir ve firmanin
+    /// ICP'ye uyup uymadigi (IcpMatch) hesaplanir. ICP bossa sabit agirliklarla eski davranis.
+    /// </summary>
+    public ScoreBreakdown ScoreCompany(CompanyAnalysis? analysis, ScrapedSite? site, IEnumerable<Contact>? contacts,
+        IcpProfile? icp, Company? company)
     {
         var breakdown = new ScoreBreakdown();
+        var useIcp = icp is { IsActive: true };
+        bool industryOk = true, locationOk = true, sizeOk = true, manufacturerOk = true;
+
+        if (useIcp && analysis is not null)
+        {
+            var haystack = string.Join(" ", new[] { company?.Name, analysis.Industry, company?.Industry }
+                .Concat(analysis.Products).Where(s => !string.IsNullOrWhiteSpace(s)));
+            var excluded = icp!.ExcludeKeywords.FirstOrDefault(k => TurkishText.ContainsNormalized(haystack, k));
+            if (excluded is not null)
+            {
+                breakdown.Disqualify($"ICP dışı: \"{excluded}\"");
+                return breakdown;
+            }
+        }
 
         if (analysis is not null)
         {
@@ -50,10 +72,34 @@ public class LeadScoringService
                 breakdown.Add("Üretici firma", _options.Manufacturer);
             }
 
-            if (IsTargetIndustry(analysis.Industry))
+            manufacturerOk = !useIcp || !icp!.RequireManufacturer || analysis.Manufacturer;
+
+            if (useIcp && icp!.HasIndustryCriteria)
+            {
+                var nace = analysis.NaceCode ?? company?.NaceCode;
+                if (icp.MatchesNace(nace))
+                    breakdown.Add($"ICP: NACE {nace} hedef sektörde", _options.TargetIndustry);
+                else if (icp.IndustryKeywords.Any(k => TurkishText.ContainsNormalized(analysis.Industry ?? "", k)))
+                    breakdown.Add("ICP: hedef sektör", _options.TargetIndustry);
+                else
+                {
+                    // NACE kodu henuz belirlenmemis (eski) firma puan kaybetmez, ama NACE'si
+                    // dogrulanmadan "ICP'ye uyuyor" da sayilmaz.
+                    industryOk = false;
+                    if (string.IsNullOrWhiteSpace(nace) && IsTargetIndustry(analysis.Industry))
+                        breakdown.Add("Hedef sektör (NACE bilinmiyor)", _options.TargetIndustry);
+                }
+            }
+            else if (IsTargetIndustry(analysis.Industry))
                 breakdown.Add("Hedef sektör", _options.TargetIndustry);
 
-            if (IsLargeCompany(analysis.EmployeeSizeHint))
+            if (useIcp && icp!.MinEmployees > 0)
+            {
+                var count = EmployeeCount(analysis.EmployeeSizeHint);
+                sizeOk = count >= icp.MinEmployees;
+                if (sizeOk) breakdown.Add($"ICP: büyüklük uygun ({count}+ çalışan)", _options.LargeCompany);
+            }
+            else if (IsLargeCompany(analysis.EmployeeSizeHint))
                 breakdown.Add("Büyük ölçekli firma", _options.LargeCompany);
         }
 
@@ -64,6 +110,17 @@ public class LeadScoringService
             // boylece analiz edilmis gercek adaylarin onune gecemez.
             breakdown.MarkUnverified();
         }
+
+        if (useIcp && icp!.HasLocationCriteria)
+        {
+            locationOk = company is not null
+                && (icp.Cities.Any(c => string.Equals(c, company.City, StringComparison.OrdinalIgnoreCase))
+                    || icp.Countries.Any(c => string.Equals(c, company.Country, StringComparison.OrdinalIgnoreCase)));
+            if (locationOk) breakdown.Add("ICP: hedef bölge", icp.LocationWeight);
+        }
+
+        breakdown.IcpMatch = useIcp && analysis is not null && analysis.Potential && !analysis.SapVendor
+                             && industryOk && locationOk && sizeOk && manufacturerOk;
 
         var contactList = contacts?.ToList() ?? new List<Contact>();
 
@@ -112,15 +169,17 @@ public class LeadScoringService
     /// AI'dan gelen serbest metinli calisan sayisi ipucunu degerlendirir
     /// ("500+ çalışan", "10.000'in üzerinde çalışan").
     /// </summary>
-    private static bool IsLargeCompany(string? employeeSizeHint)
+    private static bool IsLargeCompany(string? employeeSizeHint) => EmployeeCount(employeeSizeHint) >= 100;
+
+    /// <summary>"500+ çalışan", "10.000'in üzerinde" -> 500, 10000. Sayi yoksa 0.</summary>
+    public static int EmployeeCount(string? employeeSizeHint)
     {
-        if (string.IsNullOrWhiteSpace(employeeSizeHint)) return false;
+        if (string.IsNullOrWhiteSpace(employeeSizeHint)) return 0;
 
-        var digits = new string(employeeSizeHint.Where(ch => char.IsDigit(ch) || ch == '.' || ch == ',').ToArray())
-            .Replace(".", string.Empty)
-            .Replace(",", string.Empty);
-
-        return int.TryParse(digits, out var count) && count >= 100;
+        var match = System.Text.RegularExpressions.Regex.Match(employeeSizeHint, @"\d[\d.,]*");
+        if (!match.Success) return 0;
+        var digits = match.Value.Replace(".", string.Empty).Replace(",", string.Empty);
+        return int.TryParse(digits, out var count) ? count : 0;
     }
 }
 
@@ -134,6 +193,9 @@ public class ScoreBreakdown
 
     /// <summary>AI analizi yapilamadi; firma profili dogrulanmis degil.</summary>
     public bool Unverified { get; private set; }
+
+    /// <summary>ICP tanimli ve firma tum ICP kosullarini sagliyor.</summary>
+    public bool IcpMatch { get; set; }
 
     /// <summary>
     /// Dogrulanmamis firmalarin ust siniri. AI analizi olan gercek adaylarin

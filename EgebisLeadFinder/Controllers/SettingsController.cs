@@ -78,12 +78,25 @@ public class SettingsController : Controller
             [SettingKeys.SmtpHost] = Clean(form.SmtpHost),
             [SettingKeys.SmtpPort] = form.SmtpPort is > 0 and < 65536 ? form.SmtpPort.ToString() : null,
             [SettingKeys.SmtpSecurity] = form.SmtpSecurity is "starttls" or "ssl" or "auto" ? form.SmtpSecurity : "starttls",
-            [SettingKeys.SmtpUsername] = Clean(form.SmtpUsername)
+            [SettingKeys.SmtpUsername] = Clean(form.SmtpUsername),
+
+            [SettingKeys.SalesforceConsumerKey] = Clean(form.SalesforceConsumerKey),
+            [SettingKeys.SalesforceUsername] = Clean(form.SalesforceUsername),
+            [SettingKeys.SalesforceLoginUrl] = Clean(form.SalesforceLoginUrl) ?? SettingKeys.DefaultSalesforceLoginUrl,
+            [SettingKeys.SalesforcePublicBaseUrl] = SalesforceController.NormalizeBaseUrl(form.SalesforcePublicBaseUrl)
         };
 
         // Sifre ekrana hic basilmaz; alan bos gelirse kayitli sifre korunur.
         if (!string.IsNullOrWhiteSpace(form.SmtpPassword))
             values[SettingKeys.SmtpPassword] = form.SmtpPassword.Trim();
+
+        // Salesforce sirlari da ayni sekilde: bos gelirse kayitli deger korunur.
+        if (!string.IsNullOrWhiteSpace(form.SalesforceConsumerSecret))
+            values[SettingKeys.SalesforceConsumerSecret] = form.SalesforceConsumerSecret.Trim();
+        if (!string.IsNullOrWhiteSpace(form.SalesforcePassword))
+            values[SettingKeys.SalesforcePassword] = form.SalesforcePassword.Trim();
+        if (!string.IsNullOrWhiteSpace(form.SalesforceSecurityToken))
+            values[SettingKeys.SalesforceSecurityToken] = form.SalesforceSecurityToken.Trim();
 
         if (!string.IsNullOrWhiteSpace(form.SmtpFromAddress) && !System.Net.Mail.MailAddress.TryCreate(form.SmtpFromAddress.Trim(), out _))
         {
@@ -122,6 +135,20 @@ public class SettingsController : Controller
             TempData["SettingsSaved"] = $"Test e-postası {s.FromAddress} adresine gönderildi. Gelen kutunuzu kontrol edin.";
         else
             TempData["SettingsError"] = $"Test e-postası gönderilemedi: {result.Error}";
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>Kayitli Salesforce bilgileriyle yalnizca kimlik dogrulamayi dener.</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestSalesforceConnection([FromServices] ISalesforceConnector connector, CancellationToken ct)
+    {
+        var (success, error) = await connector.TestConnectionAsync(ct);
+        if (success)
+            TempData["SettingsSaved"] = "Salesforce bağlantısı başarılı.";
+        else
+            TempData["SettingsError"] = $"Salesforce bağlantısı başarısız: {error}";
 
         return RedirectToAction(nameof(Index));
     }
@@ -200,6 +227,18 @@ public class SettingsController : Controller
                 ? null : smtp.Username,
             SmtpPasswordSet = !string.IsNullOrWhiteSpace(smtp.Password),
             SmtpConfigured = smtp.IsConfigured,
+
+            SalesforceConsumerKey = Stored(SettingKeys.SalesforceConsumerKey),
+            SalesforceConsumerSecretSet = !string.IsNullOrWhiteSpace(Stored(SettingKeys.SalesforceConsumerSecret)),
+            SalesforceUsername = Stored(SettingKeys.SalesforceUsername),
+            SalesforcePasswordSet = !string.IsNullOrWhiteSpace(Stored(SettingKeys.SalesforcePassword)),
+            SalesforceSecurityTokenSet = !string.IsNullOrWhiteSpace(Stored(SettingKeys.SalesforceSecurityToken)),
+            SalesforceLoginUrl = Stored(SettingKeys.SalesforceLoginUrl) ?? SettingKeys.DefaultSalesforceLoginUrl,
+            SalesforceOAuthConnected = await HttpContext.RequestServices.GetRequiredService<ISalesforceConnector>().IsConnectedAsync(ct),
+            SalesforcePublicBaseUrl = SalesforceController.NormalizeBaseUrl(Stored(SettingKeys.SalesforcePublicBaseUrl)),
+            SalesforceCallbackUrl = $"{SalesforceController.NormalizeBaseUrl(Stored(SettingKeys.SalesforcePublicBaseUrl)) ?? $"{Request.Scheme}://{Request.Host}"}/Salesforce/Callback",
+            SalesforceCallbackIsLocal = SalesforceController.NormalizeBaseUrl(Stored(SettingKeys.SalesforcePublicBaseUrl)) is null
+                && (Request.Host.Host is "localhost" or "127.0.0.1" or "::1"),
 
             LeadTitleKeywords = Stored(SettingKeys.LeadTitleKeywords)
                 ?? string.Join(", ", SettingsService.DefaultTitleKeywords),

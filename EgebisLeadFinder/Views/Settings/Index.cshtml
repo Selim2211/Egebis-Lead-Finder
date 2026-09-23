@@ -19,7 +19,25 @@
     <div class="alert alert-danger" data-flash="error">@settingsError</div>
 }
 
+<a class="card card-link mb-4 d-block text-decoration-none" asp-controller="Icp" asp-action="Index">
+    <div class="card-body d-flex align-items-center gap-3">
+        <div class="flex-grow-1">
+            <div class="fw-semibold">İdeal Müşteri Profili (ICP) ve NACE</div>
+            <div class="small text-muted-2">Hedef sektör, bölge ve büyüklüğü tanımlayın; firma puanları buna göre hesaplanır.</div>
+        </div>
+        <span>→</span>
+    </div>
+</a>
+
 <form id="smtpTestForm" method="post" asp-action="SendTestEmail" class="d-none">
+    @Html.AntiForgeryToken()
+</form>
+
+<form id="salesforceTestForm" method="post" asp-action="TestSalesforceConnection" class="d-none">
+    @Html.AntiForgeryToken()
+</form>
+
+<form id="salesforceSchemaForm" method="post" asp-controller="Salesforce" asp-action="SetupSchema" class="d-none">
     @Html.AntiForgeryToken()
 </form>
 
@@ -182,6 +200,162 @@
                 {
                     <button class="btn btn-outline-secondary btn-sm" type="submit" form="smtpTestForm">
                         Kendime test e-postası gönder
+                    </button>
+                }
+            </div>
+        </div>
+
+        <div class="card mb-4" id="salesforce-settings">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Salesforce CRM</span>
+                @if (Model.SalesforceOAuthConnected)
+                {
+                    <span class="tag tag-success">bağlı</span>
+                }
+                else if (Model.SalesforceConfigured)
+                {
+                    <span class="tag tag-success">etkin</span>
+                }
+                else
+                {
+                    <span class="tag tag-muted">ayarlanmadı</span>
+                }
+            </div>
+            <div class="card-body">
+                <p class="small text-muted-2 mb-3">
+                    Firma ve lead'leri Salesforce'a Account/Contact/Lead olarak gönderir.
+                </p>
+
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <label class="form-label" asp-for="SalesforceConsumerKey">Consumer Key</label>
+                        <input class="form-control font-monospace" asp-for="SalesforceConsumerKey" autocomplete="off" />
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label" asp-for="SalesforceConsumerSecret">
+                            Consumer Secret
+                            @if (Model.SalesforceConsumerSecretSet)
+                            {
+                                <span class="tag tag-success ms-1">kayıtlı</span>
+                            }
+                        </label>
+                        <input class="form-control font-monospace" type="password" asp-for="SalesforceConsumerSecret"
+                               value="" autocomplete="new-password"
+                               placeholder="@(Model.SalesforceConsumerSecretSet ? "Değiştirmek için yeni değer yazın" : "")" />
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label" asp-for="SalesforceLoginUrl">Login URL</label>
+                        <input class="form-control" asp-for="SalesforceLoginUrl" placeholder="https://login.salesforce.com" />
+                        <div class="form-text">Sandbox kullanıyorsanız <code>https://test.salesforce.com</code>.</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label" asp-for="SalesforcePublicBaseUrl">Uygulamanın dış adresi</label>
+                        <input class="form-control" asp-for="SalesforcePublicBaseUrl" autocomplete="off"
+                               placeholder="https://app.sirketiniz.com" />
+                        <div class="form-text">Salesforce'un bağlantı sonrası geri döneceği adres. Test için ngrok adresi.</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="sfCallbackUrl">Salesforce'a kaydedilecek Callback URL</label>
+                        <div class="input-group">
+                            <input class="form-control font-monospace" id="sfCallbackUrl" value="@Model.SalesforceCallbackUrl" readonly />
+                            <button class="btn btn-outline-secondary" type="button"
+                                    onclick="navigator.clipboard.writeText(document.getElementById('sfCallbackUrl').value);window.egToast&&egToast.success('Callback URL kopyalandı.')">
+                                Kopyala
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            Bu adresi Salesforce'ta External Client App → Settings → OAuth Settings → Callback URL
+                            alanına <strong>birebir</strong> ekleyin.
+                        </div>
+                        @if (Model.SalesforceCallbackIsLocal)
+                        {
+                            <div class="form-text text-danger fw-semibold">
+                                Sayfa localhost'tan açıldı ve dış adres tanımlı değil. Salesforce localhost'a geri
+                                dönemez; yukarıya dış adresi (ör. ngrok adresi) girip kaydedin.
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="mt-3 p-3 rounded" style="background:var(--surface-2, #f4f6f9)">
+                    @if (Model.SalesforceOAuthConnected)
+                    {
+                        <p class="mb-2 small">
+                            <strong>Bağlantı kuruldu.</strong> Firma/lead'leri gönderdiğinizde kendi
+                            Salesforce hesabınız kullanılır; şifreniz sistemde tutulmaz.
+                        </p>
+                        <button class="btn btn-outline-secondary btn-sm" type="submit" form="salesforceSchemaForm"
+                                title="Aktarımın ihtiyaç duyduğu Egebis_* alanlarını Salesforce'ta oluşturur/kontrol eder">
+                            Alanları kur / kontrol et
+                        </button>
+                        <form method="post" asp-controller="Salesforce" asp-action="Disconnect" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <button class="btn btn-outline-danger btn-sm" type="submit">Bağlantıyı kaldır</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <p class="mb-2 small">
+                            Consumer Key/Secret'ı kaydettikten sonra kendi Salesforce hesabınızla
+                            güvenli şekilde bağlanın — şifrenizi buraya yazmanıza gerek kalmaz.
+                        </p>
+                        <a class="btn btn-accent btn-sm @(Model.SalesforceCanConnect ? "" : "disabled")"
+                           asp-controller="Salesforce" asp-action="Connect"
+                           aria-disabled="@(!Model.SalesforceCanConnect)">
+                            Salesforce'a Bağlan
+                        </a>
+                        @if (!Model.SalesforceCanConnect)
+                        {
+                            <div class="form-text">Önce Consumer Key/Secret'ı girip Kaydet'e basın.</div>
+                        }
+                    }
+                </div>
+
+                <details class="mt-3">
+                    <summary class="form-label" style="cursor:pointer">Eski yöntem (kullanıcı adı/şifre)</summary>
+                    <div class="row g-3 mt-1">
+                        <div class="col-sm-6">
+                            <label class="form-label" asp-for="SalesforceUsername">Salesforce kullanıcı adı</label>
+                            <input class="form-control" asp-for="SalesforceUsername" autocomplete="off"
+                                   placeholder="ad@egebis.com" />
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label" asp-for="SalesforcePassword">
+                                Salesforce şifresi
+                                @if (Model.SalesforcePasswordSet)
+                                {
+                                    <span class="tag tag-success ms-1">kayıtlı</span>
+                                }
+                            </label>
+                            <input class="form-control" type="password" asp-for="SalesforcePassword" value=""
+                                   autocomplete="new-password"
+                                   placeholder="@(Model.SalesforcePasswordSet ? "Değiştirmek için yeni şifre yazın" : "")" />
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label" asp-for="SalesforceSecurityToken">
+                                Security Token
+                                @if (Model.SalesforceSecurityTokenSet)
+                                {
+                                    <span class="tag tag-success ms-1">kayıtlı</span>
+                                }
+                            </label>
+                            <input class="form-control font-monospace" type="password" asp-for="SalesforceSecurityToken"
+                                   value="" autocomplete="new-password"
+                                   placeholder="@(Model.SalesforceSecurityTokenSet ? "Değiştirmek için yeni değer yazın" : "")" />
+                        </div>
+                    </div>
+                    <div class="form-text mt-2">
+                        "Salesforce'a Bağlan" varken bu alanlara gerek yok; yalnızca OAuth bağlantısı
+                        kurulamazsa yedek olarak kullanılır.
+                    </div>
+                </details>
+            </div>
+            <div class="card-footer d-flex flex-wrap gap-2 align-items-center">
+                <button class="btn btn-accent btn-sm" type="submit">Kaydet</button>
+                @if (Model.SalesforceConfigured)
+                {
+                    <button class="btn btn-outline-secondary btn-sm" type="submit" form="salesforceTestForm">
+                        Bağlantıyı test et
                     </button>
                 }
             </div>

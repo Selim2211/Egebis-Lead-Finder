@@ -1,0 +1,10 @@
+@model string
+@* Lead'ler: Liste / Pano gecisi. Mevcut filtreler (siralama ve durum haric) korunur. *@
+@{
+    var req = Context.Request;
+    string Keep(string path) => QueryUrl.WithPath(req, path, "view", Model == "list" ? "board" : "list");
+}
+<div class="view-switch" role="group" aria-label="Görünüm">
+    <a class="view-switch-btn @(Model == "list" ? "is-active" : "")" href="@(Model == "list" ? "#" : Keep("/Lead"))">Liste</a>
+    <a class="view-switch-btn @(Model == "board" ? "is-active" : "")" href="@(Model == "board" ? "#" : Keep("/Lead/Board"))">Pano</a>
+</div>

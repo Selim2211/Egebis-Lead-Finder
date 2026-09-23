@@ -49,8 +49,8 @@ public class CompanyResearchService : ICompanyResearchService
         var sourceList = _sources.ToList();
         var sourcesDone = 0;
 
-        progress?.Report(new JobStep(5, "Kamuya açık kaynaklar taranıyor",
-            "haber, KAP, resmi kayıtlar"));
+        progress?.Report(new JobStep(5, "Kaynaklar taranıyor",
+            "firma web sitesi, haberler, KAP, resmi kayıtlar"));
 
         var collected = await Task.WhenAll(sourceList.Select(async source =>
         {
@@ -74,7 +74,7 @@ public class CompanyResearchService : ICompanyResearchService
                 var n = Interlocked.Increment(ref sourcesDone);
                 progress?.Report(new JobStep(
                     5 + (int)(60.0 * n / Math.Max(1, sourceList.Count)),
-                    "Kamuya açık kaynaklar taranıyor",
+                    "Kaynaklar taranıyor",
                     $"{n}/{sourceList.Count} kaynak tarandı"));
             }
         }));
@@ -115,14 +115,16 @@ public class CompanyResearchService : ICompanyResearchService
         }
 
         // 2) AI sentezi.
-        progress?.Report(new JobStep(72, "Yapay zeka finansal analizi yapıyor",
-            $"{snippets.Count} bilgi parçası değerlendiriliyor"));
+        progress?.Report(new JobStep(72, "Yapay zeka derin analiz yapıyor",
+            $"{snippets.Count} bilgi parçası değerlendiriliyor (1-2 dk sürebilir)"));
 
         var aiResult = await _ai.RateCompanyAsync(new CompanyRatingInput
         {
             Company = company,
             Analysis = ParseAnalysis(company.AiAnalysis),
-            Snippets = snippets
+            Snippets = snippets,
+            MaxInputChars = _options.MaxAiInputChars,
+            Timeout = TimeSpan.FromSeconds(Math.Max(30, _options.AiTimeoutSeconds))
         }, ct);
 
         // AI patlarsa (ör. Gemini 503 "yogun talep") toplanan kaynaklari (6-7 Serper
@@ -196,12 +198,13 @@ public class CompanyResearchService : ICompanyResearchService
             FoundSomething = s.FoundSomething,
             Error = s.Error,
             Snippets = s.Snippets
-                .Take(5)
+                .Take(10)
                 .Select(sn => new SourceSnippetItem
                 {
-                    Text = Truncate(sn.Text, 280),
+                    Text = Truncate(sn.Text, 600),
                     Url = sn.SourceUrl,
-                    Kind = sn.Kind.ToString()
+                    Kind = sn.Kind.ToString(),
+                    Date = sn.Date
                 })
                 .ToList()
         }).ToList();

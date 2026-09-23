@@ -144,9 +144,16 @@ namespace EgebisLeadFinder.Migrations
                     b.Property<DateTime?>("EmailSentAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("IcpMatch")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Industry")
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
+
+                    b.Property<string>("NaceCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -168,6 +175,23 @@ namespace EgebisLeadFinder.Migrations
                     b.Property<string>("RatingSignal")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("SalesforceAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("SalesforceDirty")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("SalesforceId")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("SalesforceSyncError")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("SalesforceSyncedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Score")
                         .HasColumnType("integer");
@@ -231,6 +255,16 @@ namespace EgebisLeadFinder.Migrations
                     b.Property<string>("Email")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
+
+                    b.Property<DateTime?>("EmailCheckedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EmailStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("EmailStatusReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<DateOnly?>("EmploymentStartDate")
                         .HasColumnType("date");
@@ -306,6 +340,30 @@ namespace EgebisLeadFinder.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("EmailImages");
+                });
+
+            modelBuilder.Entity("EgebisLeadFinder.Models.EmailSequence", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("EmailSequences");
                 });
 
             modelBuilder.Entity("EgebisLeadFinder.Models.EmailTemplate", b =>
@@ -431,6 +489,23 @@ namespace EgebisLeadFinder.Migrations
                     b.Property<DateTime?>("RepliedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("SalesforceAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("SalesforceDirty")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("SalesforceId")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("SalesforceSyncError")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("SalesforceSyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("Score")
                         .HasColumnType("integer");
 
@@ -457,6 +532,50 @@ namespace EgebisLeadFinder.Migrations
                     b.HasIndex("Status");
 
                     b.ToTable("Leads");
+                });
+
+            modelBuilder.Entity("EgebisLeadFinder.Models.LeadSequence", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CurrentStep")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("LeadId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("NextSendAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("SequenceId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StopReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LeadId");
+
+                    b.HasIndex("SequenceId");
+
+                    b.HasIndex("Status", "NextSendAt");
+
+                    b.ToTable("LeadSequences");
                 });
 
             modelBuilder.Entity("EgebisLeadFinder.Models.SearchProfile", b =>
@@ -522,11 +641,18 @@ namespace EgebisLeadFinder.Migrations
                     b.Property<int>("LeadId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("MessageId")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
                     b.Property<int>("Method")
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("SentAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("SequenceStepId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Subject")
                         .IsRequired()
@@ -547,9 +673,43 @@ namespace EgebisLeadFinder.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("MessageId");
+
                     b.HasIndex("LeadId", "SentAt");
 
                     b.ToTable("SentEmails");
+                });
+
+            modelBuilder.Entity("EgebisLeadFinder.Models.SequenceStep", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("DelayDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SequenceId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TemplateId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("UseAi")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SequenceId");
+
+                    b.HasIndex("TemplateId");
+
+                    b.ToTable("SequenceSteps");
                 });
 
             modelBuilder.Entity("EgebisLeadFinder.Models.CompanySearchProfile", b =>
@@ -607,6 +767,25 @@ namespace EgebisLeadFinder.Migrations
                     b.Navigation("SelectedTemplate");
                 });
 
+            modelBuilder.Entity("EgebisLeadFinder.Models.LeadSequence", b =>
+                {
+                    b.HasOne("EgebisLeadFinder.Models.Lead", "Lead")
+                        .WithMany()
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EgebisLeadFinder.Models.EmailSequence", "Sequence")
+                        .WithMany()
+                        .HasForeignKey("SequenceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Lead");
+
+                    b.Navigation("Sequence");
+                });
+
             modelBuilder.Entity("EgebisLeadFinder.Models.SentEmail", b =>
                 {
                     b.HasOne("EgebisLeadFinder.Models.Lead", "Lead")
@@ -618,11 +797,34 @@ namespace EgebisLeadFinder.Migrations
                     b.Navigation("Lead");
                 });
 
+            modelBuilder.Entity("EgebisLeadFinder.Models.SequenceStep", b =>
+                {
+                    b.HasOne("EgebisLeadFinder.Models.EmailSequence", "Sequence")
+                        .WithMany("Steps")
+                        .HasForeignKey("SequenceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EgebisLeadFinder.Models.EmailTemplate", "Template")
+                        .WithMany()
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Sequence");
+
+                    b.Navigation("Template");
+                });
+
             modelBuilder.Entity("EgebisLeadFinder.Models.Company", b =>
                 {
                     b.Navigation("Contacts");
 
                     b.Navigation("Leads");
+                });
+
+            modelBuilder.Entity("EgebisLeadFinder.Models.EmailSequence", b =>
+                {
+                    b.Navigation("Steps");
                 });
 
             modelBuilder.Entity("EgebisLeadFinder.Models.Lead", b =>

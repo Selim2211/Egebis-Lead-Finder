@@ -146,12 +146,26 @@
                         <label class="form-label">Alıcı</label>
                         <input class="form-control" name="toAddress" id="toAddress" value="@Model.ToAddress"
                                placeholder="ornek@firma.com" />
+                        @if (Model.Contact is not null && Model.Contact.Email == Model.ToAddress)
+                        {
+                            <div class="form-text"><partial name="_EmailBadge" model="Model.Contact" /> @Model.Contact.EmailStatusReason</div>
+                        }
                         @if (string.IsNullOrWhiteSpace(Model.ToAddress))
                         {
                             <div class="form-text text-warning">
                                 Bu firma için e-posta adresi bulunamadı, elle girmeniz gerekiyor.
                             </div>
                         }
+                    </div>
+
+                    <div class="ai-draft-bar mb-3">
+                        <button type="button" class="btn btn-sm btn-primary" id="aiDraftButton"
+                                data-url="@Url.Action("Draft")" data-lead="@Model.Lead.Id" data-template="@Model.SelectedTemplateId">
+                            ✦ AI ile yaz
+                        </button>
+                        <span class="small text-muted-2" id="aiDraftHint">
+                            Firma analizini, fırsatları ve kişinin rolünü kullanarak kişiye özel taslak yazar. Göndermeden önce kontrol edin.
+                        </span>
                     </div>
 
                     <div class="mb-3">
@@ -172,7 +186,16 @@
 
                         @if (Model.SmtpEnabled)
                         {
-                            <button type="submit" class="btn btn-accent" id="sendButton">GÖNDER</button>
+                            @if (Model.Contact is { EmailStatus: EmailStatus.Invalid } bad && bad.Email == Model.ToAddress)
+                            {
+                                <button type="submit" class="btn btn-accent" id="sendButton"
+                                        data-confirm="@(bad.EmailStatusReason ?? "Bu adres geçersiz görünüyor.") Mail büyük ihtimalle geri dönecek ve gönderici itibarınızı etkileyebilir."
+                                        data-confirm-title="Adres geçersiz" data-confirm-ok="Yine de gönder" data-confirm-tone="warning">GÖNDER</button>
+                            }
+                            else
+                            {
+                                <button type="submit" class="btn btn-accent" id="sendButton">GÖNDER</button>
+                            }
                         }
                         else
                         {
@@ -200,8 +223,8 @@
 
                 <div class="alert alert-warning small mt-3 mb-0" data-flash="info" data-flash-title="KVKK ve ticari elektronik ileti" data-flash-timeout="8000">
 
-                    Bu araç toplu gönderim yapmaz; her e-posta tek tek gözden geçirilip
-                    gönderilir. Kişisel verilerin işlenmesi ve ticari elektronik ileti
+                    Bu ekrandaki e-posta tek tek gözden geçirilip gönderilir; otomatik diziler
+                    günlük tavan ve iş saati sınırıyla çalışır. Kişisel verilerin işlenmesi ve ticari elektronik ileti
                     gönderimi (İYS kaydı dâhil) yükümlülükleri gönderen tarafa aittir.
                 </div>
             </div>
@@ -223,6 +246,37 @@
 @section Scripts {
 <script src="~/js/mail-editor.js" asp-append-version="true"></script>
 <script>
+    (function () {
+        var btn = document.getElementById('aiDraftButton');
+        if (!btn) return;
+        var hint = document.getElementById('aiDraftHint');
+        var token = document.querySelector('#sendForm input[name="__RequestVerificationToken"]').value;
+
+        btn.addEventListener('click', async function () {
+            var editor = document.getElementById('bodyEditor');
+            var original = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Yazılıyor...';
+            try {
+                var body = new URLSearchParams({ leadId: btn.dataset.lead, templateId: btn.dataset.template || '', __RequestVerificationToken: token });
+                var res = await fetch(btn.dataset.url, { method: 'POST', body: body, headers: { 'Accept': 'application/json' } });
+                var data = await res.json();
+                if (!data.success) { egToast.error(data.error || 'Taslak üretilemedi.'); return; }
+                document.getElementById('subject').value = data.subject;
+                editor.innerHTML = data.bodyHtml;
+                editor.dispatchEvent(new Event('input', { bubbles: true }));
+                btn.dataset.used = '1';
+                egToast.success('Taslak hazır. Göndermeden önce gözden geçirin.');
+                if (data.hint) hint.textContent = data.hint;
+            } catch (e) {
+                egToast.error('Taslak üretilemedi: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = btn.dataset.used ? '↻ Yeniden yaz' : original;
+            }
+        });
+    })();
+
     // Cift tiklamada ayni e-posta iki kez gitmesin.
     document.getElementById('sendForm').addEventListener('submit', function (e) {
         var b = document.getElementById('sendButton');

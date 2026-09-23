@@ -24,6 +24,7 @@ public class CompanyController : Controller
     private readonly ISettingsService _settings;
     private readonly IWebScraperService _scraper;
     private readonly IAiService _ai;
+    private readonly IcpService _icp;
     private readonly ILogger<CompanyController> _logger;
 
     public CompanyController(
@@ -39,8 +40,10 @@ public class CompanyController : Controller
         ISettingsService settings,
         IWebScraperService scraper,
         IAiService ai,
-        ILogger<CompanyController> logger)
+        ILogger<CompanyController> logger,
+        IcpService icp)
     {
+        _icp = icp;
         _settings = settings;
         _scraper = scraper;
         _ai = ai;
@@ -399,77 +402,15 @@ public class CompanyController : Controller
     public async Task<IActionResult> Index(string? search, int minScore = 0, bool onlyWithoutLead = false,
         int? profileId = null, string? stage = null, string? signal = null, string? sort = null,
         [FromQuery(Name = "region")] string[]? regions = null, [FromQuery(Name = "city")] string[]? cities = null,
-        [FromQuery(Name = "country")] string[]? countries = null,
+        [FromQuery(Name = "country")] string[]? countries = null, string? nace = null, bool icp = false,
         int page = 1, CancellationToken ct = default)
     {
         var geo = GeoFilter.From(regions, cities, countries);
-        var query = _db.Companies.AsNoTracking().Where(c => c.Score >= minScore);
-
-        if (geo.Countries.Count > 0)
-        {
-            var names = geo.CountryNames();
-            query = query.Where(c => c.Country != null && names.Contains(c.Country));
-        }
-
-        if (geo.Regions.Count > 0 || geo.Cities.Count > 0)
-        {
-            var geoCities = geo.EffectiveCities();
-            query = query.Where(c => c.City != null && geoCities.Contains(c.City));
-        }
-
-        query = signal switch
-        {
-            "guclu" => query.Where(c => c.RatingSignal == "Guclu"),
-            "incelenmeli" => query.Where(c => c.RatingSignal == "Incelenmeli"),
-            "riskli" => query.Where(c => c.RatingSignal == "Riskli"),
-            "none" => query.Where(c => c.RatingSignal == null || c.RatingSignal == "Bilinmiyor"),
-            _ => query
-        };
         if (signal is not ("guclu" or "incelenmeli" or "riskli" or "none")) signal = null;
-
-        query = stage switch
-        {
-            CompanyStage.Contacted => query.Where(c => c.ContactedAt != null),
-            CompanyStage.Mailed => query.Where(c => c.EmailSentAt != null),
-            CompanyStage.Project => query.Where(c => c.ProjectStartedAt != null),
-            CompanyStage.Untouched => query.Where(c =>
-                c.ContactedAt == null && c.EmailSentAt == null && c.ProjectStartedAt == null),
-            _ => query
-        };
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = $"%{search}%";
-            query = query.Where(c =>
-                EF.Functions.ILike(c.Name, term) ||
-                (c.Industry != null && EF.Functions.ILike(c.Industry, term)) ||
-                (c.Domain != null && EF.Functions.ILike(c.Domain, term)));
-        }
-
-        if (onlyWithoutLead)
-            query = query.Where(c => !c.Leads.Any());
-
-        if (profileId is > 0)
-        {
-            var companyIds = await _db.CompanySearchProfiles
-                .Where(x => x.SearchProfileId == profileId)
-                .Select(x => x.CompanyId)
-                .ToListAsync(ct);
-            query = query.Where(c => companyIds.Contains(c.Id));
-        }
-
         sort = CompanySort.Options.Any(o => o.Key == sort) ? sort! : CompanySort.Default;
-        IOrderedQueryable<Company> ordered = sort switch
-        {
-            "score_asc" => query.OrderBy(c => c.Score).ThenBy(c => c.Name),
-            "newest" => query.OrderByDescending(c => c.CreatedAt),
-            "oldest" => query.OrderBy(c => c.CreatedAt),
-            "name" => query.OrderBy(c => c.Name),
-            "name_desc" => query.OrderByDescending(c => c.Name),
-            "contacts" => query.OrderByDescending(c => c.Contacts.Count).ThenByDescending(c => c.Score),
-            "city" => query.OrderBy(c => c.City == null).ThenBy(c => c.City).ThenByDescending(c => c.Score),
-            _ => query.OrderByDescending(c => c.Score).ThenBy(c => c.Name)
-        };
+        nace = NaceCatalog.DivisionCode(nace);
+        var query = await FilterCompaniesAsync(search, minScore, onlyWithoutLead, profileId, stage, signal, geo, nace, icp, ct);
+        var ordered = OrderCompanies(query, sort);
 
         var total = await query.CountAsync(ct);
         page = PagerModel.Clamp(page, total);
@@ -497,6 +438,14 @@ public class CompanyController : Controller
             ProfileId = profileId,
             Stage = stage,
             Signal = signal,
+            Nace = nace,
+            Icp = icp,
+            NaceCounts = await _db.Companies.AsNoTracking()
+                .Where(c => c.NaceCode != null)
+                .GroupBy(c => c.NaceCode!.Substring(0, 2))
+                .Select(g => new { g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Key, x => x.Count, ct),
+            IcpCount = await _db.Companies.CountAsync(c => c.IcpMatch, ct),
             Sort = sort,
             Geo = geo,
             Pager = new PagerModel { Page = page, TotalItems = total },
@@ -535,6 +484,115 @@ public class CompanyController : Controller
         }
 
         return View(model);
+    }
+
+    /// <summary>Firmalar listesindeki filtrelerle Excel (firmalar + kisiler sayfasi) veya CSV indirir.</summary>
+    [HttpGet]
+    public async Task<IActionResult> Export(string format, string? search, int minScore = 0, bool onlyWithoutLead = false,
+        int? profileId = null, string? stage = null, string? signal = null, string? sort = null,
+        [FromQuery(Name = "region")] string[]? regions = null, [FromQuery(Name = "city")] string[]? cities = null,
+        [FromQuery(Name = "country")] string[]? countries = null, string? nace = null, bool icp = false,
+        CancellationToken ct = default)
+    {
+        var geo = GeoFilter.From(regions, cities, countries);
+        if (signal is not ("guclu" or "incelenmeli" or "riskli" or "none")) signal = null;
+        sort = CompanySort.Options.Any(o => o.Key == sort) ? sort! : CompanySort.Default;
+
+        var query = await FilterCompaniesAsync(search, minScore, onlyWithoutLead, profileId, stage, signal, geo,
+            NaceCatalog.DivisionCode(nace), icp, ct);
+        var companies = await OrderCompanies(query, sort).ThenBy(c => c.Id)
+            .Take(ExportService.MaxRows)
+            .Include(c => c.Contacts)
+            .Include(c => c.Leads)
+            .AsSplitQuery()
+            .ToListAsync(ct);
+
+        var tables = ExportService.CompanyTables(companies);
+        var stamp = DateTime.Now.ToString("yyyy-MM-dd-HHmm");
+
+        return format == "csv"
+            ? File(ExportService.ToCsv(tables[0]), "text/csv; charset=utf-8", $"firmalar-{stamp}.csv")
+            : File(ExportService.ToXlsx(tables),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"firmalar-{stamp}.xlsx");
+    }
+
+    /// <summary>Firmalar listesi ve disa aktarim ayni suzgeci kullanir: ekranda ne varsa o iner.</summary>
+    private async Task<IQueryable<Company>> FilterCompaniesAsync(string? search, int minScore, bool onlyWithoutLead,
+        int? profileId, string? stage, string? signal, GeoFilter geo, string? nace, bool icp, CancellationToken ct)
+    {
+        var query = _db.Companies.AsNoTracking().Where(c => c.Score >= minScore);
+
+        if (nace is not null) query = query.Where(c => c.NaceCode != null && c.NaceCode.StartsWith(nace));
+        if (icp) query = query.Where(c => c.IcpMatch);
+
+        if (geo.Countries.Count > 0)
+        {
+            var names = geo.CountryNames();
+            query = query.Where(c => c.Country != null && names.Contains(c.Country));
+        }
+
+        if (geo.Regions.Count > 0 || geo.Cities.Count > 0)
+        {
+            var geoCities = geo.EffectiveCities();
+            query = query.Where(c => c.City != null && geoCities.Contains(c.City));
+        }
+
+        query = signal switch
+        {
+            "guclu" => query.Where(c => c.RatingSignal == "Guclu"),
+            "incelenmeli" => query.Where(c => c.RatingSignal == "Incelenmeli"),
+            "riskli" => query.Where(c => c.RatingSignal == "Riskli"),
+            "none" => query.Where(c => c.RatingSignal == null || c.RatingSignal == "Bilinmiyor"),
+            _ => query
+        };
+
+        query = stage switch
+        {
+            CompanyStage.Contacted => query.Where(c => c.ContactedAt != null),
+            CompanyStage.Mailed => query.Where(c => c.EmailSentAt != null),
+            CompanyStage.Project => query.Where(c => c.ProjectStartedAt != null),
+            CompanyStage.Untouched => query.Where(c =>
+                c.ContactedAt == null && c.EmailSentAt == null && c.ProjectStartedAt == null),
+            _ => query
+        };
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = $"%{search}%";
+            query = query.Where(c =>
+                EF.Functions.ILike(c.Name, term) ||
+                (c.Industry != null && EF.Functions.ILike(c.Industry, term)) ||
+                (c.Domain != null && EF.Functions.ILike(c.Domain, term)));
+        }
+
+        if (onlyWithoutLead)
+            query = query.Where(c => !c.Leads.Any());
+
+        if (profileId is > 0)
+        {
+            var companyIds = await _db.CompanySearchProfiles
+                .Where(x => x.SearchProfileId == profileId)
+                .Select(x => x.CompanyId)
+                .ToListAsync(ct);
+            query = query.Where(c => companyIds.Contains(c.Id));
+        }
+
+        return query;
+    }
+
+    private static IOrderedQueryable<Company> OrderCompanies(IQueryable<Company> query, string sort)
+    {
+        return sort switch
+        {
+            "score_asc" => query.OrderBy(c => c.Score).ThenBy(c => c.Name),
+            "newest" => query.OrderByDescending(c => c.CreatedAt),
+            "oldest" => query.OrderBy(c => c.CreatedAt),
+            "name" => query.OrderBy(c => c.Name),
+            "name_desc" => query.OrderByDescending(c => c.Name),
+            "contacts" => query.OrderByDescending(c => c.Contacts.Count).ThenByDescending(c => c.Score),
+            "city" => query.OrderBy(c => c.City == null).ThenBy(c => c.City).ThenByDescending(c => c.Score),
+            _ => query.OrderByDescending(c => c.Score).ThenBy(c => c.Name)
+        };
     }
 
     /// <summary>
@@ -589,6 +647,26 @@ public class CompanyController : Controller
             return Json(new { deleted = true, name = company.Name });
 
         TempData["SettingsSaved"] = $"\"{company.Name}\" silindi.";
+        return RedirectToLocal(returnUrl);
+    }
+
+    /// <summary>Firmayi (ve kisilerini) Salesforce'a Account/Contact olarak gonderir.</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SyncToSalesforce(
+        int id, string? returnUrl, [FromServices] SalesforceSyncRunner salesforce, CancellationToken ct)
+    {
+        var result = await salesforce.SyncCompanyAsync(id, ct);
+        if (result is null) return NotFound();
+
+        if (WantsJson())
+            return Json(new { success = result.Success, error = result.Error, salesforceId = result.SalesforceId });
+
+        var name = await _db.Companies.Where(c => c.Id == id).Select(c => c.Name).FirstOrDefaultAsync(ct);
+        TempData[result.Success ? "SettingsSaved" : "SettingsError"] = result.Success
+            ? $"\"{name}\" Salesforce'a gönderildi. Bundan sonraki değişiklikler otomatik aktarılacak."
+            : $"Salesforce'a gönderilemedi: {result.Error}";
+
         return RedirectToLocal(returnUrl);
     }
 
@@ -669,7 +747,7 @@ public class CompanyController : Controller
         if (company is null) return null;
 
         var analysis = ParseAnalysis(company.AiAnalysis);
-        var breakdown = _scoring.ScoreCompany(analysis, site: null, company.Contacts);
+        var breakdown = _scoring.ScoreCompany(analysis, site: null, company.Contacts, await _icp.GetAsync(ct), company);
 
         var model = new CompanyDetailViewModel
         {
@@ -750,7 +828,7 @@ public class CompanyController : Controller
                 company.Name = aiResult.Analysis.CompanyName;
 
             StringLengthGuard.Apply(company);
-            company.Score = _scoring.ScoreCompany(aiResult.Analysis, site, company.Contacts).Total;
+            await _icp.ScoreAsync(company, aiResult.Analysis, site, ct);
 
             await _db.SaveChangesAsync(ct);
             TempData["EnrichSuccess"] = "Yapay zeka analizi yenilendi.";
@@ -802,8 +880,7 @@ public class CompanyController : Controller
 
                 // Yeni bulunan yonetici "IT/SAP yoneticisi bulundu" kriterini
                 // karsilayabilir; puan guncel kisi listesiyle yeniden hesaplanir.
-                var analysis = ParseAnalysis(company.AiAnalysis);
-                company.Score = _scoring.ScoreCompany(analysis, site: null, company.Contacts).Total;
+                await _icp.ScoreAsync(company, ParseAnalysis(company.AiAnalysis), site: null, ct);
 
                 await _db.SaveChangesAsync(ct);
 

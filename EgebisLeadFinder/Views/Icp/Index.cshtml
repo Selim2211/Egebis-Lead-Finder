@@ -1,0 +1,134 @@
+@model IcpProfile
+@{
+    ViewData["Title"] = "İdeal Müşteri Profili";
+    var naceCounts = (Dictionary<string, int>)ViewBag.NaceCounts;
+    var selected = new HashSet<string>(Model.NaceCodes);
+    var sections = NaceCatalog.Divisions.GroupBy(d => (d.SectionCode, d.SectionName));
+}
+
+<div class="page-head">
+    <div>
+        <h1>İdeal Müşteri Profili (ICP)</h1>
+        <div class="page-sub">Hedef sektör (NACE), bölge ve büyüklük; firma puanları ve "ICP'ye uyanlar" filtresi buna göre çalışır</div>
+    </div>
+    <a class="btn btn-outline-secondary" asp-controller="Company" asp-action="Index" asp-route-icp="true">
+        ICP'ye uyan @ViewBag.MatchCount firma →
+    </a>
+</div>
+
+@if (TempData["SettingsSaved"] is string saved)
+{
+    <div class="alert alert-success" data-flash="success">@saved</div>
+}
+
+<form id="fillNaceForm" method="post" asp-action="StartFillNace" class="d-none"
+      data-progress-start="@Url.Action("StartFillNace")"
+      data-progress-title="NACE kodları belirleniyor"
+      data-progress-hint="Kayıtlı firma analizlerinden yapay zeka NACE kodu atıyor; siteler yeniden taranmaz, puanlar değişmez.">
+    @Html.AntiForgeryToken()
+</form>
+
+<form method="post">
+    @Html.AntiForgeryToken()
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header">Hedef sektörler (NACE Rev.2)</div>
+                <div class="card-body">
+                    @if (ViewBag.MissingNace is int missing && missing > 0)
+                    {
+                        <div class="alert alert-secondary small d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                            <span>@missing firmanın NACE kodu yok; bu firmalar "ICP'ye uyanlar" listesine giremez.</span>
+                            <button type="submit" form="fillNaceForm" class="btn btn-sm btn-primary">NACE kodlarını doldur</button>
+                        </div>
+                    }
+                    <div class="small text-muted-2 mb-3">
+                        Seçilen bölümlerdeki firmalar "hedef sektör" puanı alır. Firmanın NACE kodunu yapay zeka
+                        site analizinde belirler; eski firmalarda boşsa firma sayfasındaki "Yeniden Analiz Et" ile dolar.
+                    </div>
+                    @foreach (var sec in sections)
+                    {
+                        var open = sec.Key.SectionCode == "C" || sec.Any(d => selected.Contains(d.Code));
+                        <details class="icp-section" open="@open">
+                            <summary>
+                                <strong>@sec.Key.SectionCode</strong> · @sec.Key.SectionName
+                                <span class="cell-sub">(@sec.Count(d => selected.Contains(d.Code)) seçili)</span>
+                            </summary>
+                            <div class="icp-grid">
+                                @foreach (var d in sec)
+                                {
+                                    <label class="icp-option">
+                                        <input type="checkbox" name="nace" value="@d.Code" checked="@selected.Contains(d.Code)" />
+                                        <span><strong>@d.Code</strong> @d.Name</span>
+                                        @if (naceCounts.TryGetValue(d.Code, out var n))
+                                        {
+                                            <span class="tag tag-muted">@n</span>
+                                        }
+                                    </label>
+                                }
+                            </div>
+                        </details>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card mb-4">
+                <div class="card-header">Diğer kriterler</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Sektör kelimeleri</label>
+                        <input class="form-control" name="industries" value="@string.Join(", ", Model.IndustryKeywords)"
+                               placeholder="otomotiv, plastik, kalıp" />
+                        <div class="form-text">NACE kodu olmayan firmalarda sektör metninde aranır. Virgülle ayırın.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Hedef iller</label>
+                        <input class="form-control" name="cities" list="provinceList" value="@string.Join(", ", Model.Cities)"
+                               placeholder="Bursa, Kocaeli, Manisa" />
+                        <datalist id="provinceList">
+                            @foreach (var p in TurkishProvinces.All)
+                            {
+                                <option value="@p"></option>
+                            }
+                        </datalist>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Hedef ülkeler</label>
+                        <input class="form-control" name="countries" value="@string.Join(", ", Model.Countries)"
+                               placeholder="Türkiye, Almanya" />
+                        <div class="form-text">İl veya ülkeden biri tutarsa "hedef bölge" sayılır.</div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Asgari çalışan</label>
+                            <input class="form-control" type="number" min="0" name="minEmployees" value="@Model.MinEmployees" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Bölge puanı</label>
+                            <input class="form-control" type="number" min="0" max="30" name="locationWeight" value="@Model.LocationWeight" />
+                        </div>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" name="requireManufacturer" value="true" id="reqMan" checked="@Model.RequireManufacturer" />
+                        <input type="hidden" name="requireManufacturer" value="false" />
+                        <label class="form-check-label" for="reqMan">Yalnızca üretici firmalar ICP'ye uysun</label>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label">Hariç tutulacak kelimeler</label>
+                        <input class="form-control" name="exclude" value="@string.Join(", ", Model.ExcludeKeywords)"
+                               placeholder="bayi, distribütör, ithalatçı" />
+                        <div class="form-text">Firma adı, sektör veya ürünlerde geçerse firma elenir (puan 0).</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 flex-wrap">
+                <button class="btn btn-accent" name="rescore" value="true">Kaydet ve firmaları yeniden puanla</button>
+                <button class="btn btn-outline-secondary" name="rescore" value="false">Sadece kaydet</button>
+            </div>
+            <div class="form-text mt-2">Yeniden puanlama kayıtlı analizleri kullanır; API kredisi harcamaz.</div>
+        </div>
+    </div>
+</form>

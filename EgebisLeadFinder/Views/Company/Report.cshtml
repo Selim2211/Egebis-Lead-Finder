@@ -106,7 +106,7 @@
     </section>
 
     <section class="report-section">
-        <h2>Ön araştırma</h2>
+        <h2>Firma analizi</h2>
         @if (rating is null)
         {
             <p class="report-note">Bu firma henüz araştırılmadı.</p>
@@ -124,9 +124,103 @@
                     <span>· güven %@rating.Confidence</span>
                 }
             </p>
-            @if (!string.IsNullOrWhiteSpace(rating.Rating.Summary))
+            var rr = rating.Rating;
+            @if (!string.IsNullOrWhiteSpace(rr.Summary))
             {
-                <p>@rating.Rating.Summary</p>
+                <p>@rr.Summary</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(rr.SalesApproach) || rr.Opportunities.Count > 0)
+            {
+                <h3 class="report-sub">Egebis için fırsatlar</h3>
+                @if (!string.IsNullOrWhiteSpace(rr.SalesApproach))
+                {
+                    <p>@rr.SalesApproach</p>
+                }
+                <ul class="report-bullets">
+                    @foreach (var o in rr.Opportunities)
+                    {
+                        <li>@o.Text@(string.IsNullOrWhiteSpace(o.Reason) ? "" : " — " + o.Reason)</li>
+                    }
+                </ul>
+            }
+            @if (rr.FinancialPeriods.Count > 0 || !string.IsNullOrWhiteSpace(rr.FinancialInfo) || rr.SizeInfo is not null)
+            {
+                <h3 class="report-sub">Finans ve büyüklük</h3>
+                @if (rr.FinancialPeriods.Count > 0)
+                {
+                    <table class="report-table">
+                        <thead><tr><th>Dönem</th><th>Ciro</th><th>Net kâr</th></tr></thead>
+                        <tbody>
+                            @foreach (var p in rr.FinancialPeriods)
+                            {
+                                <tr><td>@p.Period</td><td>@p.Revenue</td><td>@p.NetProfit</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                @if (!string.IsNullOrWhiteSpace(rr.FinancialInfo))
+                {
+                    <p class="report-note"><strong>Finansal durum:</strong> @rr.FinancialInfo</p>
+                }
+                @if (!string.IsNullOrWhiteSpace(rr.SizeInfo?.Employees))
+                {
+                    <p class="report-note"><strong>Çalışan:</strong> @rr.SizeInfo!.Employees</p>
+                }
+                @if (!string.IsNullOrWhiteSpace(rr.SizeInfo?.ExportInfo))
+                {
+                    <p class="report-note"><strong>İhracat:</strong> @rr.SizeInfo!.ExportInfo</p>
+                }
+                @if (rr.SizeInfo is { Locations.Count: > 0 })
+                {
+                    <p class="report-note"><strong>Lokasyonlar:</strong> @string.Join(", ", rr.SizeInfo.Locations)</p>
+                }
+            }
+            @if (rr.Management.Count > 0 || rr.GroupCompanies.Count > 0)
+            {
+                <h3 class="report-sub">Yönetim ve karar vericiler</h3>
+                <ul class="report-bullets">
+                    @foreach (var m in rr.Management)
+                    {
+                        <li><strong>@m.Name</strong>@(string.IsNullOrWhiteSpace(m.Role) ? "" : " — " + m.Role)</li>
+                    }
+                </ul>
+                @if (rr.GroupCompanies.Count > 0)
+                {
+                    <p class="report-note"><strong>Grup / iştirakler:</strong> @string.Join(", ", rr.GroupCompanies)</p>
+                }
+            }
+            @if (rr.Technology is { IsEmpty: false } tech)
+            {
+                <h3 class="report-sub">Teknoloji ve IT</h3>
+                <p class="report-note"><strong>ERP:</strong> @tech.Erp @(string.IsNullOrWhiteSpace(tech.ErpEvidence) ? "" : "(" + tech.ErpEvidence + ")")</p>
+                @if (tech.Software.Count > 0)
+                {
+                    <p class="report-note"><strong>Yazılımlar:</strong> @string.Join(", ", tech.Software)</p>
+                }
+                @if (tech.DigitalProjects.Count > 0)
+                {
+                    <p class="report-note"><strong>Dijital projeler:</strong> @string.Join("; ", tech.DigitalProjects)</p>
+                }
+            }
+            @if (rr.RiskSignals.Count > 0)
+            {
+                <h3 class="report-sub">Riskler</h3>
+                <ul class="report-bullets">
+                    @foreach (var risk in rr.RiskSignals)
+                    {
+                        <li>[@risk.Severity] @risk.Text</li>
+                    }
+                </ul>
+            }
+            @if (rr.NewsTimeline.Count > 0)
+            {
+                <h3 class="report-sub">Son haberler</h3>
+                <ul class="report-bullets">
+                    @foreach (var n in rr.NewsTimeline.Take(8))
+                    {
+                        <li>@(string.IsNullOrWhiteSpace(n.Date) ? "" : n.Date + " · ")@n.Title</li>
+                    }
+                </ul>
             }
             @if (rating.Notes.Count > 0)
             {

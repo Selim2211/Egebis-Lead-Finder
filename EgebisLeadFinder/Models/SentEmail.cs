@@ -45,4 +45,11 @@ public class SentEmail
     public SentEmailMethod Method { get; set; } = SentEmailMethod.Smtp;
 
     public DateTime SentAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Gonderilen mailin Message-ID'si; gelen cevabin In-Reply-To'su ile eslestirilir.</summary>
+    [MaxLength(300)]
+    public string? MessageId { get; set; }
+
+    /// <summary>Otomatik diziden gittiyse adimi.</summary>
+    public int? SequenceStepId { get; set; }
 }

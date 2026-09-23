@@ -1,0 +1,113 @@
+{
+  "sections": [
+    { "code": "A", "name": "Tarım, ormancılık ve balıkçılık", "divisions": [
+      { "code": "01", "name": "Bitkisel ve hayvansal üretim, avcılık" },
+      { "code": "02", "name": "Ormancılık ve tomrukçuluk" },
+      { "code": "03", "name": "Balıkçılık ve su ürünleri yetiştiriciliği" } ] },
+    { "code": "B", "name": "Madencilik ve taş ocakçılığı", "divisions": [
+      { "code": "05", "name": "Kömür ve linyit çıkartılması" },
+      { "code": "06", "name": "Ham petrol ve doğal gaz çıkarımı" },
+      { "code": "07", "name": "Metal cevherleri madenciliği" },
+      { "code": "08", "name": "Diğer madencilik ve taş ocakçılığı" },
+      { "code": "09", "name": "Madenciliği destekleyici hizmet faaliyetleri" } ] },
+    { "code": "C", "name": "İmalat", "divisions": [
+      { "code": "10", "name": "Gıda ürünlerinin imalatı" },
+      { "code": "11", "name": "İçeceklerin imalatı" },
+      { "code": "12", "name": "Tütün ürünleri imalatı" },
+      { "code": "13", "name": "Tekstil ürünlerinin imalatı" },
+      { "code": "14", "name": "Giyim eşyalarının imalatı" },
+      { "code": "15", "name": "Deri ve ilgili ürünlerin imalatı" },
+      { "code": "16", "name": "Ağaç, ağaç ürünleri ve mantar ürünleri imalatı (mobilya hariç)" },
+      { "code": "17", "name": "Kağıt ve kağıt ürünlerinin imalatı" },
+      { "code": "18", "name": "Kayıtlı medyanın basılması ve çoğaltılması" },
+      { "code": "19", "name": "Kok kömürü ve rafine edilmiş petrol ürünleri imalatı" },
+      { "code": "20", "name": "Kimyasalların ve kimyasal ürünlerin imalatı" },
+      { "code": "21", "name": "Temel eczacılık ürünlerinin ve müstahzarlarının imalatı" },
+      { "code": "22", "name": "Kauçuk ve plastik ürünlerin imalatı" },
+      { "code": "23", "name": "Diğer metalik olmayan mineral ürünlerin imalatı (cam, seramik, çimento)" },
+      { "code": "24", "name": "Ana metal sanayii (demir-çelik, alüminyum, döküm)" },
+      { "code": "25", "name": "Fabrikasyon metal ürünleri imalatı (makine ve teçhizat hariç)" },
+      { "code": "26", "name": "Bilgisayarların, elektronik ve optik ürünlerin imalatı" },
+      { "code": "27", "name": "Elektrikli teçhizat imalatı" },
+      { "code": "28", "name": "Başka yerde sınıflandırılmamış makine ve ekipman imalatı" },
+      { "code": "29", "name": "Motorlu kara taşıtı, römork ve yarı römork imalatı (otomotiv)" },
+      { "code": "30", "name": "Diğer ulaşım araçlarının imalatı (gemi, raylı sistem, hava taşıtı, savunma)" },
+      { "code": "31", "name": "Mobilya imalatı" },
+      { "code": "32", "name": "Diğer imalatlar (medikal, takı, spor, oyuncak)" },
+      { "code": "33", "name": "Makine ve ekipmanların kurulumu ve onarımı" } ] },
+    { "code": "D", "name": "Elektrik, gaz, buhar ve iklimlendirme üretimi ve dağıtımı", "divisions": [
+      { "code": "35", "name": "Elektrik, gaz, buhar ve iklimlendirme üretimi ve dağıtımı" } ] },
+    { "code": "E", "name": "Su temini; kanalizasyon, atık yönetimi ve iyileştirme", "divisions": [
+      { "code": "36", "name": "Suyun toplanması, arıtılması ve dağıtılması" },
+      { "code": "37", "name": "Kanalizasyon" },
+      { "code": "38", "name": "Atığın toplanması, ıslahı ve bertarafı; geri kazanım" },
+      { "code": "39", "name": "İyileştirme faaliyetleri ve diğer atık yönetimi hizmetleri" } ] },
+    { "code": "F", "name": "İnşaat", "divisions": [
+      { "code": "41", "name": "Bina inşaatı" },
+      { "code": "42", "name": "Bina dışı yapıların inşaatı" },
+      { "code": "43", "name": "Özel inşaat faaliyetleri" } ] },
+    { "code": "G", "name": "Toptan ve perakende ticaret; motorlu kara taşıtlarının onarımı", "divisions": [
+      { "code": "45", "name": "Motorlu kara taşıtları ticareti ve onarımı" },
+      { "code": "46", "name": "Toptan ticaret" },
+      { "code": "47", "name": "Perakende ticaret" } ] },
+    { "code": "H", "name": "Ulaştırma ve depolama", "divisions": [
+      { "code": "49", "name": "Kara taşımacılığı ve boru hattı taşımacılığı" },
+      { "code": "50", "name": "Su yolu taşımacılığı" },
+      { "code": "51", "name": "Havayolu taşımacılığı" },
+      { "code": "52", "name": "Taşımacılık için depolama ve destekleyici faaliyetler (lojistik)" },
+      { "code": "53", "name": "Posta ve kurye faaliyetleri" } ] },
+    { "code": "I", "name": "Konaklama ve yiyecek hizmeti faaliyetleri", "divisions": [
+      { "code": "55", "name": "Konaklama" },
+      { "code": "56", "name": "Yiyecek ve içecek hizmeti faaliyetleri" } ] },
+    { "code": "J", "name": "Bilgi ve iletişim", "divisions": [
+      { "code": "58", "name": "Yayımcılık faaliyetleri" },
+      { "code": "59", "name": "Sinema filmi, video ve televizyon programı yapımcılığı; ses kaydı" },
+      { "code": "60", "name": "Programcılık ve yayıncılık faaliyetleri" },
+      { "code": "61", "name": "Telekomünikasyon" },
+      { "code": "62", "name": "Bilgisayar programlama, danışmanlık ve ilgili faaliyetler" },
+      { "code": "63", "name": "Bilgi hizmet faaliyetleri" } ] },
+    { "code": "K", "name": "Finans ve sigorta faaliyetleri", "divisions": [
+      { "code": "64", "name": "Finansal hizmet faaliyetleri (sigorta ve emeklilik hariç)" },
+      { "code": "65", "name": "Sigorta, reasürans ve emeklilik fonları" },
+      { "code": "66", "name": "Finansal hizmetler ve sigorta için yardımcı faaliyetler" } ] },
+    { "code": "L", "name": "Gayrimenkul faaliyetleri", "divisions": [
+      { "code": "68", "name": "Gayrimenkul faaliyetleri" } ] },
+    { "code": "M", "name": "Mesleki, bilimsel ve teknik faaliyetler", "divisions": [
+      { "code": "69", "name": "Hukuk ve muhasebe faaliyetleri" },
+      { "code": "70", "name": "İdare merkezi faaliyetleri; idari danışmanlık" },
+      { "code": "71", "name": "Mimarlık ve mühendislik faaliyetleri; teknik test ve analiz" },
+      { "code": "72", "name": "Bilimsel araştırma ve geliştirme faaliyetleri" },
+      { "code": "73", "name": "Reklamcılık ve piyasa araştırması" },
+      { "code": "74", "name": "Diğer mesleki, bilimsel ve teknik faaliyetler" },
+      { "code": "75", "name": "Veterinerlik hizmetleri" } ] },
+    { "code": "N", "name": "İdari ve destek hizmet faaliyetleri", "divisions": [
+      { "code": "77", "name": "Kiralama ve leasing faaliyetleri" },
+      { "code": "78", "name": "İstihdam faaliyetleri" },
+      { "code": "79", "name": "Seyahat acentesi ve tur operatörü faaliyetleri" },
+      { "code": "80", "name": "Güvenlik ve soruşturma faaliyetleri" },
+      { "code": "81", "name": "Binalar ile ilgili hizmetler ve çevre düzenlemesi" },
+      { "code": "82", "name": "Büro yönetimi, büro destek ve diğer iş destek faaliyetleri" } ] },
+    { "code": "O", "name": "Kamu yönetimi ve savunma; zorunlu sosyal güvenlik", "divisions": [
+      { "code": "84", "name": "Kamu yönetimi ve savunma; zorunlu sosyal güvenlik" } ] },
+    { "code": "P", "name": "Eğitim", "divisions": [
+      { "code": "85", "name": "Eğitim" } ] },
+    { "code": "Q", "name": "İnsan sağlığı ve sosyal hizmet faaliyetleri", "divisions": [
+      { "code": "86", "name": "İnsan sağlığı hizmetleri" },
+      { "code": "87", "name": "Yatılı bakım faaliyetleri" },
+      { "code": "88", "name": "Barınacak yer sağlanmaksızın verilen sosyal yardım" } ] },
+    { "code": "R", "name": "Kültür, sanat, eğlence, dinlence ve spor", "divisions": [
+      { "code": "90", "name": "Yaratıcı sanatlar, gösteri sanatları ve eğlence faaliyetleri" },
+      { "code": "91", "name": "Kütüphaneler, arşivler, müzeler ve diğer kültürel faaliyetler" },
+      { "code": "92", "name": "Kumar ve müşterek bahis faaliyetleri" },
+      { "code": "93", "name": "Spor faaliyetleri, eğlence ve dinlence faaliyetleri" } ] },
+    { "code": "S", "name": "Diğer hizmet faaliyetleri", "divisions": [
+      { "code": "94", "name": "Üye olunan kuruluşların faaliyetleri" },
+      { "code": "95", "name": "Bilgisayarların, kişisel eşyaların ve ev eşyalarının onarımı" },
+      { "code": "96", "name": "Diğer hizmet faaliyetleri" } ] },
+    { "code": "T", "name": "Hanehalklarının işveren olarak faaliyetleri", "divisions": [
+      { "code": "97", "name": "Ev içi çalışan personelin işverenleri olarak hanehalklarının faaliyetleri" },
+      { "code": "98", "name": "Hanehalklarının kendi kullanımlarına yönelik mal ve hizmet üretimi" } ] },
+    { "code": "U", "name": "Uluslararası örgütler ve temsilciliklerinin faaliyetleri", "divisions": [
+      { "code": "99", "name": "Uluslararası örgütler ve temsilciliklerinin faaliyetleri" } ] }
+  ]
+}

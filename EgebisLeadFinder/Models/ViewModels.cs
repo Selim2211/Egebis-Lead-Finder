@@ -28,6 +28,9 @@ public class DashboardViewModel
     // --- Bugün yapılacaklar ---
     public int FollowUpAfterDays { get; set; } = SettingKeys.DefaultFollowUpAfterDays;
     public int DueLeads { get; set; }
+
+    /// <summary>Bugun otomatik diziden gidecek mail sayisi.</summary>
+    public int SequenceDueToday { get; set; }
     public int LeadsWithoutEmail { get; set; }
     public int UnresearchedCompanies { get; set; }
 
@@ -44,7 +47,8 @@ public class DashboardViewModel
     public int SignalTotal => Signals.Sum(s => s.Count);
 
     /// <summary>Panelde "yapacak bir sey yok" durumunu gostermek icin.</summary>
-    public bool HasTodo => DueLeads > 0 || LeadsWithoutEmail > 0 || UnresearchedCompanies > 0 || ToReview > 0;
+    public bool HasTodo => DueLeads > 0 || LeadsWithoutEmail > 0 || UnresearchedCompanies > 0 || ToReview > 0
+                           || SequenceDueToday > 0;
 }
 
 /// <summary>Firma Arama ekrani. Arama sonrasi sonuc ozeti de burada tasinir.</summary>
@@ -100,6 +104,17 @@ public class CompanyListViewModel
     /// <summary>AI on arastirma sinyali filtresi: guclu | incelenmeli | riskli | none (arastirilmamis).</summary>
     public string? Signal { get; set; }
 
+    /// <summary>NACE bolumu (2 hane) filtresi.</summary>
+    public string? Nace { get; set; }
+
+    /// <summary>Yalnizca ICP'ye uyan firmalar.</summary>
+    public bool Icp { get; set; }
+
+    /// <summary>NACE bolumu -> firma sayisi.</summary>
+    public Dictionary<string, int> NaceCounts { get; set; } = new();
+
+    public int IcpCount { get; set; }
+
     public string Sort { get; set; } = CompanySort.Default;
     public GeoFilter Geo { get; set; } = new();
     public PagerModel Pager { get; set; } = new();
@@ -108,13 +123,55 @@ public class CompanyListViewModel
     public int ActiveFilterCount =>
         (string.IsNullOrWhiteSpace(Search) ? 0 : 1) + (MinScore > 0 ? 1 : 0) + (OnlyWithoutLead ? 1 : 0)
         + (ProfileId is > 0 ? 1 : 0) + (string.IsNullOrWhiteSpace(Signal) ? 0 : 1)
+        + (Nace is null ? 0 : 1) + (Icp ? 1 : 0)
         + Geo.Countries.Count + Geo.Regions.Count + Geo.Cities.Count;
+}
+
+/// <summary>Mail dizileri ekrani.</summary>
+public class SequenceIndexViewModel
+{
+    public List<EmailSequence> Sequences { get; set; } = new();
+    public Dictionary<(int SequenceId, LeadSequenceStatus Status), int> Stats { get; set; } = new();
+    public Dictionary<int, int> Replied { get; set; } = new();
+    public List<EmailTemplate> Templates { get; set; } = new();
+    public int DailyCap { get; set; }
+    public int SentToday { get; set; }
+    public int DueToday { get; set; }
+    public bool InWindow { get; set; }
+    public string? ImapHost { get; set; }
+    public string? ImapPort { get; set; }
+    public string? ImapUsername { get; set; }
+    public bool ImapHasPassword { get; set; }
+    public bool ImapReady { get; set; }
+    public DateTime? ImapLastCheck { get; set; }
+    public string? ImapLastError { get; set; }
+
+    public int Count(int sequenceId, LeadSequenceStatus status) =>
+        Stats.TryGetValue((sequenceId, status), out var n) ? n : 0;
+}
+
+/// <summary>Satis hunisi panosu.</summary>
+public class BoardViewModel
+{
+    public const int MaxCards = 600;
+
+    public Dictionary<LeadStatus, List<Lead>> Columns { get; set; } = new();
+    public string? Query { get; set; }
+    public GeoFilter Geo { get; set; } = new();
+    public int FollowUpAfterDays { get; set; }
+    public bool Truncated { get; set; }
+
+    /// <summary>Aktif dizideki lead'ler icin "Dizi adı · 2/3".</summary>
+    public Dictionary<int, string> SequenceLabels { get; set; } = new();
 }
 
 /// <summary>Lead'ler ekrani: kart listesi + arama/filtreler.</summary>
 public class LeadListViewModel
 {
     public List<Lead> Leads { get; set; } = new();
+
+    /// <summary>Coklu secimle eklenebilecek aktif mail dizileri.</summary>
+    public List<EmailSequence> Sequences { get; set; } = new();
     public string? Query { get; set; }
     public LeadStatus? Status { get; set; }
 
@@ -165,6 +222,12 @@ public class LeadDetailViewModel
 
     /// <summary>Kac gun cevap gelmezse takip gerekiyor (Ayarlar).</summary>
     public int FollowUpAfterDays { get; set; } = SettingKeys.DefaultFollowUpAfterDays;
+
+    /// <summary>Lead'in dizi gecmisi (en yeni once).</summary>
+    public List<LeadSequence> SequenceRuns { get; set; } = new();
+
+    /// <summary>Eklenebilecek aktif diziler.</summary>
+    public List<EmailSequence> Sequences { get; set; } = new();
 }
 
 /// <summary>Firma satis takibi asamalari (ToggleStage ve Firmalar filtresi).</summary>
@@ -361,6 +424,45 @@ public class SettingsViewModel
 
     public bool SmtpPasswordSet { get; set; }
     public bool SmtpConfigured { get; set; }
+
+    // --- Salesforce CRM ---
+
+    public string? SalesforceConsumerKey { get; set; }
+
+    /// <summary>Formdan yeni deger; bos gelirse kayitli deger korunur (ekrana hic basilmaz).</summary>
+    public string? SalesforceConsumerSecret { get; set; }
+    public bool SalesforceConsumerSecretSet { get; set; }
+
+    public string? SalesforceUsername { get; set; }
+
+    public string? SalesforcePassword { get; set; }
+    public bool SalesforcePasswordSet { get; set; }
+
+    public string? SalesforceSecurityToken { get; set; }
+    public bool SalesforceSecurityTokenSet { get; set; }
+
+    public string SalesforceLoginUrl { get; set; } = SettingKeys.DefaultSalesforceLoginUrl;
+
+    public bool SalesforceConfigured =>
+        SalesforceOAuthConnected ||
+        (!string.IsNullOrWhiteSpace(SalesforceConsumerKey) && SalesforceConsumerSecretSet
+         && !string.IsNullOrWhiteSpace(SalesforceUsername) && SalesforcePasswordSet);
+
+    /// <summary>"Salesforce'a Bağlan" akışıyla kurulmuş bir bağlantı var mı (refresh token kayıtlı).</summary>
+    public bool SalesforceOAuthConnected { get; set; }
+
+    /// <summary>Uygulamanın dış adresi (ör. https://app.egebis.com); OAuth callback bununla kurulur.</summary>
+    public string? SalesforcePublicBaseUrl { get; set; }
+
+    /// <summary>Salesforce Connected App'e birebir kaydedilmesi gereken geri dönüş adresi.</summary>
+    public string SalesforceCallbackUrl { get; set; } = string.Empty;
+
+    /// <summary>Dış adres yok ve sayfa localhost'tan açılmış: Salesforce bu adrese geri dönemez.</summary>
+    public bool SalesforceCallbackIsLocal { get; set; }
+
+    /// <summary>Consumer Key/Secret girildiyse "Bağlan" butonu gösterilir.</summary>
+    public bool SalesforceCanConnect =>
+        !string.IsNullOrWhiteSpace(SalesforceConsumerKey) && SalesforceConsumerSecretSet;
 
     // Ayar bos ama User Secrets/appsettings'te deger varsa true.
     // Sistem calisir durumdadir, deger sadece bu ekrandan yonetilmiyordur.

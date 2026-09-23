@@ -19,6 +19,12 @@ public class CompanyRatingInput
     public Company Company { get; init; } = null!;
     public CompanyAnalysis? Analysis { get; init; }
     public IReadOnlyList<IntelSnippet> Snippets { get; init; } = new List<IntelSnippet>();
+
+    /// <summary>AI'a gidecek kaynak metninin azami uzunlugu (ResearchOptions.MaxAiInputChars).</summary>
+    public int MaxInputChars { get; init; } = 40000;
+
+    /// <summary>Tek Gemini denemesinin zaman asimi.</summary>
+    public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(90);
 }
 
 /// <summary>AI sonucu ve ham JSON. Ham JSON dogrudan Company.RatingJson (jsonb) kolonuna yazilir.</summary>

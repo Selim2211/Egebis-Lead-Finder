@@ -64,6 +64,9 @@ public class HomeController : Controller
 
             FollowUpAfterDays = followUpDays,
             DueLeads = await LeadController.OnlyDue(_db.Leads.AsNoTracking(), followUpDays, now).CountAsync(ct),
+            SequenceDueToday = await _db.LeadSequences.CountAsync(s =>
+                s.Status == LeadSequenceStatus.Active
+                && s.NextSendAt < EgebisLeadFinder.Services.Sequences.SequenceScheduler.LocalDayStartUtc(now).AddDays(1), ct),
             LeadsWithoutEmail = lead?.NoEmail ?? 0,
             UnresearchedCompanies = company?.Unrated ?? 0,
 

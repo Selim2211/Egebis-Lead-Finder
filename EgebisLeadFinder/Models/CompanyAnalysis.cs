@@ -16,6 +16,10 @@ public class CompanyAnalysis
     [JsonPropertyName("industry")]
     public string? Industry { get; set; }
 
+    /// <summary>NACE Rev.2 sinif kodu ("22.19"). Emin degilse bolum ("22").</summary>
+    [JsonPropertyName("naceCode")]
+    public string? NaceCode { get; set; }
+
     [JsonPropertyName("manufacturer")]
     public bool Manufacturer { get; set; }
 

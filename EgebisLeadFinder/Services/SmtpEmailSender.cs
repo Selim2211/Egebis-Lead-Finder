@@ -23,7 +23,7 @@ public record SmtpSettings(
         : string.IsNullOrWhiteSpace(FromName) ? FromAddress : $"{FromName} <{FromAddress}>";
 }
 
-public record SendResult(bool Sent, string? Error, string? FromAddress);
+public record SendResult(bool Sent, string? Error, string? FromAddress, string? MessageId = null);
 
 public interface IEmailSender
 {
@@ -102,6 +102,9 @@ public class SmtpEmailSender : IEmailSender
             message.To.Add(MailboxAddress.Parse(to.Trim()));
             message.Subject = subject;
             message.Body = BuildBody(body, html, images);
+            // Cevap geldiginde In-Reply-To bu kimligi tasir; ReplyDetectionService eslestirir.
+            var domain = s.FromAddress!.Contains('@') ? s.FromAddress[(s.FromAddress.IndexOf('@') + 1)..] : "egebis.local";
+            message.MessageId = MimeKit.Utils.MimeUtils.GenerateMessageId(domain);
 
             using var client = new SmtpClient { Timeout = 20000 };
 
@@ -121,7 +124,7 @@ public class SmtpEmailSender : IEmailSender
             await client.DisconnectAsync(true, ct);
 
             _logger.LogInformation("E-posta gönderildi: {From} → {To}", s.FromAddress, to);
-            return new SendResult(true, null, s.FromAddress);
+            return new SendResult(true, null, s.FromAddress, message.MessageId);
         }
         catch (AuthenticationException ex)
         {

@@ -2,17 +2,19 @@
 @{
     // Faz-II: firma on arastirma / rating karti. Model null ise firma henuz arastirilmadi.
     var companyId = (int)(ViewData["CompanyId"] ?? 0);
+    const string progressTitle = "Firma derin analizi";
+    const string progressHint = "Firma web sitesi, haberler, KAP ve resmi kayıtlar taranıp yapay zeka ile derinlemesine değerlendiriliyor. 1-2 dakika sürebilir.";
 }
 
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center gap-2">
-        <span>Firma Durumu — Ön Araştırma</span>
+        <span>Firma Analizi — Derin Araştırma</span>
         @if (Model is not null)
         {
             <form method="post" asp-action="Research" asp-route-id="@companyId" class="research-form m-0"
                   data-progress-start="@Url.Action("StartResearch", new { id = companyId })"
-                  data-progress-title="Firma ön araştırması ve finansal analizi"
-                  data-progress-hint="Haber, KAP ve resmi kayıt kaynakları taranıp yapay zeka ile değerlendiriliyor.">
+                  data-progress-title="@progressTitle"
+                  data-progress-hint="@progressHint">
                 @Html.AntiForgeryToken()
                 <button class="btn btn-sm btn-outline-secondary research-button" type="submit">
                     Yeniden Araştır
@@ -38,27 +40,42 @@
             </div>
             <div class="empty-title">Bu firma henüz araştırılmadı</div>
             <div class="mb-3">
-                Ücretsiz kaynaklardan (haber, KAP, resmi kayıt linkleri) firmanın ticari ve
-                finansal sağlık durumu için bir sinyal üretilir. Lead puanından bağımsızdır.
+                Firmanın web sitesi, haberler, KAP ve resmi kayıtlar taranır; finans ve büyüklük,
+                yönetim, teknoloji altyapısı, haberler, riskler ve Egebis için satış fırsatları
+                tek raporda derlenir. Lead puanından bağımsızdır.
             </div>
             <form method="post" asp-action="Research" asp-route-id="@companyId" class="research-form"
                   data-progress-start="@Url.Action("StartResearch", new { id = companyId })"
-                  data-progress-title="Firma ön araştırması ve finansal analizi"
-                  data-progress-hint="Haber, KAP ve resmi kayıt kaynakları taranıp yapay zeka ile değerlendiriliyor.">
+                  data-progress-title="@progressTitle"
+                  data-progress-hint="@progressHint">
                 @Html.AntiForgeryToken()
-                <button class="btn btn-primary btn-sm research-button" type="submit">Ön Araştırma Yap</button>
+                <button class="btn btn-primary btn-sm research-button" type="submit">Derin Analiz Yap</button>
             </form>
         </div>
     }
     else
     {
         var r = Model.Rating;
+        var size = r.SizeInfo;
+        var tech = r.Technology;
+        var hasSize = size is not null && (Has(size.Employees) || Has(size.ExportInfo) || Has(size.Capacity) || size.Locations.Count > 0);
+        var hasFinance = hasSize || Has(r.FinancialInfo) || Has(r.ScaleInfo) || r.FinancialPeriods.Count > 0;
+        var hasManagement = r.Management.Count > 0 || r.GroupCompanies.Count > 0 || Has(r.Owners);
+        var hasTech = tech is not null && !tech.IsEmpty;
+        var hasOpportunity = r.Opportunities.Count > 0 || Has(r.SalesApproach);
+        var hasCommercial = r.Customers.Count > 0 || r.Suppliers.Count > 0 || r.Projects.Count > 0 || r.GrowthSignals.Count > 0;
 
         <div class="card-body">
             <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
                 <span class="signal-badge @Model.SignalCss">
                     <span class="signal-dot"></span> @Model.SignalLabel
                 </span>
+                @if (r.Confidence is not null)
+                {
+                    <span class="tag tag-muted" title="Kaynak, bilgi parçası ve olumlu kanıt sayısından hesaplanır">
+                        Güven: %@r.Confidence
+                    </span>
+                }
                 @if (Model.RatedAt is not null)
                 {
                     <span class="cell-sub">
@@ -67,108 +84,302 @@
                 }
             </div>
 
-            @if (!string.IsNullOrWhiteSpace(r.Summary))
+            @if (Has(r.Summary))
             {
-                <p class="mb-3">@r.Summary</p>
+                <div class="stat-label mb-1">Yönetici özeti</div>
+                <p class="mb-3 rating-summary">@r.Summary</p>
             }
 
-            <div class="table-responsive">
-                <table class="table table-sm rating-table mb-0">
-                    <tbody>
-                        <tr>
-                            <th>Şirket</th>
-                            <td>@Fallback(r.FoundingInfo)</td>
-                        </tr>
-                        <tr>
-                            <th>Ölçek</th>
-                            <td>@Fallback(r.ScaleInfo)</td>
-                        </tr>
-                        <tr>
-                            <th>Finansal durum</th>
-                            <td>
-                                @Fallback(r.FinancialInfo)
-                                @if (r.HasFinancialData)
+            @if (Has(r.FoundingInfo))
+            {
+                <p class="small mb-3"><strong>Şirket:</strong> @r.FoundingInfo</p>
+            }
+
+            @if (hasOpportunity)
+            {
+                <details class="rating-section" open>
+                    <summary>Egebis için fırsatlar ve satış önerisi</summary>
+                    @if (Has(r.SalesApproach))
+                    {
+                        <div class="rating-callout mb-2">@r.SalesApproach</div>
+                    }
+                    @if (r.Opportunities.Count > 0)
+                    {
+                        <ul class="mb-0">
+                            @foreach (var o in r.Opportunities)
+                            {
+                                <li class="mb-1">
+                                    <strong>@o.Text</strong>
+                                    @if (Has(o.Reason))
+                                    {
+                                        <span class="text-muted-2"> — @o.Reason</span>
+                                    }
+                                    @SourceLink(o.SourceUrl)
+                                </li>
+                            }
+                        </ul>
+                    }
+                </details>
+            }
+
+            <details class="rating-section" open>
+                <summary>Finans ve büyüklük</summary>
+                @if (!hasFinance)
+                {
+                    <span class="text-muted-2">Kaynaklarda finansal veya büyüklük bilgisi bulunamadı.</span>
+                }
+                else
+                {
+                    @if (r.FinancialPeriods.Count > 0)
+                    {
+                        <div class="table-responsive mb-2">
+                            <table class="table table-sm rating-table mb-0">
+                                <thead><tr><th>Dönem</th><th>Ciro</th><th>Net kâr</th><th></th></tr></thead>
+                                <tbody>
+                                    @foreach (var p in r.FinancialPeriods)
+                                    {
+                                        <tr>
+                                            <td>@Fallback(p.Period)</td>
+                                            <td>@Fallback(p.Revenue)</td>
+                                            <td>@Fallback(p.NetProfit)</td>
+                                            <td>@SourceLink(p.SourceUrl)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    <table class="table table-sm rating-table mb-0">
+                        <tbody>
+                            @if (Has(r.FinancialInfo))
+                            {
+                                <tr>
+                                    <th>Finansal durum</th>
+                                    <td>
+                                        @r.FinancialInfo
+                                        @if (r.HasFinancialData)
+                                        {
+                                            <span class="tag tag-muted ms-1">kaynak: @r.FinancialSource</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                            @if (Has(r.ScaleInfo))
+                            {
+                                <tr><th>Ölçek</th><td>@r.ScaleInfo</td></tr>
+                            }
+                            @if (Has(size?.Employees))
+                            {
+                                <tr><th>Çalışan</th><td>@size!.Employees</td></tr>
+                            }
+                            @if (Has(size?.ExportInfo))
+                            {
+                                <tr><th>İhracat</th><td>@size!.ExportInfo</td></tr>
+                            }
+                            @if (Has(size?.Capacity))
+                            {
+                                <tr><th>Kapasite</th><td>@size!.Capacity</td></tr>
+                            }
+                            @if (size is { Locations.Count: > 0 })
+                            {
+                                <tr><th>Lokasyonlar</th><td>@string.Join(", ", size.Locations)</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </details>
+
+            <details class="rating-section" open>
+                <summary>Yönetim ve karar vericiler</summary>
+                @if (!hasManagement)
+                {
+                    <span class="text-muted-2">Kaynaklarda yönetici bilgisi bulunamadı.</span>
+                }
+                else
+                {
+                    @if (r.Management.Count > 0)
+                    {
+                        <ul class="list-unstyled mb-2">
+                            @foreach (var m in r.Management)
+                            {
+                                <li class="mb-1">
+                                    <strong>@m.Name</strong>
+                                    @if (Has(m.Role))
+                                    {
+                                        <span class="text-muted-2"> — @m.Role</span>
+                                    }
+                                    @SourceLink(m.SourceUrl)
+                                </li>
+                            }
+                        </ul>
+                    }
+                    @if (Has(r.Owners))
+                    {
+                        <div class="small mb-1"><strong>Ortaklık yapısı:</strong> @r.Owners</div>
+                    }
+                    @if (r.GroupCompanies.Count > 0)
+                    {
+                        <div class="small"><strong>Grup / iştirakler:</strong> @string.Join(", ", r.GroupCompanies)</div>
+                    }
+                }
+            </details>
+
+            <details class="rating-section" open>
+                <summary>Teknoloji ve IT altyapısı</summary>
+                @if (!hasTech)
+                {
+                    <span class="text-muted-2">Kaynaklarda kullanılan sistemlere dair kanıt bulunamadı.</span>
+                }
+                else
+                {
+                    <table class="table table-sm rating-table mb-0">
+                        <tbody>
+                            <tr>
+                                <th>ERP</th>
+                                <td>
+                                    @Fallback(tech!.Erp)
+                                    @if (Has(tech.ErpEvidence))
+                                    {
+                                        <div class="small text-muted-2">@tech.ErpEvidence</div>
+                                    }
+                                </td>
+                            </tr>
+                            @if (tech.Software.Count > 0)
+                            {
+                                <tr><th>Yazılımlar</th><td>@string.Join(", ", tech.Software)</td></tr>
+                            }
+                            @if (tech.DigitalProjects.Count > 0)
+                            {
+                                <tr><th>Dijital projeler</th><td>@string.Join("; ", tech.DigitalProjects)</td></tr>
+                            }
+                            @if (tech.ItJobSignals.Count > 0)
+                            {
+                                <tr><th>IT ilanları</th><td>@string.Join("; ", tech.ItJobSignals)</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </details>
+
+            @if (hasCommercial)
+            {
+                <details class="rating-section">
+                    <summary>Ticari ilişkiler ve büyüme</summary>
+                    <table class="table table-sm rating-table mb-0">
+                        <tbody>
+                            <tr><th>Müşteriler</th><td>@ListOrDash(r.Customers)</td></tr>
+                            <tr><th>Tedarikçiler</th><td>@ListOrDash(r.Suppliers)</td></tr>
+                            <tr><th>Projeler</th><td>@ListOrDash(r.Projects)</td></tr>
+                            <tr><th>Büyüme</th><td>@ListOrDash(r.GrowthSignals)</td></tr>
+                        </tbody>
+                    </table>
+                </details>
+            }
+
+            <details class="rating-section" open>
+                <summary>Riskler</summary>
+                @if (r.RiskSignals.Count == 0)
+                {
+                    <span class="text-success">Risk işareti bulunamadı</span>
+                }
+                else
+                {
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var risk in r.RiskSignals)
+                        {
+                            <li class="mb-1">
+                                <span class="tag @RiskCss(risk.Severity)">@risk.Severity</span>
+                                @risk.Text
+                                @SourceLink(risk.SourceUrl)
+                            </li>
+                        }
+                    </ul>
+                }
+            </details>
+
+            @if (r.NewsTimeline.Count > 0)
+            {
+                <details class="rating-section">
+                    <summary>Haber akışı (@r.NewsTimeline.Count)</summary>
+                    <ul class="list-unstyled mb-0 rating-timeline">
+                        @foreach (var n in r.NewsTimeline)
+                        {
+                            <li class="mb-1">
+                                <span class="cell-sub">@(Has(n.Date) ? n.Date : "tarih yok")</span>
+                                @if (Has(n.Kind) && n.Kind != "genel")
                                 {
-                                    <span class="tag tag-muted ms-1">kaynak: @r.FinancialSource</span>
+                                    <span class="tag @NewsCss(n.Kind)">@n.Kind</span>
                                 }
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>Ortaklar / yöneticiler</th>
-                            <td>@Fallback(r.Owners)</td>
-                        </tr>
-                        <tr>
-                            <th>Müşteriler</th>
-                            <td>@ListOrDash(r.Customers)</td>
-                        </tr>
-                        <tr>
-                            <th>Tedarikçiler</th>
-                            <td>@ListOrDash(r.Suppliers)</td>
-                        </tr>
-                        <tr>
-                            <th>Projeler</th>
-                            <td>@ListOrDash(r.Projects)</td>
-                        </tr>
-                        <tr>
-                            <th>Risk sinyalleri</th>
-                            <td>
-                                @if (r.RiskSignals.Count == 0)
+                                @if (SafeUrl(n.Url) is { } newsUrl)
                                 {
-                                    <span class="text-success">Risk işareti bulunamadı</span>
+                                    <a href="@newsUrl" target="_blank" rel="noopener noreferrer">@n.Title</a>
                                 }
                                 else
                                 {
-                                    <ul class="list-unstyled mb-0">
-                                        @foreach (var risk in r.RiskSignals)
-                                        {
-                                            <li class="mb-1">
-                                                <span class="tag @RiskCss(risk.Severity)">@risk.Severity</span>
-                                                @risk.Text
-                                                @if (!string.IsNullOrWhiteSpace(risk.SourceUrl))
-                                                {
-                                                    <a href="@risk.SourceUrl" target="_blank" rel="noopener noreferrer"
-                                                       class="small ms-1">kaynak</a>
-                                                }
-                                            </li>
-                                        }
-                                    </ul>
+                                    @n.Title
                                 }
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>Büyüme</th>
-                            <td>@ListOrDash(r.GrowthSignals)</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            @if (r.EvaluatorNotes.Count > 0)
-            {
-                <div class="mt-3">
-                    <div class="stat-label mb-1">Sinyal gerekçesi</div>
-                    <ul class="mb-0 small text-muted-2">
-                        @foreach (var note in r.EvaluatorNotes)
-                        {
-                            <li>@note</li>
+                            </li>
                         }
                     </ul>
-                </div>
+                </details>
             }
 
-            @if (r.CheckedSources.Count > 0)
+            @if (r.EvaluatorNotes.Count > 0 || r.EvaluatorNotesV2.Count > 0)
             {
-                <div class="mt-3">
-                    <div class="stat-label mb-1">Kontrol edilen kaynaklar</div>
-                    <div class="d-flex flex-wrap gap-2">
-                        @foreach (var src in r.CheckedSources)
+                <details class="rating-section">
+                    <summary>Sinyal gerekçesi</summary>
+                    <ul class="mb-0 small text-muted-2">
+                        @if (r.EvaluatorNotesV2.Count > 0)
                         {
-                            <span class="tag @(src.FoundSomething ? "tag-success" : "tag-muted")">
-                                @src.Name @(src.FoundSomething ? "✓" : "—")
-                            </span>
+                            foreach (var note in r.EvaluatorNotesV2)
+                            {
+                                <li>@note.Reason</li>
+                            }
                         }
-                    </div>
-                </div>
+                        else
+                        {
+                            foreach (var note in r.EvaluatorNotes)
+                            {
+                                <li>@note</li>
+                            }
+                        }
+                    </ul>
+                </details>
+            }
+
+            @if (r.SourceSnippets.Any(g => g.Snippets.Count > 0) || r.CheckedSources.Count > 0)
+            {
+                <details class="rating-section">
+                    <summary>Kaynaklar</summary>
+                    @if (r.CheckedSources.Count > 0)
+                    {
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            @foreach (var src in r.CheckedSources)
+                            {
+                                <span class="tag @(src.FoundSomething ? "tag-success" : "tag-muted")">
+                                    @src.Name @(src.FoundSomething ? "✓" : "—")
+                                </span>
+                            }
+                        </div>
+                    }
+                    @foreach (var group in r.SourceSnippets.Where(g => g.Snippets.Count > 0))
+                    {
+                        <div class="stat-label mt-2 mb-1">@group.Name</div>
+                        <ul class="small mb-0">
+                            @foreach (var s in group.Snippets)
+                            {
+                                <li class="mb-1">
+                                    @if (Has(s.Date))
+                                    {
+                                        <span class="cell-sub">@s.Date</span>
+                                    }
+                                    @s.Text
+                                    @SourceLink(s.Url)
+                                </li>
+                            }
+                        </ul>
+                    }
+                </details>
             }
 
             @if (r.RegistryLinks.Count > 0)
@@ -178,35 +389,62 @@
                     <div class="d-flex flex-wrap gap-2">
                         @foreach (var link in r.RegistryLinks)
                         {
-                            <a href="@link.Url" target="_blank" rel="noopener noreferrer"
-                               class="btn btn-sm btn-outline-secondary">@link.Label ↗</a>
+                            if (SafeUrl(link.Url) is { } registryUrl)
+                            {
+                                <a href="@registryUrl" target="_blank" rel="noopener noreferrer"
+                                   class="btn btn-sm btn-outline-secondary">@link.Label ↗</a>
+                            }
                         }
                     </div>
                 </div>
             }
 
-            <div class="alert alert-warning small mt-3 mb-0" data-flash="info" data-flash-title="Ön araştırma hakkında" data-flash-timeout="7000">
-                Bu değerlendirme kamuya açık kaynaklardan
-                otomatik derlenmiştir; kesin bir finansal analiz değildir. Kritik kararlar öncesi
-                Findeks gibi ticari istihbarat raporlarıyla veya resmi kayıtlarla doğrulayın.
+            <div class="alert alert-warning small mt-3 mb-0" data-flash="info" data-flash-title="Firma analizi hakkında" data-flash-timeout="7000">
+                Bu analiz kamuya açık kaynaklardan yapay zeka ile otomatik derlenmiştir; kesin
+                bir finansal analiz değildir. Kritik kararlar öncesi Findeks gibi ticari istihbarat
+                raporlarıyla veya resmi kayıtlarla doğrulayın.
             </div>
         </div>
     }
 </div>
 
 @functions {
-    static string Fallback(string? value) =>
-        string.IsNullOrWhiteSpace(value) || value.Equals("bilinmiyor", StringComparison.OrdinalIgnoreCase)
-            ? "—"
-            : value;
+    static bool Has(string? value) =>
+        !string.IsNullOrWhiteSpace(value) && !value.Equals("bilinmiyor", StringComparison.OrdinalIgnoreCase);
+
+    static string Fallback(string? value) => Has(value) ? value! : "—";
 
     static string ListOrDash(List<string> items) =>
         items is { Count: > 0 } ? string.Join(", ", items) : "—";
+
+    // Linkler AI ciktisindan gelir: yalnizca http(s) kabul edilir (javascript: vb. engellenir).
+    static string? SafeUrl(string? url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+            ? uri.ToString()
+            : null;
+
+    static Microsoft.AspNetCore.Html.IHtmlContent SourceLink(string? url)
+    {
+        var safe = SafeUrl(url);
+        if (safe is null) return Microsoft.AspNetCore.Html.HtmlString.Empty;
+        var builder = new Microsoft.AspNetCore.Html.HtmlContentBuilder();
+        builder.AppendHtml("<a href=\"");
+        builder.Append(safe);
+        builder.AppendHtml("\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"small ms-1\">kaynak</a>");
+        return builder;
+    }
 
     static string RiskCss(string? severity) => severity?.ToLowerInvariant() switch
     {
         "yuksek" => "tag-danger",
         "orta" => "tag-amber",
+        _ => "tag-muted"
+    };
+
+    static string NewsCss(string? kind) => kind switch
+    {
+        "risk" => "tag-danger",
+        "buyume" or "finansal" => "tag-success",
         _ => "tag-muted"
     };
 }

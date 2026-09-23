@@ -60,6 +60,39 @@ public class CompanyRating
     [JsonPropertyName("riskSignals")]
     public List<RiskSignal> RiskSignals { get; set; } = new();
 
+    // --- Derin analiz alanlari (hepsi opsiyonel; eski kayitlarda bos gelir) ---
+
+    /// <summary>Calisan, ihracat, kapasite, lokasyon bilgisi.</summary>
+    [JsonPropertyName("sizeInfo")]
+    public SizeInfo? SizeInfo { get; set; }
+
+    /// <summary>Kaynaklarda gecen donemsel ciro/kar rakamlari.</summary>
+    [JsonPropertyName("financialPeriods")]
+    public List<AiFinancialPeriod> FinancialPeriods { get; set; } = new();
+
+    /// <summary>Yoneticiler ve karar vericiler.</summary>
+    [JsonPropertyName("management")]
+    public List<ManagementPerson> Management { get; set; } = new();
+
+    /// <summary>Bagli oldugu grup / holding / istirakler.</summary>
+    [JsonPropertyName("groupCompanies")]
+    public List<string> GroupCompanies { get; set; } = new();
+
+    [JsonPropertyName("technology")]
+    public TechnologyInfo? Technology { get; set; }
+
+    /// <summary>Tarihli onemli haberler, en yeni once.</summary>
+    [JsonPropertyName("newsTimeline")]
+    public List<NewsItem> NewsTimeline { get; set; } = new();
+
+    /// <summary>Egebis icin satis firsatlari.</summary>
+    [JsonPropertyName("opportunities")]
+    public List<Opportunity> Opportunities { get; set; } = new();
+
+    /// <summary>Kime, hangi acidan yaklasilmali.</summary>
+    [JsonPropertyName("salesApproach")]
+    public string? SalesApproach { get; set; }
+
     /// <summary>Hangi kaynaklar kontrol edildi ve veri dondu mu? Seffaflik icin.</summary>
     [JsonPropertyName("checkedSources")]
     public List<CheckedSource> CheckedSources { get; set; } = new();
@@ -108,6 +141,102 @@ public class CompanyRating
     public bool HasFinancialData =>
         !string.IsNullOrWhiteSpace(FinancialInfo)
         && !FinancialSource.Equals("yok", StringComparison.OrdinalIgnoreCase);
+}
+
+public class SizeInfo
+{
+    [JsonPropertyName("employees")]
+    public string? Employees { get; set; }
+
+    [JsonPropertyName("exportInfo")]
+    public string? ExportInfo { get; set; }
+
+    [JsonPropertyName("capacity")]
+    public string? Capacity { get; set; }
+
+    [JsonPropertyName("locations")]
+    public List<string> Locations { get; set; } = new();
+}
+
+/// <summary>AI'in kaynaklardan cikardigi donem rakami; tutarlar metin (birimiyle) olarak tutulur.</summary>
+public class AiFinancialPeriod
+{
+    [JsonPropertyName("period")]
+    public string? Period { get; set; }
+
+    [JsonPropertyName("revenue")]
+    public string? Revenue { get; set; }
+
+    [JsonPropertyName("netProfit")]
+    public string? NetProfit { get; set; }
+
+    [JsonPropertyName("sourceUrl")]
+    public string? SourceUrl { get; set; }
+}
+
+public class ManagementPerson
+{
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("role")]
+    public string? Role { get; set; }
+
+    [JsonPropertyName("sourceUrl")]
+    public string? SourceUrl { get; set; }
+}
+
+public class TechnologyInfo
+{
+    /// <summary>Kullandigi ERP (SAP, Logo, Netsis...) ya da "bilinmiyor".</summary>
+    [JsonPropertyName("erp")]
+    public string? Erp { get; set; }
+
+    [JsonPropertyName("erpEvidence")]
+    public string? ErpEvidence { get; set; }
+
+    [JsonPropertyName("software")]
+    public List<string> Software { get; set; } = new();
+
+    [JsonPropertyName("digitalProjects")]
+    public List<string> DigitalProjects { get; set; } = new();
+
+    /// <summary>IT/yazilim is ilanlari gibi ihtiyac sinyalleri.</summary>
+    [JsonPropertyName("itJobSignals")]
+    public List<string> ItJobSignals { get; set; } = new();
+
+    [JsonIgnore]
+    public bool IsEmpty =>
+        (string.IsNullOrWhiteSpace(Erp) || Erp.Equals("bilinmiyor", StringComparison.OrdinalIgnoreCase))
+        && Software.Count == 0 && DigitalProjects.Count == 0 && ItJobSignals.Count == 0;
+}
+
+public class NewsItem
+{
+    [JsonPropertyName("date")]
+    public string? Date { get; set; }
+
+    [JsonPropertyName("title")]
+    public string Title { get; set; } = string.Empty;
+
+    [JsonPropertyName("url")]
+    public string? Url { get; set; }
+
+    /// <summary>"risk" | "buyume" | "finansal" | "yonetim" | "teknoloji" | "genel".</summary>
+    [JsonPropertyName("kind")]
+    public string? Kind { get; set; }
+}
+
+public class Opportunity
+{
+    [JsonPropertyName("text")]
+    public string Text { get; set; } = string.Empty;
+
+    [JsonPropertyName("reason")]
+    public string? Reason { get; set; }
+
+    [JsonPropertyName("sourceUrl")]
+    public string? SourceUrl { get; set; }
 }
 
 /// <summary>Bir gerekce satiri ve isaret ettigi yon ("guclu" | "riskli" | "incelenmeli" | "bilinmiyor").</summary>

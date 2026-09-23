@@ -18,10 +18,58 @@ public class ApplicationDbContext : DbContext
     public DbSet<CompanySearchProfile> CompanySearchProfiles => Set<CompanySearchProfile>();
     public DbSet<SentEmail> SentEmails => Set<SentEmail>();
     public DbSet<EmailImage> EmailImages => Set<EmailImage>();
+    public DbSet<EmailSequence> EmailSequences => Set<EmailSequence>();
+    public DbSet<SequenceStep> SequenceSteps => Set<SequenceStep>();
+    public DbSet<LeadSequence> LeadSequences => Set<LeadSequence>();
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        ResetChangedEmailVerification();
+        var pending = SalesforceChangeTracker.Collect(ChangeTracker);
+        var result = base.SaveChanges(acceptAllChangesOnSuccess);
+        if (!pending.IsEmpty) SalesforceChangeTracker.MarkDirtyAsync(this, pending, CancellationToken.None).GetAwaiter().GetResult();
+        return result;
+    }
+
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        // Firma/kisi/lead degisince Salesforce'taki kopyasi eskir; kaydedilen her degisiklik
+        // "senkron bekliyor" olarak isaretlenir (bkz. SalesforceAutoSyncService).
+        ResetChangedEmailVerification();
+        var pending = SalesforceChangeTracker.Collect(ChangeTracker);
+        var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        if (!pending.IsEmpty) await SalesforceChangeTracker.MarkDirtyAsync(this, pending, cancellationToken);
+        return result;
+    }
+
+    /// <summary>
+    /// E-posta eklenen/degisen kisinin dogrulama sonucu eskir; EmailVerificationWorker
+    /// "dogrulanmadi" durumundaki adresleri kisa surede yeniden kontrol eder.
+    /// </summary>
+    private void ResetChangedEmailVerification()
+    {
+        foreach (var entry in ChangeTracker.Entries<Contact>())
+        {
+            var changed = entry.State == EntityState.Added
+                ? !string.IsNullOrWhiteSpace(entry.Entity.Email) && entry.Entity.EmailCheckedAt is null
+                : entry.State == EntityState.Modified && entry.Property(c => c.Email).IsModified
+                  && !entry.Property(c => c.EmailCheckedAt).IsModified;
+
+            if (!changed) continue;
+            entry.Entity.EmailStatus = EmailStatus.Unchecked;
+            entry.Entity.EmailStatusReason = null;
+            entry.Entity.EmailCheckedAt = null;
+        }
+    }
 
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
+
+        b.Entity<LeadSequence>().HasIndex(x => new { x.Status, x.NextSendAt });
+        b.Entity<LeadSequence>().HasIndex(x => x.LeadId);
+        b.Entity<SentEmail>().HasIndex(x => x.MessageId);
+        b.Entity<SequenceStep>().HasOne(s => s.Template).WithMany().OnDelete(DeleteBehavior.SetNull);
 
         // Ayni ayar iki kez kaydedilemez; okuma anahtar uzerinden yapiliyor.
         b.Entity<AppSetting>().HasIndex(x => x.Key).IsUnique();

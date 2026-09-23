@@ -47,6 +47,22 @@ public class EmailController : Controller
         return View(model);
     }
 
+    /// <summary>"AI ile yaz": kisiye ozel konu + govde uretir; editore JS ile yazilir, gonderilmez.</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Draft(int leadId, int? templateId, [FromServices] EmailDraftService drafts, CancellationToken ct)
+    {
+        var draft = await drafts.DraftAsync(leadId, templateId, ct: ct);
+        return Json(new
+        {
+            success = draft.Success,
+            subject = draft.Subject,
+            bodyHtml = draft.BodyHtml,
+            error = draft.Error,
+            hint = draft.HasDeepAnalysis ? null : "Firma analizi yapılırsa mail çok daha kişisel olur (Firma → Firma analizi)."
+        });
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Send(int leadId, int templateId, string subject, string body,
@@ -69,7 +85,7 @@ public class EmailController : Controller
         if (result.Sent)
         {
             await RecordAsync(leadId, templateId, result.FromAddress, toAddress!, subject, body, html,
-                images, SentEmailMethod.Smtp, ct);
+                images, SentEmailMethod.Smtp, ct, result.MessageId);
             TempData["LeadSuccess"] = $"E-posta {toAddress} adresine gönderildi ve lead geçmişine kaydedildi.";
             return RedirectToAction("Details", "Lead", new { id = leadId });
         }
@@ -190,36 +206,16 @@ public class EmailController : Controller
     }
 
     private async Task RecordAsync(int leadId, int? templateId, string? from, string to, string subject,
-        string body, string html, IReadOnlyList<EmailImage> images, SentEmailMethod method, CancellationToken ct)
+        string body, string html, IReadOnlyList<EmailImage> images, SentEmailMethod method, CancellationToken ct,
+        string? messageId = null)
     {
         var lead = await _db.Leads.FirstAsync(l => l.Id == leadId, ct);
         var template = templateId is not null
             ? await _db.EmailTemplates.AsNoTracking().FirstOrDefaultAsync(t => t.Id == templateId, ct)
             : null;
 
-        var sentEmail = new SentEmail
-        {
-            LeadId = leadId,
-            FromAddress = from,
-            ToAddress = to.Trim(),
-            Subject = subject,
-            Body = body,
-            BodyHtml = string.IsNullOrEmpty(html) ? null : html,
-            TemplateId = template?.Id,
-            TemplateName = template?.Name,
-            ImageNames = images.Count == 0 ? null : string.Join(", ", images.Select(i => i.Name)),
-            Method = method,
-            SentAt = DateTime.UtcNow
-        };
-        StringLengthGuard.Apply(sentEmail);
-        _db.SentEmails.Add(sentEmail);
-
-        lead.Status = LeadStatus.Gonderildi;
-        // Takip sayaci son gonderimden isler: her yeni e-posta tarihi gunceller.
-        lead.SentAt = sentEmail.SentAt;
-        lead.SnoozedUntil = null;
-        if (template is not null) lead.SelectedTemplateId = template.Id;
-
+        SentEmailRecorder.Add(_db, lead, template, from, to, subject, body, html,
+            images.Count == 0 ? null : string.Join(", ", images.Select(i => i.Name)), method, messageId, stepId: null);
         await _db.SaveChangesAsync(ct);
     }
 

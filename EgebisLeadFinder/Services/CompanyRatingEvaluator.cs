@@ -27,7 +27,8 @@ public class CompanyRatingEvaluator
         // sayisini (yan etkisiz okumalar) bastan cikariyoruz; result.Add cagrilari
         // yerlerinde kaliyor ki gerekce sirasi bozulmasin.
         var sourceCount = rating.CheckedSources.Count(c => c.FoundSomething);
-        var hasFinancial = rating.HasFinancialData;
+        var hasFinancial = rating.HasFinancialData
+            || rating.FinancialPeriods.Any(p => !string.IsNullOrWhiteSpace(p.Revenue) && !string.IsNullOrWhiteSpace(p.SourceUrl));
         var hasGrowth = rating.GrowthSignals.Count > 0
             || snippets.Any(s => s.Kind == IntelKind.Buyume);
         var hasEstablished = LooksEstablished(rating);
@@ -83,7 +84,10 @@ public class CompanyRatingEvaluator
             result.Add($"Düşük seviye / doğrulanmamış risk işareti: {r.Text}", RatingSignal.Incelenmeli);
 
         // 3) Pozitif kanit (booleanlar metodun basinda hesaplandi) gerekce olarak eklenir.
-        if (hasFinancial) result.Add($"Finansal veri bulundu ({rating.FinancialSource})", RatingSignal.Guclu);
+        if (hasFinancial)
+            result.Add(rating.HasFinancialData
+                ? $"Finansal veri bulundu ({rating.FinancialSource})"
+                : "Kaynaklı ciro rakamı bulundu", RatingSignal.Guclu);
         if (hasGrowth) result.Add("Büyüme / yatırım işareti", RatingSignal.Guclu);
         if (hasEstablished) result.Add("Köklü / kurumsal firma işareti", RatingSignal.Guclu);
         if (hasActivity) result.Add("Aktif ticari faaliyet işareti", RatingSignal.Guclu);

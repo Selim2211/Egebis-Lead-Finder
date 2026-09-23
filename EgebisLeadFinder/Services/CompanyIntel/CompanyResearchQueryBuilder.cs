@@ -30,6 +30,18 @@ public static class CompanyResearchQueryBuilder
             $"{q} (\"yönetim kurulu\" OR \"genel müdür\" OR ortak OR \"satın aldı\" OR birleşti)",
             // Musteri / tedarikci / referans
             $"{q} (müşteri OR tedarikçi OR referans OR \"iş ortağı\")",
+            // Karar vericiler
+            $"{q} (\"genel müdür\" OR CEO OR CFO OR \"bilgi işlem müdürü\" OR \"IT müdürü\" OR CIO OR \"yönetim kurulu başkanı\")",
+            // Teknoloji / IT altyapisi
+            $"{q} (SAP OR ERP OR \"dijital dönüşüm\" OR Logo OR Netsis OR \"Microsoft Dynamics\" OR Oracle OR MES)",
+            // IT is ilanlari: yatirim/ihtiyac sinyali
+            $"{q} (kariyer.net OR \"iş ilanı\" OR linkedin.com/jobs) (SAP OR ERP OR yazılım OR \"bilgi işlem\")",
+            // Buyukluk
+            $"{q} (\"çalışan sayısı\" OR personel OR ihracat OR \"üretim kapasitesi\" OR metrekare)",
+            // Grup sirketleri
+            $"{q} (\"grup şirketi\" OR holding OR iştirak OR \"bağlı ortaklık\")",
+            // Genel guncel haberler
+            $"{q} haber",
             // Resmi kayit izleri (site: taramasi)
             $"site:ticaretsicil.gov.tr {q}",
             $"site:ekap.kamuihale.gov.tr {q}",

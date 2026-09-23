@@ -190,6 +190,17 @@
                                 <span class="todo-go" aria-hidden="true">→</span>
                             </a>
                         }
+                        @if (Model.SequenceDueToday > 0)
+                        {
+                            <a class="todo-item is-info" asp-controller="Sequence" asp-action="Index">
+                                <span class="todo-count">@Model.SequenceDueToday</span>
+                                <span class="todo-text">
+                                    <strong>otomatik mail bugün gidecek</strong>
+                                    <span>Mail dizilerinden, hafta içi 09-18 arası</span>
+                                </span>
+                                <span class="todo-go" aria-hidden="true">→</span>
+                            </a>
+                        }
                         @if (Model.ToReview > 0)
                         {
                             <a class="todo-item is-success" asp-controller="Company" asp-action="Index"

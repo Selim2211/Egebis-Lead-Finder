@@ -11,7 +11,7 @@ namespace EgebisLeadFinder.Services;
 /// AI #1: firma analizi. Gemini'ye responseSchema verilerek JSON ciktisi sema ile zorlanir,
 /// boylece serbest metin ayristirma riski ortadan kalkar.
 /// </summary>
-public class GeminiAiService : IAiService, ICompanyRatingAi
+public class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INaceClassifierAi
 {
     private readonly HttpClient _http;
     private readonly AiOptions _options;
@@ -121,8 +121,9 @@ public class GeminiAiService : IAiService, ICompanyRatingAi
     /// 429 doner. Bu gecici bir durumdur, artan bekleme ile tekrar denenir.
     /// </summary>
     private async Task<(string? Content, string? Error)> SendWithRetryAsync(
-        string url, string payloadJson, string apiKey, CancellationToken ct)
+        string url, string payloadJson, string apiKey, CancellationToken ct, TimeSpan? timeout = null)
     {
+        var attemptTimeout = timeout ?? TimeSpan.FromSeconds(_options.TimeoutSeconds);
         // Gemini ucretsiz katmaninda "model su an yogun talep altinda" (503) hatasi
         // dakikalarca surebilir; 4 deneme (~35 sn) cogu zaman yetersiz kaliyordu.
         const int maxAttempts = 6;
@@ -134,8 +135,22 @@ public class GeminiAiService : IAiService, ICompanyRatingAi
             request.Headers.Add("x-goog-api-key", apiKey);
             request.Content = new StringContent(payloadJson, System.Text.Encoding.UTF8, "application/json");
 
-            using var response = await _http.SendAsync(request, ct);
-            var body = await response.Content.ReadAsStringAsync(ct);
+            using var attemptCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            attemptCts.CancelAfter(attemptTimeout);
+
+            HttpResponseMessage response;
+            string body;
+            try
+            {
+                response = await _http.SendAsync(request, attemptCts.Token);
+                body = await response.Content.ReadAsStringAsync(attemptCts.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                throw new TimeoutException($"Gemini {attemptTimeout.TotalSeconds:0} sn içinde yanıt vermedi.");
+            }
+
+            using var responseScope = response;
 
             if (response.IsSuccessStatusCode)
             {
@@ -240,6 +255,10 @@ public class GeminiAiService : IAiService, ICompanyRatingAi
         companyName alanı: sitenin sahibi olan firmanın adı.
         Haber başlığı veya ilan başlığı değil, firmanın kendi ticari adı.
 
+        naceCode alanı: firmanın ana faaliyetine en uygun NACE Rev.2 sınıf kodu,
+        "22.19" biçiminde (bölüm.sınıf). Sınıftan emin değilsen yalnızca bölüm
+        kodunu yaz ("22"). Faaliyet belirsizse boş bırak.
+
         recommendedTemplate alanı şu değerlerden biri olmalı:
         - "SAP_ENTEGRASYON": SAP kullanıyor, entegrasyon ihtiyacı olabilir
         - "SAP": SAP kullanıyor veya geçiş ihtimali var, genel danışmanlık
@@ -260,6 +279,7 @@ public class GeminiAiService : IAiService, ICompanyRatingAi
         {
             companyName = new { type = "string", description = "Sitenin sahibi firmanın ticari adı" },
             industry = new { type = "string", description = "Firmanın sektörü" },
+            naceCode = new { type = "string", description = "NACE Rev.2 kodu, ör. 22.19" },
             manufacturer = new { type = "boolean", description = "Üretim yapıyor mu" },
             products = new
             {
@@ -305,16 +325,12 @@ public class GeminiAiService : IAiService, ICompanyRatingAi
         if (input.Snippets.Count == 0)
             return CompanyRatingAiResult.Failed("Değerlendirilecek kaynak bilgisi yok.");
 
-        var sources = string.Join("\n\n", input.Snippets.Select((s, i) =>
-            $"[{i + 1}] ({s.Kind}) {s.SourceUrl}\n{s.Text}"));
-
-        if (sources.Length > _options.MaxInputChars)
-            sources = sources[.._options.MaxInputChars];
+        var sources = BuildSourcesBlock(input.Snippets, input.MaxInputChars);
 
         var analysisNote = input.Analysis is null
             ? "(firma analizi yok)"
             : $"Sektör: {input.Analysis.Industry}; Üretici: {input.Analysis.Manufacturer}; " +
-              $"Ürünler: {string.Join(", ", input.Analysis.Products)}";
+              $"SAP: {input.Analysis.Sap}; Ürünler: {string.Join(", ", input.Analysis.Products)}";
 
         var userText =
             $"FİRMA: {input.Company.Name}\n" +
@@ -344,7 +360,7 @@ public class GeminiAiService : IAiService, ICompanyRatingAi
 
         try
         {
-            var body = await SendWithRetryAsync(url, payloadJson, apiKey, ct);
+            var body = await SendWithRetryAsync(url, payloadJson, apiKey, ct, input.Timeout);
             if (body.Error is not null) return CompanyRatingAiResult.Failed(body.Error);
 
             var json = ExtractText(body.Content!);
@@ -364,25 +380,282 @@ public class GeminiAiService : IAiService, ICompanyRatingAi
         }
     }
 
-    private const string RatingSystemPrompt = """
-        Egebis Bilişim için bir potansiyel müşterinin (firmanın) ticari ve finansal
-        sağlık durumunu değerlendiriyorsun. Bu değerlendirme, firmanın Egebis'e
-        uygunluğundan (SAP kullanımı vb.) AYRI bir eksendir.
+    /// <summary>
+    /// Kaynaklari onem sirasina gore dizer ve sinira kadar ekler: kesilme olursa
+    /// risk/finans/site yerine siradan haberler duser. Parca ortadan bolunmez.
+    /// </summary>
+    public static string BuildSourcesBlock(IReadOnlyList<IntelSnippet> snippets, int maxChars)
+    {
+        var ordered = snippets
+            .Select((s, i) => (Snippet: s, Index: i))
+            .OrderBy(x => SourcePriority(x.Snippet.Kind))
+            .ThenBy(x => x.Index);
 
-        Sana firma hakkında internetten toplanmış kaynak parçaları (haber başlıkları,
-        arama sonucu özetleri, KAP bildirimleri) verilecek. SADECE bu parçalardan
-        yararlanarak verilen şemaya uygun JSON döndür.
+        var sb = new System.Text.StringBuilder();
+        var n = 0;
+        foreach (var (s, _) in ordered)
+        {
+            var date = string.IsNullOrWhiteSpace(s.Date) ? "" : $" [{s.Date}]";
+            var block = $"[{++n}] ({s.Kind}){date} {s.SourceUrl}\n{s.Text}\n\n";
+            if (sb.Length + block.Length > maxChars)
+            {
+                if (sb.Length == 0) sb.Append(block[..Math.Min(block.Length, maxChars)]);
+                continue; // daha kisa bir sonraki parca hala sigabilir
+            }
+            sb.Append(block);
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    private static int SourcePriority(IntelKind kind) => kind switch
+    {
+        IntelKind.Risk => 0,
+        IntelKind.Finansal => 1,
+        IntelKind.Site => 2,
+        IntelKind.Teknoloji => 3,
+        IntelKind.Yonetim => 4,
+        IntelKind.Buyume => 5,
+        IntelKind.Kayit => 6,
+        IntelKind.Haber => 7,
+        _ => 8
+    };
+
+    // ================= AI #4: Kisiye ozel e-posta =================
+
+    public async Task<EmailDraftAiResult> WriteEmailAsync(EmailDraftInput input, CancellationToken ct = default)
+    {
+        var apiKey = await _settings.GetAsync(SettingKeys.GeminiApiKey, ct);
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return EmailDraftAiResult.Failed(new MissingApiKeyException("Gemini").Message);
+
+        var url = $"{_options.GeminiEndpoint}/{await ModelAsync(ct)}:generateContent";
+        var payload = new
+        {
+            system_instruction = new { parts = new[] { new { text = EmailSystemPrompt } } },
+            contents = new[] { new { role = "user", parts = new[] { new { text = BuildEmailBrief(input) } } } },
+            generationConfig = new
+            {
+                temperature = 0.6,
+                responseMimeType = "application/json",
+                responseSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        subject = new { type = "string", description = "En fazla 70 karakter" },
+                        body = new { type = "string", description = "Düz metin; paragraflar arasında boş satır" }
+                    },
+                    required = new[] { "subject", "body" }
+                }
+            }
+        };
+
+        try
+        {
+            var response = await SendWithRetryAsync(url, JsonSerializer.Serialize(payload), apiKey, ct);
+            if (response.Error is not null) return EmailDraftAiResult.Failed(response.Error);
+
+            var json = ExtractText(response.Content!);
+            if (json is null) return EmailDraftAiResult.Failed("Gemini yanıtında metin bulunamadı.");
+
+            using var doc = JsonDocument.Parse(json);
+            return new EmailDraftAiResult
+            {
+                Subject = doc.RootElement.TryGetProperty("subject", out var s) ? s.GetString() : null,
+                Body = doc.RootElement.TryGetProperty("body", out var b) ? b.GetString() : null
+            };
+        }
+        catch (QuotaExceededException)
+        {
+            return EmailDraftAiResult.Failed("Gemini kotası doldu; bir süre sonra tekrar deneyin.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Gemini e-posta taslağı başarısız.");
+            return EmailDraftAiResult.Failed(ex.Message);
+        }
+    }
+
+    /// <summary>AI'a verilen bilgi notu: yalnizca dogrulanmis bilgiler, kaynak listesiyle.</summary>
+    public static string BuildEmailBrief(EmailDraftInput input)
+    {
+        var sb = new System.Text.StringBuilder();
+        var c = input.Company;
+        var r = input.Rating;
+        var a = input.Analysis;
+
+        sb.AppendLine($"DİL: {input.Language}");
+        sb.AppendLine($"MAİL TÜRÜ: {(input.IsFollowUp ? "takip (daha önce mail atıldı, cevap gelmedi)" : "ilk temas")}");
+        sb.AppendLine($"GÖNDEREN: {input.SenderName} (Egebis Bilişim)");
+        sb.AppendLine();
+        sb.AppendLine($"ALICI: {input.Contact?.Name ?? "(isim bilinmiyor — 'Sayın Yetkili' kullan)"}");
+        if (!string.IsNullOrWhiteSpace(input.Contact?.Title)) sb.AppendLine($"Ünvan: {input.Contact.Title}");
+        sb.AppendLine();
+        sb.AppendLine($"FİRMA: {c.Name} ({c.City}{(string.IsNullOrWhiteSpace(c.Country) ? "" : ", " + c.Country)})");
+        if (a is not null)
+        {
+            sb.AppendLine($"Sektör: {a.Industry}; Üretici: {(a.Manufacturer ? "evet" : "hayır")}; SAP: {a.Sap}");
+            if (!string.IsNullOrWhiteSpace(a.SapEvidence)) sb.AppendLine($"SAP kanıtı: {a.SapEvidence}");
+            if (a.Products.Count > 0) sb.AppendLine($"Ürünler: {string.Join(", ", a.Products.Take(6))}");
+        }
+
+        if (r is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(r.Summary)) sb.AppendLine($"Firma özeti: {r.Summary}");
+            if (!string.IsNullOrWhiteSpace(r.SalesApproach)) sb.AppendLine($"Satış önerisi: {r.SalesApproach}");
+            foreach (var o in r.Opportunities.Take(4)) sb.AppendLine($"Fırsat: {o.Text} — {o.Reason}");
+            if (r.Technology is { IsEmpty: false } t)
+                sb.AppendLine($"Teknoloji: ERP {t.Erp}; {string.Join(", ", t.Software.Concat(t.DigitalProjects).Take(5))}");
+            foreach (var n in r.NewsTimeline.Take(3)) sb.AppendLine($"Haber: {n.Date} {n.Title}");
+            foreach (var g in r.GrowthSignals.Take(3)) sb.AppendLine($"Büyüme: {g}");
+        }
+
+        if (input.PreviousEmails.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("DAHA ÖNCE GÖNDERİLENLER:");
+            foreach (var p in input.PreviousEmails) sb.AppendLine($"- {p}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(input.TemplateBody))
+        {
+            sb.AppendLine();
+            sb.AppendLine("ŞİRKETİN KENDİ ŞABLONU (ton, hizmetler ve imza için örnek; birebir kopyalama):");
+            sb.AppendLine($"Konu: {input.TemplateSubject}");
+            sb.AppendLine(input.TemplateBody.Length > 3000 ? input.TemplateBody[..3000] : input.TemplateBody);
+        }
+
+        return sb.ToString();
+    }
+
+    private const string EmailSystemPrompt = """
+        Egebis Bilişim adına B2B satış e-postası yazıyorsun. Egebis; üretici firmalara SAP
+        danışmanlığı, SAP entegrasyonu, MES/üretim takip ve özel yazılım hizmeti veren bir
+        SAP iş ortağıdır.
+
+        Kurallar:
+        - Yalnızca verilen bilgi notundaki olguları kullan. Firma hakkında notta olmayan
+          hiçbir şey iddia etme, rakam uydurma.
+        - İlk cümlede firmaya özgü, somut bir gözlemle başla (bir haber, yatırım, ürün,
+          teknoloji kanıtı). Genel iltifat ("sektörün lideri") yazma.
+        - Alıcının rolüne göre açı seç: IT/bilgi işlem → entegrasyon, SAP, MES, veri;
+          genel müdür/yönetim → verimlilik, maliyet, büyümeye hazırlık; üretim/fabrika →
+          üretim takibi, izlenebilirlik; finans → raporlama, kapanış süresi.
+        - 120-180 kelime, kısa paragraflar, tek net çağrı (ör. 15-20 dakikalık görüşme).
+        - Takip mailinde önceki maile kısaca atıf yap, yeni bir değer/açı ekle, 80-120 kelime.
+        - Hitap: isim biliniyorsa "Sayın Ad Soyad" (Türkçe) ya da dile uygun resmi hitap;
+          bilinmiyorsa "Sayın Yetkili".
+        - Sonda gönderen adıyla kapanış yap. Şablonda imza/iletişim bilgisi varsa onu kullan.
+        - DİL alanındaki dilde yaz (tr = Türkçe, en = İngilizce, de = Almanca...).
+        - Konu satırı kısa (en fazla 70 karakter), kişisel ve tıklama tuzağı olmayan.
+        - body alanı düz metindir: HTML, markdown veya köşeli parantezli yer tutucu kullanma.
+        """;
+
+    // ================= AI #5: Toplu NACE siniflandirma =================
+
+    /// <summary>
+    /// Kayitli firma ozetlerinden (sektor, urunler, aciklama) NACE Rev.2 kodu atar.
+    /// Site yeniden taranmaz; tek cagrida en fazla ~25 firma.
+    /// </summary>
+    public async Task<Dictionary<int, string>> ClassifyNaceAsync(IReadOnlyList<(int Id, string Text)> companies, CancellationToken ct = default)
+    {
+        var result = new Dictionary<int, string>();
+        if (companies.Count == 0) return result;
+
+        var apiKey = await _settings.GetAsync(SettingKeys.GeminiApiKey, ct);
+        if (string.IsNullOrWhiteSpace(apiKey)) throw new MissingApiKeyException("Gemini");
+
+        var list = string.Join("\n", companies.Select(c => $"[{c.Id}] {c.Text}"));
+        var url = $"{_options.GeminiEndpoint}/{await ModelAsync(ct)}:generateContent";
+        var payload = new
+        {
+            system_instruction = new { parts = new[] { new { text = NaceSystemPrompt } } },
+            contents = new[] { new { role = "user", parts = new[] { new { text = list } } } },
+            generationConfig = new
+            {
+                temperature = 0.0,
+                responseMimeType = "application/json",
+                responseSchema = new
+                {
+                    type = "array",
+                    items = new
+                    {
+                        type = "object",
+                        properties = new
+                        {
+                            id = new { type = "integer" },
+                            naceCode = new { type = "string" }
+                        },
+                        required = new[] { "id", "naceCode" }
+                    }
+                }
+            }
+        };
+
+        var response = await SendWithRetryAsync(url, JsonSerializer.Serialize(payload), apiKey, ct);
+        if (response.Error is not null) throw new InvalidOperationException(response.Error);
+
+        var json = ExtractText(response.Content!);
+        if (json is null) return result;
+
+        using var doc = JsonDocument.Parse(json);
+        foreach (var item in doc.RootElement.EnumerateArray())
+        {
+            if (!item.TryGetProperty("id", out var idEl) || !idEl.TryGetInt32(out var id)) continue;
+            var code = item.TryGetProperty("naceCode", out var c) ? c.GetString() : null;
+            if (!string.IsNullOrWhiteSpace(code)) result[id] = code;
+        }
+        return result;
+    }
+
+    private const string NaceSystemPrompt = """
+        Her satırda köşeli parantez içinde firma numarası ve firma hakkında kısa bilgi
+        (ad, sektör, ürünler, açıklama) var. Her firma için ana faaliyetine en uygun NACE
+        Rev.2 kodunu "22.19" biçiminde (bölüm.sınıf) ver. Sınıftan emin değilsen yalnızca
+        bölüm kodunu yaz ("22"). Bilgi faaliyeti anlamaya yetmiyorsa naceCode boş olsun.
+        Her firma için verilen numarayı id alanına aynen yaz.
+        """;
+
+    private const string RatingSystemPrompt = """
+        Egebis Bilişim için bir potansiyel müşteri (firma) hakkında DERİN bir ön araştırma
+        raporu hazırlıyorsun. Egebis; üretici firmalara SAP danışmanlığı, SAP entegrasyonu,
+        MES/üretim takip ve özel yazılım hizmeti veren bir SAP iş ortağıdır.
+
+        Sana firma hakkında internetten toplanmış kaynaklar verilecek: firmanın kendi web
+        sitesinden sayfalar (Site), haber makaleleri ve arama sonucu özetleri, KAP
+        bildirimleri. Her kaynağın başında [numara] (tür) [tarih] link yazar.
+        SADECE bu kaynaklardan yararlanarak verilen şemaya uygun JSON döndür.
 
         Kesin kurallar:
-        - Metinde olmayan hiçbir bilgiyi uydurma. Bilgi yoksa alanı boş bırak veya
-          "bilinmiyor" yaz.
-        - Her risk sinyali (riskSignals) için sourceUrl alanına o bilgiyi veren
-          kaynağın linkini koy. Kaynağı olmayan risk iddiası yazma.
+        - Kaynaklarda olmayan hiçbir bilgiyi uydurma. Bilgi yoksa alanı boş bırak veya
+          boş dizi döndür. Tahmin yürütüyorsan bunu açıkça "tahmini" diye belirt.
+        - Başka bir firmaya ait bilgiyi (benzer isimli firma, haberde adı geçen başka
+          şirket) bu firmaya yazma.
+        - Link isteyen her alana (sourceUrl, url) o bilgiyi veren kaynağın linkini koy.
+        - summary: 5-8 cümlelik yönetici özeti. Firma ne yapar, ne büyüklükte, finansal
+          ve ticari durumu, öne çıkan gelişmeler, riskler ve Egebis açısından önemi.
         - riskSignals.severity: konkordato, iflas, haciz, tasfiye, el koyma =>
           "yuksek". Dava, icra takibi, ödeme gecikmesi haberi => "orta".
-          Belirsiz/söylenti => "dusuk".
-        - financialSource: rakam KAP bildiriminden geliyorsa "KAP", haberden
-          geliyorsa "haber", hiç rakam yoksa "yok".
+          Belirsiz/söylenti => "dusuk". Kaynağı olmayan risk iddiası yazma.
+        - financialSource: rakam KAP bildiriminden geliyorsa "KAP", haber veya firma
+          sitesinden geliyorsa "haber", hiç rakam yoksa "yok".
+        - financialPeriods: kaynakta açıkça geçen dönemsel ciro/kâr rakamları; tutarı
+          birimiyle yaz ("1,2 milyar TL", "45 milyon USD"). Her satıra sourceUrl.
+        - sizeInfo: çalışan sayısı, ihracat (ülke sayısı/oranı), üretim kapasitesi,
+          fabrika/şube lokasyonları.
+        - management: yönetim kurulu, genel müdür, CFO, IT/bilgi işlem yöneticisi gibi
+          karar vericiler; isim + rol + sourceUrl. İsmi kaynakta geçmeyen kişi yazma.
+        - groupCompanies: bağlı olduğu holding/grup ve iştirakler.
+        - technology: kullandığı ERP (SAP, Logo, Netsis, Microsoft Dynamics, Oracle...)
+          ve dayanağı (erpEvidence), diğer yazılımlar, dijital dönüşüm projeleri,
+          IT/yazılım iş ilanları. Kanıt yoksa erp = "bilinmiyor".
+        - newsTimeline: önemli haberler, en yeni önce, en fazla 12; tarih kaynakta
+          varsa yaz. kind: risk | buyume | finansal | yonetim | teknoloji | genel.
+        - opportunities: Egebis için somut satış fırsatları (ör. SAP'ye geçiş, yeni
+          fabrika = yeni sistem ihtiyacı, IT ilanı, entegrasyon ihtiyacı) ve nedeni.
+        - salesApproach: 2-4 cümle; kime (rol/isim), hangi açıdan, hangi zamanlamayla
+          yaklaşılmalı.
         - signal alanı senin ÖNERİN: net risk yoksa ve firma köklü/aktif görünüyorsa
           "guclu"; veri az veya karışıksa "incelenmeli"; doğrulanmış ciddi risk
           varsa "riskli". Nihai kararı sistem verecek.
@@ -392,6 +665,14 @@ public class GeminiAiService : IAiService, ICompanyRatingAi
         Tüm metin alanlarını Türkçe yaz.
         """;
 
+    private static readonly object StringArray = new { type = "array", items = new { type = "string" } };
+
+    private static object ObjectArray(object properties, string[] required) => new
+    {
+        type = "array",
+        items = new { type = "object", properties, required }
+    };
+
     /// <summary>Rating responseSchema'si. CompanyRating sinifiyla birebir eslesmelidir.</summary>
     private static readonly object RatingResponseSchema = new
     {
@@ -399,31 +680,73 @@ public class GeminiAiService : IAiService, ICompanyRatingAi
         properties = new
         {
             signal = new { type = "string", @enum = new[] { "guclu", "incelenmeli", "riskli" } },
-            summary = new { type = "string", description = "1-2 cümlelik Türkçe özet" },
+            summary = new { type = "string", description = "5-8 cümlelik yönetici özeti" },
             foundingInfo = new { type = "string", description = "Kuruluş yılı, merkez, faaliyet alanı" },
-            scaleInfo = new { type = "string", description = "Çalışan sayısı, şube/fabrika" },
+            scaleInfo = new { type = "string", description = "Büyüklüğün kısa özeti" },
             financialInfo = new { type = "string", description = "Ciro/kâr/sermaye bilgisi, yoksa boş" },
             financialSource = new { type = "string", @enum = new[] { "KAP", "haber", "yok" } },
-            owners = new { type = "string", description = "Ortaklık yapısı ve önemli yöneticiler" },
-            customers = new { type = "array", items = new { type = "string" } },
-            suppliers = new { type = "array", items = new { type = "string" } },
-            projects = new { type = "array", items = new { type = "string" } },
-            growthSignals = new { type = "array", items = new { type = "string" } },
-            riskSignals = new
+            owners = new { type = "string", description = "Ortaklık yapısı" },
+            customers = StringArray,
+            suppliers = StringArray,
+            projects = StringArray,
+            growthSignals = StringArray,
+            riskSignals = ObjectArray(new
             {
-                type = "array",
-                items = new
+                text = new { type = "string" },
+                severity = new { type = "string", @enum = new[] { "yuksek", "orta", "dusuk" } },
+                sourceUrl = new { type = "string" }
+            }, new[] { "text", "severity" }),
+            sizeInfo = new
+            {
+                type = "object",
+                properties = new
                 {
-                    type = "object",
-                    properties = new
-                    {
-                        text = new { type = "string" },
-                        severity = new { type = "string", @enum = new[] { "yuksek", "orta", "dusuk" } },
-                        sourceUrl = new { type = "string" }
-                    },
-                    required = new[] { "text", "severity" }
+                    employees = new { type = "string" },
+                    exportInfo = new { type = "string" },
+                    capacity = new { type = "string" },
+                    locations = StringArray
                 }
-            }
+            },
+            financialPeriods = ObjectArray(new
+            {
+                period = new { type = "string" },
+                revenue = new { type = "string" },
+                netProfit = new { type = "string" },
+                sourceUrl = new { type = "string" }
+            }, new[] { "period" }),
+            management = ObjectArray(new
+            {
+                name = new { type = "string" },
+                role = new { type = "string" },
+                sourceUrl = new { type = "string" }
+            }, new[] { "name" }),
+            groupCompanies = StringArray,
+            technology = new
+            {
+                type = "object",
+                properties = new
+                {
+                    erp = new { type = "string" },
+                    erpEvidence = new { type = "string" },
+                    software = StringArray,
+                    digitalProjects = StringArray,
+                    itJobSignals = StringArray
+                }
+            },
+            newsTimeline = ObjectArray(new
+            {
+                date = new { type = "string" },
+                title = new { type = "string" },
+                url = new { type = "string" },
+                kind = new { type = "string", @enum = new[] { "risk", "buyume", "finansal", "yonetim", "teknoloji", "genel" } }
+            }, new[] { "title" }),
+            opportunities = ObjectArray(new
+            {
+                text = new { type = "string" },
+                reason = new { type = "string" },
+                sourceUrl = new { type = "string" }
+            }, new[] { "text" }),
+            salesApproach = new { type = "string" }
         },
         required = new[] { "signal", "summary", "financialSource" }
     };

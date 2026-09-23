@@ -22,6 +22,13 @@ public class Company
     [MaxLength(150)]
     public string? Industry { get; set; }
 
+    /// <summary>NACE Rev.2 faaliyet kodu ("22.19"); AI analizinden gelir.</summary>
+    [MaxLength(10)]
+    public string? NaceCode { get; set; }
+
+    /// <summary>Son puanlamada Ayarlar'daki ideal musteri profiline (ICP) uydu mu?</summary>
+    public bool IcpMatch { get; set; }
+
     [MaxLength(100)]
     public string? City { get; set; }
 
@@ -60,6 +67,24 @@ public class Company
     public DateTime? ContactedAt { get; set; }
     public DateTime? EmailSentAt { get; set; }
     public DateTime? ProjectStartedAt { get; set; }
+
+    // --- CRM (Salesforce) senkronu. Null = hic gonderilmedi. ---
+
+    /// <summary>Salesforce'taki karsilik gelen Account kaydinin Id'si.</summary>
+    [MaxLength(30)]
+    public string? SalesforceId { get; set; }
+
+    public DateTime? SalesforceSyncedAt { get; set; }
+
+    /// <summary>Son senkron denemesinin sonucu (basarili ise null; hata varsa mesaj).</summary>
+    [MaxLength(500)]
+    public string? SalesforceSyncError { get; set; }
+
+    /// <summary>Son gonderimden sonra degisti mi? Arka plan senkronu bunlari gonderir.</summary>
+    public bool SalesforceDirty { get; set; }
+
+    /// <summary>Son senkron denemesi (basarili/basarisiz); hatali kayit hemen tekrar denenmesin diye.</summary>
+    public DateTime? SalesforceAttemptAt { get; set; }
 
     public List<Contact> Contacts { get; set; } = new();
     public List<Lead> Leads { get; set; } = new();

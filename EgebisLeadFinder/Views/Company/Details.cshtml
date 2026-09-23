@@ -25,6 +25,14 @@
             {
                 <span>@Model.Company.Industry</span>
             }
+            @if (!string.IsNullOrWhiteSpace(Model.Company.NaceCode))
+            {
+                <span title="@NaceCatalog.Label(Model.Company.NaceCode)">NACE @Model.Company.NaceCode</span>
+            }
+            @if (Model.Company.IcpMatch)
+            {
+                <span class="tag tag-success" title="İdeal müşteri profiline uyuyor">ICP</span>
+            }
             @if (!string.IsNullOrWhiteSpace(Model.Company.City))
             {
                 <span>@Model.Company.City</span>
@@ -54,7 +62,7 @@
 
 <nav class="detail-tabs" role="tablist" aria-label="Firma detayı bölümleri">
     <button type="button" class="detail-tab is-on" data-tab-btn="ozet" role="tab" aria-selected="true">Özet</button>
-    <button type="button" class="detail-tab" data-tab-btn="arastirma" role="tab" aria-selected="false">Ön araştırma</button>
+    <button type="button" class="detail-tab" data-tab-btn="arastirma" role="tab" aria-selected="false">Firma analizi</button>
     <button type="button" class="detail-tab" data-tab-btn="kisiler" role="tab" aria-selected="false">Kişiler & Lead'ler<span class="detail-tab-count">@(Model.Company.Contacts.Count)</span></button>
 </nav>
 
@@ -229,7 +237,10 @@
                             <div class="contact-title">@contact.Title</div>
                             @if (!string.IsNullOrWhiteSpace(contact.Email))
                             {
-                                <div class="small mt-1"><a href="mailto:@contact.Email">@contact.Email</a></div>
+                                <div class="small mt-1">
+                                    <a href="mailto:@contact.Email">@contact.Email</a>
+                                    <partial name="_EmailBadge" model="contact" />
+                                </div>
                             }
                             @if (!string.IsNullOrWhiteSpace(contact.Phone))
                             {
@@ -369,6 +380,7 @@
                                             @if (!string.IsNullOrWhiteSpace(contact.Email))
                                             {
                                                 <span class="dot dot-ok"></span>@contact.Email
+                                                <partial name="_EmailBadge" model="contact" />
                                             }
                                             else
                                             {

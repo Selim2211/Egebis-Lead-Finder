@@ -17,6 +17,7 @@ public class LeadDiscoveryService
     private readonly IWebScraperService _scraper;
     private readonly IAiService _ai;
     private readonly LeadScoringService _scoring;
+    private readonly IcpService _icp;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly PipelineOptions _options;
     private readonly ILogger<LeadDiscoveryService> _logger;
@@ -28,8 +29,10 @@ public class LeadDiscoveryService
         LeadScoringService scoring,
         IServiceScopeFactory scopeFactory,
         IOptions<PipelineOptions> options,
-        ILogger<LeadDiscoveryService> logger)
+        ILogger<LeadDiscoveryService> logger,
+        IcpService icp)
     {
+        _icp = icp;
         _search = search;
         _scraper = scraper;
         _ai = ai;
@@ -45,6 +48,9 @@ public class LeadDiscoveryService
         IProgress<JobStep>? progress = null)
     {
         var result = new DiscoveryResult();
+
+        // ICP firmalar paralel islenmeden once bir kez yuklenir (paylasilan DbContext'e es zamanli erisim olmasin).
+        await _icp.GetAsync(ct);
 
         progress?.Report(new JobStep(3, "Arama sorguları hazırlanıyor"));
 
@@ -218,7 +224,7 @@ public class LeadDiscoveryService
             // firma detayindaki "Lead'leri Bul" butonuna bastiginda tetiklenir.
             // Boylece arama hizli kalir ve kisisel veri yalnizca kullanicinin
             // bilerek sectigi firmalar icin toplanir.
-            company.Score = _scoring.ScoreCompany(aiResult.Analysis, site, company.Contacts).Total;
+            await _icp.ScoreAsync(company, aiResult.Analysis, site, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {

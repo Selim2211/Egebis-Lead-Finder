@@ -10,9 +10,13 @@
   <ItemGroup>
     <!-- On arastirma referans listesi: yayin ciktisina kopyalanir, elle guncellenir. -->
     <Content Update="Data\reference\company-lists.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Update="Data\reference\nace-rev2-tr.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Data\reference\*.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.105.1" />
+    <PackageReference Include="DnsClient" Version="1.8.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.13.0" />
     <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">

@@ -1,6 +1,8 @@
 using EgebisLeadFinder.Configuration;
 using EgebisLeadFinder.Data;
 using EgebisLeadFinder.Services;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Polly;
 using Polly.Extensions.Http;
@@ -16,7 +18,23 @@ builder.Host.UseSerilog((context, config) => config
     .WriteTo.File("logs/egebis-.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 14));
 
 builder.Services.AddControllersWithViews();
+
+// Konteynerde oturum/antiforgery anahtarlari kalici klasorde tutulur; yoksa her yeniden
+// baslatmada formlar ve Salesforce OAuth oturumu gecersiz kalir.
+var keysPath = builder.Configuration["DataProtection:KeysPath"];
+if (!string.IsNullOrWhiteSpace(keysPath))
+    builder.Services.AddDataProtection()
+        .SetApplicationName("EgebisLeadFinder")
+        .PersistKeysToFileSystem(new DirectoryInfo(keysPath));
 builder.Services.AddMemoryCache();
+
+// Salesforce OAuth akisindaki state (CSRF) degerini tutmak icin oturum.
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(o =>
+{
+    o.IdleTimeout = TimeSpan.FromMinutes(10);
+    o.Cookie.HttpOnly = true;
+});
 
 // Uzun suren islerin (firma aramasi, on arastirma) ilerlemesini tutan bellek-ici depo.
 builder.Services.AddSingleton<EgebisLeadFinder.Services.Progress.JobProgressStore>();
@@ -44,6 +62,7 @@ builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOpt
 builder.Services.Configure<ApolloOptions>(builder.Configuration.GetSection(ApolloOptions.Section));
 builder.Services.Configure<EnrichmentOptions>(builder.Configuration.GetSection(EnrichmentOptions.Section));
 builder.Services.Configure<ResearchOptions>(builder.Configuration.GetSection(ResearchOptions.Section));
+builder.Services.Configure<SalesforceOptions>(builder.Configuration.GetSection(SalesforceOptions.Section));
 
 // 429 (kota) ve gecici sunucu hatalarinda artan beklemeyle (2sn, 4sn, 8sn) tekrar dener.
 static IAsyncPolicy<HttpResponseMessage> ExponentialBackoffPolicy() =>
@@ -73,11 +92,9 @@ builder.Services.AddScoped<EmailTemplateService>();
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddHttpClient<IGeminiModelCatalog, GeminiModelCatalog>(c => c.Timeout = TimeSpan.FromSeconds(10));
 
-builder.Services.AddHttpClient<IAiService, GeminiAiService>(c =>
-{
-    var ai = builder.Configuration.GetSection(AiOptions.Section).Get<AiOptions>() ?? new AiOptions();
-    c.Timeout = TimeSpan.FromSeconds(ai.TimeoutSeconds);
-});
+// Zaman asimi istek basina GeminiAiService icinde uygulanir: derin firma analizi
+// (uzun girdi/cikti) normal site analizinden daha uzun surer.
+builder.Services.AddHttpClient<IAiService, GeminiAiService>(c => c.Timeout = Timeout.InfiniteTimeSpan);
 
 // 401/403 (yetki hatasi) burada yakalanmaz; ApolloPersonEmailFinder onlari
 // tekrar denemeden acikca raporlar. Sadece 429 ve gecici sunucu hatalari icin
@@ -103,12 +120,21 @@ builder.Services.AddScoped<ContactRevealService>();
 
 // AI #3 ayni GeminiAiService ornegidir; ICompanyRatingAi ona yonlendirilir.
 builder.Services.AddScoped<ICompanyRatingAi>(sp => (ICompanyRatingAi)sp.GetRequiredService<IAiService>());
+builder.Services.AddScoped<IEmailWriterAi>(sp => (IEmailWriterAi)sp.GetRequiredService<IAiService>());
+builder.Services.AddScoped<EmailDraftService>();
+builder.Services.AddScoped<INaceClassifierAi>(sp => (INaceClassifierAi)sp.GetRequiredService<IAiService>());
+builder.Services.AddScoped<IcpService>();
+builder.Services.AddScoped<EgebisLeadFinder.Services.Sequences.SequenceService>();
+builder.Services.AddScoped<EgebisLeadFinder.Services.Sequences.ReplyDetectionService>();
+builder.Services.AddHostedService<EgebisLeadFinder.Services.Sequences.SequenceSenderWorker>();
+builder.Services.AddHostedService<EgebisLeadFinder.Services.Sequences.ReplyDetectionWorker>();
 
 // Kaynak toplayicilar. Hepsi ICompanyIntelSource olarak kaydedilir; orkestrator
 // IEnumerable<ICompanyIntelSource> alir ve hepsini calistirir.
 builder.Services.AddScoped<EgebisLeadFinder.Services.CompanyIntel.ICompanyIntelSource, EgebisLeadFinder.Services.CompanyIntel.NewsIntelSource>();
 builder.Services.AddScoped<EgebisLeadFinder.Services.CompanyIntel.ICompanyIntelSource, EgebisLeadFinder.Services.CompanyIntel.RegistryLinkSource>();
 builder.Services.AddScoped<EgebisLeadFinder.Services.CompanyIntel.ICompanyIntelSource, EgebisLeadFinder.Services.CompanyIntel.CompanyListSource>();
+builder.Services.AddScoped<EgebisLeadFinder.Services.CompanyIntel.ICompanyIntelSource, EgebisLeadFinder.Services.CompanyIntel.WebsiteIntelSource>();
 
 // KAP: uye listesi + son finansal rapor (KapFinancialClient) + site: bildirim aramasi.
 builder.Services.AddHttpClient<EgebisLeadFinder.Services.CompanyIntel.KapFinancialClient>(c => c.Timeout = TimeSpan.FromSeconds(20))
@@ -121,7 +147,38 @@ builder.Services.AddScoped<EgebisLeadFinder.Services.CompanyIntel.ICompanyIntelS
 builder.Services.AddScoped<CompanyRatingEvaluator>();
 builder.Services.AddScoped<ICompanyResearchService, CompanyResearchService>();
 
+// ================= CRM: Salesforce =================
+builder.Services.AddSingleton<IMxResolver, DnsMxResolver>();
+builder.Services.AddScoped<EmailVerificationService>();
+builder.Services.AddHostedService<EmailVerificationWorker>();
+builder.Services.AddScoped<SalesforceSyncRunner>();
+builder.Services.AddHostedService<SalesforceAutoSyncService>();
+builder.Services.AddHttpClient<ISalesforceConnector, SalesforceConnector>(c =>
+{
+    var sf = builder.Configuration.GetSection(SalesforceOptions.Section).Get<SalesforceOptions>() ?? new SalesforceOptions();
+    c.Timeout = TimeSpan.FromSeconds(sf.TimeoutSeconds);
+}).AddPolicyHandler(ExponentialBackoffPolicy());
+
 var app = builder.Build();
+
+// ngrok gibi bir tunel/proxy arkasinda calisirken Request.Scheme ve Host'un
+// gercek (dis) degerleri yansitmasi icin en basta olmali. ngrok'un yerel ajani
+// Kestrel'e loopback uzerinden baglandigi icin varsayilan (loopback) guven
+// listesi zaten yeterli; yine de acik olmasi icin listeler temizlenir.
+var forwardedHeadersOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
+};
+forwardedHeadersOptions.KnownIPNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeadersOptions);
+
+// Sunucu kurulumunda tablolar elle kurulmaz: acilista bekleyen migration'lar uygulanir.
+if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+{
+    using var scope = app.Services.CreateScope();
+    scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.Migrate();
+}
 
 app.UseSerilogRequestLogging();
 
@@ -133,8 +190,11 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseRouting();
+app.UseSession();
 app.UseAuthorization();
 app.MapStaticAssets();
+
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
 app.MapControllerRoute(
     name: "default",

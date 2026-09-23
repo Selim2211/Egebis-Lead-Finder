@@ -34,6 +34,8 @@
     if (profile is not null) chips.Add(($"Profil: {profile.Name} ({SearchRegions.Get(profile.RegionKey ?? SearchRegions.ByCountry(profile.Country)?.Key).Name})", QueryUrl.Without(req, "profileId")));
     if (Model.MinScore > 0) chips.Add(($"Skor ≥ {Model.MinScore}", QueryUrl.Without(req, "minScore")));
     if (Model.OnlyWithoutLead) chips.Add(("Lead açılmamış", QueryUrl.Without(req, "onlyWithoutLead")));
+    if (Model.Icp) chips.Add(("ICP'ye uyanlar", QueryUrl.Without(req, "icp")));
+    if (Model.Nace is not null) chips.Add(($"NACE {NaceCatalog.Label(Model.Nace)}", QueryUrl.Without(req, "nace")));
     if (Model.Signal is not null) chips.Add(($"AI: {signals.First(s => s.Key == Model.Signal).Label}", QueryUrl.Without(req, "signal")));
     foreach (var k in Model.Geo.Countries) chips.Add((SearchRegions.Get(k).Name, QueryUrl.Without(req, "country", k)));
     foreach (var r in Model.Geo.Regions) chips.Add(($"{r} bölgesi", QueryUrl.Without(req, "region", r)));
@@ -45,12 +47,19 @@
         <h1>Firmalar</h1>
         <div class="page-sub">Keşfedilen firmalar ve satış takibi</div>
     </div>
-    <a class="btn btn-accent" asp-action="Search">Firma Ara</a>
+    <div class="d-flex gap-2 align-items-center">
+        <partial name="_ExportMenu" model="@("/Company/Export")" />
+        <a class="btn btn-accent" asp-action="Search">Firma Ara</a>
+    </div>
 </div>
 
 @if (!string.IsNullOrWhiteSpace(TempData["SettingsSaved"] as string))
 {
     <div class="alert alert-success" data-flash="success">@TempData["SettingsSaved"]</div>
+}
+@if (!string.IsNullOrWhiteSpace(TempData["SettingsError"] as string))
+{
+    <div class="alert alert-danger" data-flash="error">@TempData["SettingsError"]</div>
 }
 
 <div class="list-toolbar">
@@ -141,6 +150,12 @@
             @s.Label <span class="stage-chip-count">@Count(s.Key ?? "")</span>
         </a>
     }
+    <a class="stage-chip chip-icp @(Model.Icp ? "is-active" : "")"
+       href="@(Model.Icp ? QueryUrl.Without(req, "icp") : QueryUrl.With(req, "icp", "true"))"
+       title="İdeal Müşteri Profili'ne uyan firmalar">
+        ICP'ye uyanlar <span class="stage-chip-count">@Model.IcpCount</span>
+    </a>
+    <a class="stage-chip" asp-controller="Icp" asp-action="Index" title="İdeal müşteri profilini düzenle">ICP ayarla</a>
 </nav>
 
 @* ---------- Detayli filtre cekmecesi ---------- *@
@@ -197,6 +212,25 @@
                         </option>
                     }
                 </select>
+            </section>
+
+            <section class="fd-section">
+                <div class="fd-section-head"><h3>Sektör (NACE)</h3></div>
+                <select class="form-select" name="nace">
+                    <option value="">Tüm sektörler</option>
+                    @foreach (var group in NaceCatalog.Divisions.Where(d => Model.NaceCounts.ContainsKey(d.Code) || d.Code == Model.Nace).GroupBy(d => d.SectionName))
+                    {
+                        <optgroup label="@group.Key">
+                            @foreach (var d in group)
+                            {
+                                <option value="@d.Code" selected="@(Model.Nace == d.Code)">
+                                    @d.Code · @d.Name (@(Model.NaceCounts.TryGetValue(d.Code, out var nc) ? nc : 0))
+                                </option>
+                            }
+                        </optgroup>
+                    }
+                </select>
+                <div class="form-text">Yalnızca NACE kodu belirlenmiş firmalar listelenir.</div>
             </section>
 
             <section class="fd-section">
@@ -279,11 +313,12 @@ else
     <div class="company-grid">
         @foreach (var company in Model.Companies)
         {
-            var actions = new (string Stage, string Label, DateTime? At, string Css)[]
+            // Kartta 4 dugme + sil yan yana sigsin diye kisa etiket; tam ad title'da.
+            var actions = new (string Stage, string Label, string Short, DateTime? At, string Css)[]
             {
-                (CompanyStage.Contacted, "İletişim kuruldu", company.ContactedAt, "action-contacted"),
-                (CompanyStage.Mailed, "Mail atıldı", company.EmailSentAt, "action-mailed"),
-                (CompanyStage.Project, "Proje başladı", company.ProjectStartedAt, "action-project")
+                (CompanyStage.Contacted, "İletişim kuruldu", "İletişim", company.ContactedAt, "action-contacted"),
+                (CompanyStage.Mailed, "Mail atıldı", "Mail", company.EmailSentAt, "action-mailed"),
+                (CompanyStage.Project, "Proje başladı", "Proje", company.ProjectStartedAt, "action-project")
             };
 
             <article class="company-card @(company.ProjectStartedAt is not null ? "is-project" : "")" data-company-id="@company.Id">
@@ -351,10 +386,22 @@ else
                                     </svg>
                                     break;
                             }
-                            <span class="action-label">@a.Label</span>
+                            <span class="action-label">@a.Short</span>
                             <span class="action-date">@(a.At?.ToLocalTime().ToString("dd.MM"))</span>
                         </button>
                     }
+                    <button type="submit" form="stageForm"
+                            formaction="@Url.Action("SyncToSalesforce", new { id = company.Id })"
+                            class="action-btn action-salesforce @(company.SalesforceId is not null ? "is-active" : "")"
+                            title="@(company.SalesforceId is not null
+                                       ? $"Salesforce'ta kayıtlı · {company.SalesforceSyncedAt?.ToLocalTime():dd.MM.yyyy} — tekrar göndermek için tıklayın"
+                                       : "Salesforce'a Aktar")">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                            <path d="m3.3 7 8.7 5 8.7-5M12 22V12" />
+                        </svg>
+                        <span class="action-label">@(company.SalesforceId is not null ? "SF'de" : "Salesforce")</span>
+                    </button>
                     <button type="button" class="action-btn action-delete" title="Firmayı sil"
                             data-delete-company="@company.Id" data-company-name="@company.Name">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

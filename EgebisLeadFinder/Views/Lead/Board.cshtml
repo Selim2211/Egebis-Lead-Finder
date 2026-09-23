@@ -1,0 +1,160 @@
+@model BoardViewModel
+@{
+    ViewData["Title"] = "Satış Hunisi";
+    var now = DateTime.UtcNow;
+    var statuses = Enum.GetValues<LeadStatus>();
+}
+
+<div class="page-head">
+    <div>
+        <h1>Satış Hunisi</h1>
+        <div class="page-sub">Kartı sürükleyip bırakarak durumunu değiştirin; değişiklik Salesforce'a da otomatik gider</div>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <partial name="_LeadViewSwitch" model="@("board")" />
+        <partial name="_ExportMenu" model="@("/Lead/Export")" />
+    </div>
+</div>
+
+<div class="list-toolbar mb-3">
+    <form method="get" class="list-search" role="search">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+        <input type="search" name="q" value="@Model.Query" placeholder="Firma, kişi, ünvan veya e-posta ara..." aria-label="Lead ara" />
+    </form>
+    @if (Model.Truncated)
+    {
+        <span class="small text-muted-2">İlk @BoardViewModel.MaxCards lead gösteriliyor; aramayı daraltın.</span>
+    }
+</div>
+
+@Html.AntiForgeryToken()
+
+<div class="board" data-update-url="@Url.Action("UpdateStatus")">
+    @foreach (var status in statuses)
+    {
+        var cards = Model.Columns[status];
+        <section class="board-col" data-status="@((int)status)" aria-label="@LeadStatusDisplay.Label(status)">
+            <header class="board-col-head">
+                <span class="lead-status @LeadStatusDisplay.Css(status)">@LeadStatusDisplay.Label(status)</span>
+                <span class="board-count">@cards.Count</span>
+            </header>
+            <div class="board-col-body">
+                @foreach (var lead in cards)
+                {
+                    var wait = lead.RepliedAt is null ? lead.WaitingDays(now) : null;
+                    <article class="board-card @(lead.RepliedAt is not null ? "is-replied" : "")" draggable="true" data-id="@lead.Id" tabindex="0">
+                        <div class="d-flex justify-content-between gap-2">
+                            <a class="board-card-title" asp-action="Details" asp-route-id="@lead.Id">@lead.Company?.Name</a>
+                            <partial name="_ScoreBadge" model="lead.Score" />
+                        </div>
+                        <div class="board-card-sub">
+                            @if (RatingSignalDisplay.HasSignal(lead.Company?.RatingSignal))
+                            {
+                                <span class="signal-pip @RatingSignalDisplay.PipCss(lead.Company?.RatingSignal)" title="@RatingSignalDisplay.Label(lead.Company?.RatingSignal)"></span>
+                            }
+                            @PersonDisplay.DisplayName(lead.Contact)
+                            @if (!string.IsNullOrWhiteSpace(lead.Contact?.Title))
+                            {
+                                <span class="text-muted-2">· @lead.Contact.Title</span>
+                            }
+                        </div>
+                        <div class="board-card-tags">
+                            @if (lead.Contact is not null)
+                            {
+                                <partial name="_EmailBadge" model="lead.Contact" />
+                            }
+                            @if (lead.RepliedAt is not null)
+                            {
+                                <span class="tag tag-success">Cevap geldi</span>
+                            }
+                            else if (wait is > 0)
+                            {
+                                <span class="tag @(wait >= 7 ? "tag-danger" : wait >= 3 ? "tag-amber" : "tag-muted")">@wait gün</span>
+                            }
+                            @if (Model.SequenceLabels.TryGetValue(lead.Id, out var seq))
+                            {
+                                <span class="tag tag-muted" title="Otomatik mail dizisi">↻ @seq</span>
+                            }
+                        </div>
+                        <select class="board-move form-select form-select-sm" aria-label="Durumu değiştir">
+                            @foreach (var s in statuses)
+                            {
+                                <option value="@((int)s)" selected="@(s == status)">@LeadStatusDisplay.Label(s)</option>
+                            }
+                        </select>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+</div>
+
+@section Scripts {
+<script>
+    (function () {
+        var board = document.querySelector('.board');
+        var token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+        var dragged = null;
+
+        function refreshCounts() {
+            board.querySelectorAll('.board-col').forEach(function (col) {
+                col.querySelector('.board-count').textContent = col.querySelectorAll('.board-card').length;
+            });
+        }
+
+        async function move(card, targetCol) {
+            var fromCol = card.closest('.board-col');
+            if (fromCol === targetCol) return;
+            var nextSibling = card.nextElementSibling;
+            targetCol.querySelector('.board-col-body').prepend(card);
+            card.querySelector('.board-move').value = targetCol.dataset.status;
+            refreshCounts();
+            try {
+                var body = new URLSearchParams({ id: card.dataset.id, status: targetCol.dataset.status, __RequestVerificationToken: token });
+                var res = await fetch(board.dataset.updateUrl, { method: 'POST', body: body, headers: { 'Accept': 'application/json' } });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                var data = await res.json();
+                egToast.success(card.querySelector('.board-card-title').textContent.trim() + ' → ' + data.label, { timeout: 2500 });
+            } catch (e) {
+                fromCol.querySelector('.board-col-body').insertBefore(card, nextSibling);
+                card.querySelector('.board-move').value = fromCol.dataset.status;
+                refreshCounts();
+                egToast.error('Durum değiştirilemedi: ' + e.message);
+            }
+        }
+
+        board.addEventListener('dragstart', function (e) {
+            dragged = e.target.closest('.board-card');
+            if (!dragged) return;
+            dragged.classList.add('is-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', dragged.dataset.id);
+        });
+        board.addEventListener('dragend', function () {
+            if (dragged) dragged.classList.remove('is-dragging');
+            board.querySelectorAll('.is-over').forEach(function (c) { c.classList.remove('is-over'); });
+            dragged = null;
+        });
+        board.addEventListener('dragover', function (e) {
+            var col = e.target.closest('.board-col');
+            if (!col || !dragged) return;
+            e.preventDefault();
+            board.querySelectorAll('.is-over').forEach(function (c) { if (c !== col) c.classList.remove('is-over'); });
+            col.classList.add('is-over');
+        });
+        board.addEventListener('drop', function (e) {
+            var col = e.target.closest('.board-col');
+            if (!col || !dragged) return;
+            e.preventDefault();
+            col.classList.remove('is-over');
+            move(dragged, col);
+        });
+        // Klavye/mobil: kart icindeki secimden tasima.
+        board.addEventListener('change', function (e) {
+            if (!e.target.classList.contains('board-move')) return;
+            var card = e.target.closest('.board-card');
+            move(card, board.querySelector('.board-col[data-status="' + e.target.value + '"]'));
+        });
+    })();
+</script>
+}

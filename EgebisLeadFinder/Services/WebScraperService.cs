@@ -155,6 +155,57 @@ public class WebScraperService : IWebScraperService
         return result;
     }
 
+    public async Task<List<ScrapedPage>> ReadPagesAsync(
+        string siteUrl, IEnumerable<string> paths, int maxPages, int maxCharsPerPage, CancellationToken ct = default)
+    {
+        var pages = new List<ScrapedPage>();
+        if (!Uri.TryCreate(siteUrl, UriKind.Absolute, out var baseUri)) return pages;
+
+        baseUri = await ResolveReachableBaseUriAsync(baseUri, ct);
+        var disallowed = _options.RespectRobotsTxt
+            ? await GetDisallowedPathsAsync(baseUri, ct)
+            : new List<string>();
+
+        var seenContent = new HashSet<string>();
+        var consecutiveTimeouts = 0;
+        using var siteBudget = new CancellationTokenSource(TimeSpan.FromSeconds(_options.TimeoutSeconds * 4));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, siteBudget.Token);
+
+        foreach (var path in paths)
+        {
+            if (pages.Count >= maxPages || consecutiveTimeouts >= 2) break;
+            ct.ThrowIfCancellationRequested();
+            if (IsDisallowed(path, disallowed)) continue;
+
+            var pageUrl = new Uri(baseUri, path).ToString();
+            var (html, timedOut) = await TryGetWithStatusAsync(pageUrl, linkedCts.Token, ct);
+            consecutiveTimeouts = timedOut ? consecutiveTimeouts + 1 : 0;
+            if (html is null) continue;
+
+            var text = TextExtractor.ToPlainText(html);
+            if (text.Length < 80 || !seenContent.Add(ContentFingerprint(text))) continue;
+
+            pages.Add(new ScrapedPage(pageUrl, text.Length > maxCharsPerPage ? text[..maxCharsPerPage] : text));
+
+            if (_options.DelayBetweenRequestsMs > 0)
+                await Task.Delay(_options.DelayBetweenRequestsMs, ct);
+        }
+
+        return pages;
+    }
+
+    public async Task<string?> FetchPageTextAsync(string url, int maxChars, CancellationToken ct = default)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out _)) return null;
+
+        var (html, _) = await TryGetWithStatusAsync(url, ct, ct);
+        if (html is null) return null;
+
+        var text = TextExtractor.ToPlainText(html);
+        if (text.Length < 200) return null;
+        return text.Length > maxChars ? text[..maxChars] : text;
+    }
+
     private async Task<string?> TryGetAsync(string url, CancellationToken ct)
     {
         var (html, _) = await TryGetWithStatusAsync(url, ct, ct);

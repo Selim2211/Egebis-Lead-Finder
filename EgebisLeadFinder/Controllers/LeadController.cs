@@ -54,6 +54,142 @@ public class LeadController : Controller
         var geo = GeoFilter.From(regions, cities, countries);
         var now = DateTime.UtcNow;
         var followUpDays = await FollowUpDaysAsync(_settings, ct);
+        var query = FilterLeads(q, status, contact, email, due, geo, followUpDays, now);
+
+        sort = LeadSort.Options.Any(o => o.Key == sort) ? sort! : LeadSort.Default;
+        var ordered = OrderLeads(query, sort);
+
+        var filteredTotal = await query.CountAsync(ct);
+        page = PagerModel.Clamp(page, filteredTotal);
+
+        var leads = await ordered
+            .ThenBy(l => l.Id)
+            .Skip((page - 1) * PagerModel.DefaultPageSize)
+            .Take(PagerModel.DefaultPageSize)
+            .Include(l => l.Company)
+            .Include(l => l.Contact)
+            .Include(l => l.SentEmails)
+            .AsSplitQuery()
+            .ToListAsync(ct);
+
+        geo.CityCounts = await _db.Leads.AsNoTracking()
+            .Where(l => l.Company!.City != null)
+            .GroupBy(l => l.Company!.City!)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+
+        var countryRows = await _db.Leads.AsNoTracking()
+            .Where(l => l.Company!.Country != null)
+            .GroupBy(l => l.Company!.Country!)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
+        geo.CountryCounts = CompanyController.CountryCounts(countryRows.Select(r => ((string?)r.Key, r.Count)));
+
+        var all = await _db.Leads.AsNoTracking()
+            .Select(l => new { l.Status, Contacted = l.ContactedAt != null })
+            .ToListAsync(ct);
+
+        var leadIds = leads.Select(l => l.Id).ToList();
+        var emailCounts = await _db.SentEmails.AsNoTracking()
+            .Where(e => leadIds.Contains(e.LeadId))
+            .GroupBy(e => e.LeadId)
+            .Select(g => new { LeadId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.LeadId, x => x.Count, ct);
+
+        var model = new LeadListViewModel
+        {
+            Leads = leads,
+            Sequences = await _db.EmailSequences.AsNoTracking()
+                .Where(s => s.Active && s.Steps.Any()).OrderBy(s => s.Name).ToListAsync(ct),
+            EmailCounts = emailCounts,
+            Query = q,
+            Status = status,
+            Contact = contact,
+            Email = email,
+            Sort = sort,
+            Geo = geo,
+            Due = due,
+            DueCount = await OnlyDue(_db.Leads.AsNoTracking(), followUpDays, now).CountAsync(ct),
+            FollowUpAfterDays = followUpDays,
+            Pager = new PagerModel { Page = page, TotalItems = filteredTotal },
+            Total = all.Count,
+            ContactedCount = all.Count(x => x.Contacted),
+            StatusCounts = all.GroupBy(x => x.Status).ToDictionary(g => g.Key, g => g.Count())
+        };
+
+        return View(model);
+    }
+
+    /// <summary>Satis hunisi panosu: lead'ler durum kolonlarinda, surukle-birak ile durum degisir.</summary>
+    [HttpGet]
+    public async Task<IActionResult> Board(
+        string? q, string? contact, string? email, bool due,
+        [FromQuery(Name = "region")] string[]? regions, [FromQuery(Name = "city")] string[]? cities,
+        [FromQuery(Name = "country")] string[]? countries, CancellationToken ct)
+    {
+        var geo = GeoFilter.From(regions, cities, countries);
+        var now = DateTime.UtcNow;
+        var followUpDays = await FollowUpDaysAsync(_settings, ct);
+
+        var leads = await FilterLeads(q, status: null, contact, email, due, geo, followUpDays, now)
+            .OrderByDescending(l => l.Score).ThenByDescending(l => l.CreatedAt)
+            .Take(BoardViewModel.MaxCards)
+            .Include(l => l.Company)
+            .Include(l => l.Contact)
+            .Include(l => l.SentEmails)
+            .AsSplitQuery()
+            .ToListAsync(ct);
+
+        var sequences = await _db.LeadSequences.AsNoTracking()
+            .Where(s => s.Status == LeadSequenceStatus.Active)
+            .Select(s => new { s.LeadId, s.CurrentStep, Name = s.Sequence!.Name, Steps = s.Sequence.Steps.Count })
+            .ToListAsync(ct);
+
+        return View(new BoardViewModel
+        {
+            Columns = Enum.GetValues<LeadStatus>().ToDictionary(s => s, s => leads.Where(l => l.Status == s).ToList()),
+            Query = q,
+            Geo = geo,
+            FollowUpAfterDays = followUpDays,
+            Truncated = leads.Count >= BoardViewModel.MaxCards,
+            SequenceLabels = sequences.ToDictionary(s => s.LeadId, s => $"{s.Name} · {Math.Min(s.CurrentStep + 1, s.Steps)}/{s.Steps}")
+        });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Export(
+        string format, string? q, LeadStatus? status, string? contact, string? email, string? sort, bool due,
+        [FromQuery(Name = "region")] string[]? regions, [FromQuery(Name = "city")] string[]? cities,
+        [FromQuery(Name = "country")] string[]? countries, CancellationToken ct)
+    {
+        var geo = GeoFilter.From(regions, cities, countries);
+        var now = DateTime.UtcNow;
+        var followUpDays = await FollowUpDaysAsync(_settings, ct);
+        sort = LeadSort.Options.Any(o => o.Key == sort) ? sort! : LeadSort.Default;
+
+        var leads = await OrderLeads(FilterLeads(q, status, contact, email, due, geo, followUpDays, now), sort)
+            .ThenBy(l => l.Id)
+            .Take(ExportService.MaxRows)
+            .Include(l => l.Company)
+            .Include(l => l.Contact)
+            .Include(l => l.SentEmails)
+            .AsSplitQuery()
+            .ToListAsync(ct);
+
+        var table = ExportService.LeadTable(leads, now);
+        var stamp = DateTime.Now.ToString("yyyy-MM-dd-HHmm");
+
+        return format == "csv"
+            ? File(ExportService.ToCsv(table), "text/csv; charset=utf-8", $"leadler-{stamp}.csv")
+            : File(ExportService.ToXlsx(new[] { table }),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"leadler-{stamp}.xlsx");
+    }
+
+    /// <summary>Lead listesi, pano ve disa aktarim ayni suzgeci kullanir.</summary>
+    private IQueryable<Lead> FilterLeads(string? q, LeadStatus? status, string? contact, string? email, bool due,
+        GeoFilter geo, int followUpDays, DateTime now)
+    {
         var query = _db.Leads
             .AsNoTracking()
             .AsQueryable();
@@ -100,8 +236,12 @@ public class LeadController : Controller
 
         if (due) query = OnlyDue(query, followUpDays, now);
 
-        sort = LeadSort.Options.Any(o => o.Key == sort) ? sort! : LeadSort.Default;
-        IOrderedQueryable<Lead> ordered = sort switch
+        return query;
+    }
+
+    private static IOrderedQueryable<Lead> OrderLeads(IQueryable<Lead> query, string sort)
+    {
+        return sort switch
         {
             "oldest" => query.OrderBy(l => l.CreatedAt),
             "score" => query.OrderByDescending(l => l.Score).ThenByDescending(l => l.CreatedAt),
@@ -114,65 +254,6 @@ public class LeadController : Controller
                 .ThenBy(l => l.SentAt ?? l.ContactedAt),
             _ => query.OrderByDescending(l => l.CreatedAt)
         };
-
-        var filteredTotal = await query.CountAsync(ct);
-        page = PagerModel.Clamp(page, filteredTotal);
-
-        var leads = await ordered
-            .ThenBy(l => l.Id)
-            .Skip((page - 1) * PagerModel.DefaultPageSize)
-            .Take(PagerModel.DefaultPageSize)
-            .Include(l => l.Company)
-            .Include(l => l.Contact)
-            .Include(l => l.SentEmails)
-            .AsSplitQuery()
-            .ToListAsync(ct);
-
-        geo.CityCounts = await _db.Leads.AsNoTracking()
-            .Where(l => l.Company!.City != null)
-            .GroupBy(l => l.Company!.City!)
-            .Select(g => new { g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
-
-        var countryRows = await _db.Leads.AsNoTracking()
-            .Where(l => l.Company!.Country != null)
-            .GroupBy(l => l.Company!.Country!)
-            .Select(g => new { g.Key, Count = g.Count() })
-            .ToListAsync(ct);
-
-        geo.CountryCounts = CompanyController.CountryCounts(countryRows.Select(r => ((string?)r.Key, r.Count)));
-
-        var all = await _db.Leads.AsNoTracking()
-            .Select(l => new { l.Status, Contacted = l.ContactedAt != null })
-            .ToListAsync(ct);
-
-        var leadIds = leads.Select(l => l.Id).ToList();
-        var emailCounts = await _db.SentEmails.AsNoTracking()
-            .Where(e => leadIds.Contains(e.LeadId))
-            .GroupBy(e => e.LeadId)
-            .Select(g => new { LeadId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.LeadId, x => x.Count, ct);
-
-        var model = new LeadListViewModel
-        {
-            Leads = leads,
-            EmailCounts = emailCounts,
-            Query = q,
-            Status = status,
-            Contact = contact,
-            Email = email,
-            Sort = sort,
-            Geo = geo,
-            Due = due,
-            DueCount = await OnlyDue(_db.Leads.AsNoTracking(), followUpDays, now).CountAsync(ct),
-            FollowUpAfterDays = followUpDays,
-            Pager = new PagerModel { Page = page, TotalItems = filteredTotal },
-            Total = all.Count,
-            ContactedCount = all.Count(x => x.Contacted),
-            StatusCounts = all.GroupBy(x => x.Status).ToDictionary(g => g.Key, g => g.Count())
-        };
-
-        return View(model);
     }
 
     [HttpGet]
@@ -198,7 +279,14 @@ public class LeadController : Controller
         {
             Lead = lead,
             OtherLeads = siblings,
-            FollowUpAfterDays = await FollowUpDaysAsync(_settings, ct)
+            FollowUpAfterDays = await FollowUpDaysAsync(_settings, ct),
+            SequenceRuns = await _db.LeadSequences.AsNoTracking()
+                .Include(s => s.Sequence!).ThenInclude(q => q.Steps).ThenInclude(st => st.Template)
+                .Where(s => s.LeadId == id)
+                .OrderByDescending(s => s.StartedAt)
+                .ToListAsync(ct),
+            Sequences = await _db.EmailSequences.AsNoTracking().Include(s => s.Steps)
+                .Where(s => s.Active && s.Steps.Any()).OrderBy(s => s.Name).ToListAsync(ct)
         });
     }
 
@@ -287,6 +375,16 @@ public class LeadController : Controller
             lead.SnoozedUntil = null;
             if (lead.Status is not (LeadStatus.Ilgilendi or LeadStatus.Ilgilenmedi))
                 lead.Status = LeadStatus.Ilgilendi;
+
+            // Cevap veren kisiye otomatik takip gitmemeli.
+            foreach (var run in await _db.LeadSequences
+                         .Where(s => s.LeadId == id && s.Status == LeadSequenceStatus.Active).ToListAsync(ct))
+            {
+                run.Status = LeadSequenceStatus.Stopped;
+                run.StopReason = "Cevap geldi";
+                run.NextSendAt = null;
+                run.FinishedAt = DateTime.UtcNow;
+            }
         }
         else
         {
@@ -351,6 +449,25 @@ public class LeadController : Controller
 
         TempData["LeadSuccess"] = "Not kaydedildi.";
         return RedirectToAction(nameof(Details), new { id });
+    }
+
+    /// <summary>Lead'i Salesforce'a Lead nesnesi olarak gonderir.</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SyncToSalesforce(
+        int id, string? returnUrl, [FromServices] SalesforceSyncRunner salesforce, CancellationToken ct)
+    {
+        var result = await salesforce.SyncLeadAsync(id, ct);
+        if (result is null) return NotFound();
+
+        if (WantsJson())
+            return Json(new { success = result.Success, error = result.Error, salesforceId = result.SalesforceId });
+
+        TempData[result.Success ? "LeadSuccess" : "LeadError"] = result.Success
+            ? "Lead Salesforce'a gönderildi."
+            : $"Salesforce'a gönderilemedi: {result.Error}";
+
+        return RedirectToLocal(returnUrl, id);
     }
 
     /// <summary>Lead'i siler; kisi ve firma kaydi yerinde kalir.</summary>

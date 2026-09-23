@@ -15,6 +15,46 @@ public enum ContactSource
     ApolloSearch = 2
 }
 
+/// <summary>E-posta dogrulama sonucu (MX duzeyinde; posta kutusu yoklanmaz).</summary>
+public enum EmailStatus
+{
+    Unchecked = 0,
+
+    /// <summary>Bicim dogru, alan adinin posta sunucusu (MX) var, kisisel adres.</summary>
+    Valid = 1,
+
+    /// <summary>Gecerli ama info@/satis@ gibi genel bir adres; karar vericiye ulasmayabilir.</summary>
+    Role = 2,
+
+    /// <summary>Tek kullanimlik alan adi veya DNS dogrulanamadi.</summary>
+    Risky = 3,
+
+    /// <summary>Bicim hatali, alan adinda posta sunucusu yok ya da mail geri dondu.</summary>
+    Invalid = 4
+}
+
+public static class EmailStatusDisplay
+{
+    public static string? Label(EmailStatus status, string? email) =>
+        string.IsNullOrWhiteSpace(email) ? null : status switch
+        {
+            EmailStatus.Valid => "Geçerli",
+            EmailStatus.Role => "Genel adres",
+            EmailStatus.Risky => "Riskli",
+            EmailStatus.Invalid => "Geçersiz",
+            _ => "Doğrulanmadı"
+        };
+
+    public static string Css(EmailStatus status) => status switch
+    {
+        EmailStatus.Valid => "tag-success",
+        EmailStatus.Role => "tag-muted",
+        EmailStatus.Risky => "tag-amber",
+        EmailStatus.Invalid => "tag-danger",
+        _ => "tag-muted"
+    };
+}
+
 /// <summary>Firma web sitesinden veya zenginlestirme akisindan cikarilan yetkili kisi.</summary>
 public class Contact
 {
@@ -31,6 +71,13 @@ public class Contact
 
     [MaxLength(255)]
     public string? Email { get; set; }
+
+    public EmailStatus EmailStatus { get; set; }
+
+    [MaxLength(200)]
+    public string? EmailStatusReason { get; set; }
+
+    public DateTime? EmailCheckedAt { get; set; }
 
     [MaxLength(50)]
     public string? Phone { get; set; }

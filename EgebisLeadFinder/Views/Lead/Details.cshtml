@@ -107,6 +107,20 @@
                 <span class="action-label">E-posta yaz</span>
             </a>
         }
+        <form method="post" asp-action="SyncToSalesforce" asp-route-id="@lead.Id" class="m-0">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="returnUrl" value="@returnUrl" />
+            <button class="action-btn action-lg @(lead.SalesforceId is not null ? "is-active" : "")" type="submit"
+                    title="@(lead.SalesforceId is not null
+                               ? $"Salesforce'ta kayıtlı · {lead.SalesforceSyncedAt?.ToLocalTime():dd.MM.yyyy} — tekrar göndermek için tıklayın"
+                               : "Salesforce'a Aktar")">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                    <path d="m3.3 7 8.7 5 8.7-5M12 22V12" />
+                </svg>
+                <span class="action-label">@(lead.SalesforceId is not null ? "SF'de" : "Salesforce'a Aktar")</span>
+            </button>
+        </form>
     </div>
 </section>
 
@@ -143,7 +157,10 @@
                         <div class="fact-label">E-posta</div>
                         @if (hasEmail)
                         {
-                            <div class="fact-value"><a href="mailto:@contact!.Email">@contact.Email</a></div>
+                            <div class="fact-value">
+                                <a href="mailto:@contact!.Email">@contact.Email</a>
+                                <partial name="_EmailBadge" model="contact" />
+                            </div>
                         }
                         else if (canReveal)
                         {
@@ -264,6 +281,8 @@
     </div>
 
     <div class="col-lg-5">
+        <partial name="_SequenceCard" model="Model" />
+
         <div class="card mb-4">
             <div class="card-header">Takip</div>
             <div class="card-body">

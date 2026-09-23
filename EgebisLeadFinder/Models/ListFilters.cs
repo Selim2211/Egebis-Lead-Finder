@@ -111,6 +111,14 @@ public static class QueryUrl
         return url + (url.Contains('?') ? "&" : "?") + $"{Uri.EscapeDataString(key)}={Uri.EscapeDataString(value)}";
     }
 
+    /// <summary>Ayni filtrelerle baska bir adrese (ör. /Company/Export) giden link.</summary>
+    public static string WithPath(Microsoft.AspNetCore.Http.HttpRequest request, string path, string key, string value)
+    {
+        var current = Build(request, (k, _) => !Eq(k, key));
+        var query = current.Contains('?') ? current[current.IndexOf('?')..] + "&" : "?";
+        return path + query + $"{Uri.EscapeDataString(key)}={Uri.EscapeDataString(value)}";
+    }
+
     private static bool Eq(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 
     private static string Build(Microsoft.AspNetCore.Http.HttpRequest request, Func<string, string?, bool> keep)

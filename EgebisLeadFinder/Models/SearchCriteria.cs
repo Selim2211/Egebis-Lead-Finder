@@ -39,6 +39,9 @@ public class SearchResult
     public string Domain { get; set; } = string.Empty;
     public string? Snippet { get; set; }
 
+    /// <summary>Google'in sonuca ilistirdigi tarih ("3 gün önce", "12 Mar 2026"); yoksa bos.</summary>
+    public string? Date { get; set; }
+
     // --- Asagidaki alanlar yalnizca Google Haritalar (Places) aramasindan gelir;
     // organik aramada bos kalirlar. Fabrikalarin SEO'su genelde zayif oldugu icin
     // organik sonuclarda ust siralara cikamiyorlar, Haritalar kaydi ise neredeyse

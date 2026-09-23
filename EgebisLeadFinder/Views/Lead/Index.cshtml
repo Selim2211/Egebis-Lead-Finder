@@ -38,6 +38,8 @@
             <span class="lead-summary-value text-mailed">@StatusCount(LeadStatus.Gonderildi)</span>
             <span class="lead-summary-label">mail atıldı</span>
         </div>
+        <partial name="_LeadViewSwitch" model="@("list")" />
+        <partial name="_ExportMenu" model="@("/Lead/Export")" />
     </div>
 </div>
 
@@ -230,6 +232,12 @@ else
             var tenure = lead.Contact?.TenureText();
 
             <article class="lead-card">
+                @if (Model.Sequences.Count > 0)
+                {
+                    <label class="lead-select" title="Diziye eklemek için seç">
+                        <input type="checkbox" name="leadIds" value="@lead.Id" form="bulkEnrollForm" aria-label="@person seç" />
+                    </label>
+                }
                 <a class="lead-card-main" asp-action="Details" asp-route-id="@lead.Id">
                     <div class="lead-card-top">
                         <span class="avatar avatar-lg avatar-hue-@PersonDisplay.Hue(person)">@PersonDisplay.Initials(person)</span>
@@ -255,6 +263,7 @@ else
                         <div class="lead-fact">
                             <span class="dot @(hasEmail ? "dot-ok" : "dot-off")"></span>
                             <span class="text-truncate">@(hasEmail ? lead.Contact!.Email : "E-posta kapalı")</span>
+                            @if (hasEmail) { <partial name="_EmailBadge" model="lead.Contact" /> }
                         </div>
                         @if (tenure is not null)
                         {
@@ -330,7 +339,41 @@ else
     <partial name="_Pager" model="Model.Pager" />
 }
 
+@if (Model.Sequences.Count > 0)
+{
+    <form id="bulkEnrollForm" method="post" asp-controller="Sequence" asp-action="Enroll" class="bulk-bar" hidden>
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="returnUrl" value="@(Context.Request.Path + Context.Request.QueryString)" />
+        <span class="bulk-count"><strong id="bulkCount">0</strong> lead seçili</span>
+        <select class="form-select form-select-sm" name="sequenceId" aria-label="Dizi">
+            @foreach (var s in Model.Sequences)
+            {
+                <option value="@s.Id">@s.Name</option>
+            }
+        </select>
+        <button class="btn btn-sm btn-accent text-nowrap">Diziye ekle</button>
+        <button type="button" class="btn btn-sm btn-link" id="bulkClear">Seçimi temizle</button>
+    </form>
+}
+
 @section Scripts {
+<script>
+    (function () {
+        var form = document.getElementById('bulkEnrollForm');
+        if (!form) return;
+        var boxes = document.querySelectorAll('input[form="bulkEnrollForm"][name="leadIds"]');
+        function update() {
+            var n = Array.prototype.filter.call(boxes, function (b) { return b.checked; }).length;
+            document.getElementById('bulkCount').textContent = n;
+            form.hidden = n === 0;
+        }
+        boxes.forEach(function (b) { b.addEventListener('change', update); });
+        document.getElementById('bulkClear').addEventListener('click', function () {
+            boxes.forEach(function (b) { b.checked = false; });
+            update();
+        });
+    })();
+</script>
 <script src="~/js/list-filter.js" asp-append-version="true"></script>
 <script>
     (function () {
