@@ -1,8 +1,11 @@
 # Egebis Lead Finder — sunucu kurulumu
 #
-#   1) cp .env.example .env   ve .env icindeki sifreyi degistirin
-#   2) docker compose up -d --build
-#   3) http://SUNUCU_IP:8091
+#   1) docker compose up -d --build
+#   2) http://SUNUCU_IP:8091
+#
+# .env dosyasi istege baglidir. Yoksa gelistirme varsayilanlari kullanilir
+# (veritabani sifresi: egebis_dev). Canliya cikarken .env.example'i .env olarak
+# kopyalayip sifreyi degistirin. Veritabani portu disari acik degildir.
 #
 # Veritabani tablolari uygulama acilirken otomatik kurulur/guncellenir.
 # API anahtarlari (Serper, Gemini, Apollo), SMTP ve Salesforce ayarlari uygulamadaki
@@ -16,7 +19,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-egebisleadfinder}
       POSTGRES_USER: ${POSTGRES_USER:-egebis}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?.env dosyasinda POSTGRES_PASSWORD tanimlayin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-egebis_dev}
       TZ: Europe/Istanbul
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -41,7 +44,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_HTTP_PORTS: "8091"
-      ConnectionStrings__Default: "Host=db;Port=5432;Database=${POSTGRES_DB:-egebisleadfinder};Username=${POSTGRES_USER:-egebis};Password=${POSTGRES_PASSWORD}"
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=${POSTGRES_DB:-egebisleadfinder};Username=${POSTGRES_USER:-egebis};Password=${POSTGRES_PASSWORD:-egebis_dev}"
       Database__MigrateOnStartup: "true"
       DataProtection__KeysPath: /app/keys
       Search__Provider: Serper

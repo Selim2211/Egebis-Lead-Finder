@@ -35,11 +35,13 @@ Sunucuda yalnızca Docker (Compose eklentisiyle) gerekir. Uygulama **8091** port
 ```bash
 git clone https://github.com/Selim2211/Egebis-Lead-Finder.git
 cd Egebis-Lead-Finder
-cp .env.example .env        # POSTGRES_PASSWORD'u değiştirin
 docker compose up -d --build
 ```
 
 Ardından `http://SUNUCU_IP:8091` adresini açın.
+
+`.env` dosyası gerekmez; yoksa geliştirme varsayılanları kullanılır (veritabanı şifresi `egebis_dev`).
+Canlıya çıkarken `cp .env.example .env` yapıp `POSTGRES_PASSWORD`'u değiştirin.
 
 - PostgreSQL de compose içinde ayağa kalkar; veriler `pgdata` volume'unda kalıcıdır.
 - Tablolar uygulama açılırken otomatik kurulur/güncellenir (elle migration gerekmez).
