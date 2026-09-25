@@ -172,6 +172,9 @@ public class LeadListViewModel
 
     /// <summary>Coklu secimle eklenebilecek aktif mail dizileri.</summary>
     public List<EmailSequence> Sequences { get; set; } = new();
+
+    /// <summary>Kartlarda secim kutulari yalniz "Lead ekle" ile (dizi=true) acilir.</summary>
+    public bool SelectMode { get; set; }
     public string? Query { get; set; }
     public LeadStatus? Status { get; set; }
 

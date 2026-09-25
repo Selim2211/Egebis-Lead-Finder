@@ -49,7 +49,7 @@ public class LeadController : Controller
         string? q, LeadStatus? status, string? contact, string? email, string? sort, bool due,
         [FromQuery(Name = "region")] string[]? regions, [FromQuery(Name = "city")] string[]? cities,
         [FromQuery(Name = "country")] string[]? countries,
-        CancellationToken ct, int page = 1)
+        CancellationToken ct, int page = 1, bool dizi = false)
     {
         var geo = GeoFilter.From(regions, cities, countries);
         var now = DateTime.UtcNow;
@@ -110,6 +110,7 @@ public class LeadController : Controller
             Sort = sort,
             Geo = geo,
             Due = due,
+            SelectMode = dizi,
             DueCount = await OnlyDue(_db.Leads.AsNoTracking(), followUpDays, now).CountAsync(ct),
             FollowUpAfterDays = followUpDays,
             Pager = new PagerModel { Page = page, TotalItems = filteredTotal },

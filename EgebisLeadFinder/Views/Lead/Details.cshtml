@@ -366,6 +366,40 @@
             </div>
         }
 
+        @{
+            var enrollActive = Model.SequenceRuns.Any(r => r.Status == LeadSequenceStatus.Active);
+            var enrollBlock = EgebisLeadFinder.Services.Sequences.SequenceService.SkipReason(lead, alreadyActive: enrollActive);
+        }
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+            @if (enrollActive)
+            {
+                <span class="small text-muted-2">Bu lead şu an bir mail dizisinde.</span>
+            }
+            else if (enrollBlock is not null)
+            {
+                <span class="small text-muted-2">Mail dizisine eklenemez: @enrollBlock.</span>
+            }
+            else if (Model.Sequences.Count == 0)
+            {
+                <a class="btn btn-sm btn-outline-primary" asp-controller="Sequence" asp-action="Index">Mail dizisi oluştur</a>
+            }
+            else
+            {
+                <form method="post" asp-controller="Sequence" asp-action="Enroll" class="d-flex flex-wrap gap-2 m-0">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="leadIds" value="@lead.Id" />
+                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                    <select class="form-select form-select-sm w-auto" name="sequenceId" aria-label="Mail dizisi">
+                        @foreach (var s in Model.Sequences)
+                        {
+                            <option value="@s.Id">@s.Name (@s.Steps.Count adım)</option>
+                        }
+                    </select>
+                    <button class="btn btn-sm btn-primary text-nowrap" type="submit">Mail dizisine ekle</button>
+                </form>
+            }
+        </div>
+
         <form method="post" asp-action="Delete" asp-route-id="@lead.Id"
               data-confirm="Lead ve e-posta geçmişi silinecek. Kişi ve firma kaydı silinmez."
               data-confirm-title="Lead silinsin mi?" data-confirm-subject="@PersonDisplay.DisplayName(lead.Contact)"

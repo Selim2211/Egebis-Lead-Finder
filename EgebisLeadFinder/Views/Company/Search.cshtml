@@ -10,6 +10,11 @@
     // Gelismis ekranda hata olduysa (ör. profil adi bos) modal tekrar acik gelsin.
     var reopenAdvanced = Model.Error is not null
         && Model.SubmitMode is CompanySearchViewModel.ModeAdvanced or CompanySearchViewModel.ModeAdvancedSave;
+
+    // Bu aramanin bolgesi: formdan secilen, yoksa Ayarlar'daki.
+    var selRegion = SearchRegions.IsKnown(Model.Criteria.RegionKey)
+        ? SearchRegions.Get(Model.Criteria.RegionKey)
+        : Model.Region;
 }
 
 <div class="page-head">
@@ -42,6 +47,7 @@
       data-progress-hint="Firmanın resmi sitesi bulunup yapay zeka ile değerlendiriliyor.">
     @Html.AntiForgeryToken()
     <input type="hidden" name="SubmitMode" value="@CompanySearchViewModel.ModeCompany" />
+    <input type="hidden" name="Criteria.RegionKey" class="region-sync" value="@selRegion.Key" />
 
     <div class="name-search-frame">
         <div class="name-search-inner">
@@ -82,6 +88,7 @@
                       data-progress-hint="Her firmanın sitesi okunup yapay zeka ile değerlendiriliyor. Bu birkaç dakika sürebilir; sayfayı kapatmayın.">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="SubmitMode" value="@CompanySearchViewModel.ModeBasic" />
+                    <input type="hidden" name="Criteria.RegionKey" class="region-sync" value="@selRegion.Key" />
 
                     <div class="mb-3">
                         <label class="form-label" for="basicIndustry">Sektör *</label>
@@ -91,9 +98,27 @@
                     </div>
 
                     <div class="search-scope mb-4">
-                        <div><span class="search-scope-label">Kapsam</span> @Model.Region.Name geneli</div>
+                        <div class="search-scope-row">
+                            <span class="search-scope-label">Kapsam</span>
+                            <span><span class="region-name">@selRegion.Name</span> geneli</span>
+                            <button type="button" class="scope-edit" id="scopeEdit" title="Bölgeyi değiştir"
+                                    aria-label="Bölgeyi değiştir" aria-expanded="false" aria-controls="basicRegionSelect">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                            </button>
+                        </div>
+                        <select class="form-select form-select-sm mt-1" id="basicRegionSelect" aria-label="Arama bölgesi" hidden>
+                            @foreach (var g in SearchRegions.Grouped())
+                            {
+                                <optgroup label="@g.Key">
+                                    @foreach (var r in g)
+                                    {
+                                        <option value="@r.Key" selected="@(r.Key == selRegion.Key)">@r.Name</option>
+                                    }
+                                </optgroup>
+                            }
+                        </select>
                         <div><span class="search-scope-label">Sonuç</span> en fazla @Model.MaxCompanies firma, skoru en yüksekten sıralı</div>
-                        <a class="small" asp-controller="Settings" asp-action="Index">Ayarlar'dan değiştir</a>
+                        <a class="small" asp-controller="Settings" asp-action="Index">Varsayılanı Ayarlar'dan değiştir</a>
                     </div>
 
                     <button type="submit" class="btn btn-accent w-100 mb-2" id="searchButton">
@@ -267,13 +292,30 @@
                                    value="@Model.Criteria.Industry" placeholder="Otomotiv" required />
                         </div>
 
+                        <div class="mb-3">
+                            <label class="form-label" for="advRegion">Ülke / bölge</label>
+                            <select class="form-select" id="advRegion" name="Criteria.RegionKey">
+                                @foreach (var g in SearchRegions.Grouped())
+                                {
+                                    <optgroup label="@g.Key">
+                                        @foreach (var r in g)
+                                        {
+                                            <option value="@r.Key" selected="@(r.Key == selRegion.Key)">@r.Name</option>
+                                        }
+                                    </optgroup>
+                                }
+                            </select>
+                        </div>
+
+                        <input type="hidden" name="Criteria.ProfileId" id="advProfileId" value="" />
+
                         <div class="mb-4">
                             <label class="form-label" for="advProfileName">Arama profili adı</label>
                             <input class="form-control" id="advProfileName" name="Criteria.ProfileName"
                                    value="@Model.Criteria.ProfileName" placeholder="ör. Ege Otomotiv" autocomplete="off"
                                    maxlength="150" />
-                            <div class="form-text">
-                                Aynı adla kaydederseniz mevcut profil güncellenir.
+                            <div class="form-text" id="profileEditHint">
+                                Aynı adla kaydederseniz mevcut profil güncellenir. Aşağıdan bir profile tıklayıp düzenleyebilirsiniz.
                             </div>
                         </div>
 
@@ -291,7 +333,8 @@
                             @foreach (var p in Model.Profiles)
                             {
                                 <button type="button" class="profile-item" data-id="@p.Id" data-name="@p.Name"
-                                        data-industry="@p.Industry" data-city="@p.City">
+                                        data-industry="@p.Industry" data-city="@p.City"
+                                        data-region="@SearchRegions.Get(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key).Key">
                                     <span class="profile-item-name">
                                         @p.Name
                                         <span class="profile-region">@SearchRegions.Get(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key).Name</span>
@@ -303,9 +346,7 @@
                         </div>
                     </div>
 
-                    @if (Model.Region.HasProvinces)
-                    {
-                    <div class="col-lg-8">
+                    <div class="col-lg-8" id="provincePanel" hidden="@(selRegion.HasProvinces ? null : "hidden")">
                         <div class="d-flex justify-content-between align-items-baseline mb-2">
                             <span class="form-label mb-0">Bölge / il</span>
                             <span class="small">
@@ -337,26 +378,25 @@
                                 </label>
                             }
                         </div>
-                        <input type="hidden" name="Criteria.City" id="cityHiddenField" value="@Model.Criteria.City" />
+                        <input type="hidden" name="Criteria.City" id="cityHiddenField" value="@Model.Criteria.City"
+                               disabled="@(selRegion.HasProvinces ? null : "disabled")" />
                         <div class="form-text">
-                            Hiç il seçmezseniz @Model.DefaultCountry geneli taranır. En fazla @Model.MaxCompanies firma
+                            Hiç il seçmezseniz Türkiye geneli taranır. En fazla @Model.MaxCompanies firma
                             getirilir (Ayarlar).
                         </div>
                     </div>
-                    }
-                    else
-                    {
-                        @* Türkiye dışı bölgelerde il listesi yok: şehir adları elle yazılır. *@
-                        <div class="col-lg-8">
-                            <label class="form-label" for="cityFreeText">Şehir / bölge</label>
-                            <input type="text" class="form-control" id="cityFreeText" name="Criteria.City"
-                                   value="@Model.Criteria.City" placeholder="Bavyera, Stuttgart, Köln" autocomplete="off" />
-                            <div class="form-text">
-                                Birden fazla şehri virgülle ayırın. Boş bırakırsanız @Model.Region.Name geneli taranır.
-                                Sorgular @Model.Region.Name için o ülkenin dilinde kurulur.
-                            </div>
+
+                    @* Türkiye dışı bölgelerde il listesi yok: şehir adları elle yazılır. *@
+                    <div class="col-lg-8" id="freePanel" hidden="@(selRegion.HasProvinces ? "hidden" : null)">
+                        <label class="form-label" for="cityFreeText">Şehir / bölge</label>
+                        <input type="text" class="form-control" id="cityFreeText" name="Criteria.City"
+                               value="@Model.Criteria.City" placeholder="Bavyera, Stuttgart, Köln" autocomplete="off"
+                               disabled="@(selRegion.HasProvinces ? "disabled" : null)" />
+                        <div class="form-text">
+                            Birden fazla şehri virgülle ayırın. Boş bırakırsanız <span class="region-name">@selRegion.Name</span> geneli taranır.
+                            Sorgular seçilen ülkenin dilinde kurulur.
                         </div>
-                    }
+                    </div>
                 </div>
             </div>
 
@@ -408,6 +448,36 @@
         var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.city-checkbox'));
         var countLabel = document.getElementById('citySelectedCount');
         var status = document.getElementById('profileSaveStatus');
+        var advRegion = document.getElementById('advRegion');
+        var advProfileId = document.getElementById('advProfileId');
+        var basicRegion = document.getElementById('basicRegionSelect');
+        var provincePanel = document.getElementById('provincePanel');
+        var freePanel = document.getElementById('freePanel');
+        var freeText = document.getElementById('cityFreeText');
+        var regionNames = {};
+        Array.prototype.forEach.call(advRegion.options, function (o) { regionNames[o.value] = o.textContent; });
+
+        // Secilen bolge tek yerden yonetilir: tum formlar, kapsam yazisi ve il/sehir paneli birlikte guncellenir.
+        function setRegion(key) {
+            if (!regionNames[key]) return;
+            document.querySelectorAll('.region-sync').forEach(function (i) { i.value = key; });
+            basicRegion.value = key;
+            advRegion.value = key;
+            document.querySelectorAll('.region-name').forEach(function (s) { s.textContent = regionNames[key]; });
+            var tr = key === 'TR';
+            provincePanel.hidden = !tr;
+            freePanel.hidden = tr;
+            hiddenCity.disabled = !tr;
+            freeText.disabled = tr;
+        }
+
+        document.getElementById('scopeEdit').addEventListener('click', function () {
+            basicRegion.hidden = !basicRegion.hidden;
+            this.setAttribute('aria-expanded', basicRegion.hidden ? 'false' : 'true');
+            if (!basicRegion.hidden) basicRegion.focus();
+        });
+        basicRegion.addEventListener('change', function () { setRegion(basicRegion.value); });
+        advRegion.addEventListener('change', function () { setRegion(advRegion.value); });
 
         function selectedCities() {
             return checkboxes.filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
@@ -424,7 +494,7 @@
 
         function syncCities() {
             var selected = selectedCities();
-            hiddenCity.value = selected.join(', ');
+            if (!hiddenCity.disabled) hiddenCity.value = selected.join(', ');
             countLabel.textContent = selected.length === 0 ? 'Türkiye geneli' : selected.length + ' il seçili';
             refreshRegionChips();
         }
@@ -466,7 +536,12 @@
                 advName.value = item.getAttribute('data-name') || '';
                 advIndustry.value = item.getAttribute('data-industry') || '';
                 var city = item.getAttribute('data-city') || '';
-                setCities(city.split(',').map(function (s) { return s.trim(); }).filter(Boolean));
+                var list = city.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+                setRegion(item.getAttribute('data-region') || 'TR');
+                if (advRegion.value === 'TR') setCities(list); else { setCities([]); freeText.value = list.join(', '); }
+                advProfileId.value = item.getAttribute('data-id') || '';
+                document.getElementById('profileEditHint').textContent =
+                    'Düzenleme: "' + advName.value + '" — alanları değiştirip "Arama Profilini Kaydet"e basın (adı da değiştirebilirsiniz).';
                 document.querySelectorAll('.profile-item').forEach(function (i) { i.classList.remove('is-active'); });
                 item.classList.add('is-active');
             });
@@ -524,7 +599,13 @@
             item.setAttribute('data-name', p.name);
             item.setAttribute('data-industry', p.industry || '');
             item.setAttribute('data-city', p.city || '');
+            item.setAttribute('data-region', p.regionKey || 'TR');
             item.querySelector('.profile-item-name').textContent = p.name;
+            var reg = document.createElement('span');
+            reg.className = 'profile-region';
+            reg.textContent = p.regionName || '';
+            item.querySelector('.profile-item-name').appendChild(reg);
+            advProfileId.value = p.id;
             item.querySelector('.profile-item-meta').textContent = (p.industry || '') + ' · ' + formatCities(p.city);
             item.querySelector('.profile-item-date').textContent = 'Kaydedildi: ' + p.createdAt;
             list.prepend(item);

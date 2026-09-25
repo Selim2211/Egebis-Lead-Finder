@@ -142,7 +142,7 @@
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
                     <button class="btn btn-primary btn-sm">Kaydet</button>
-                    <a class="btn btn-outline-secondary btn-sm" asp-controller="Lead" asp-action="Index" asp-route-email="open">Lead ekle →</a>
+                    <a class="btn btn-outline-secondary btn-sm" asp-controller="Lead" asp-action="Index" asp-route-dizi="true">Lead ekle →</a>
                     @if (seq.Active)
                     {
                         <button type="submit" form="del-@seq.Id" class="btn btn-link btn-sm text-danger ms-auto"

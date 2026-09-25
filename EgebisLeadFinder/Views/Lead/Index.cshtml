@@ -99,6 +99,14 @@
     </div>
 }
 
+@if (Model.SelectMode)
+{
+    <div class="select-mode-banner mb-3">
+        <span>Mail dizisine eklemek için kartların köşesindeki kutuları işaretleyin.</span>
+        <a class="btn btn-sm btn-outline-secondary" href="@QueryUrl.Without(req, "dizi")">Seçimi kapat</a>
+    </div>
+}
+
 <nav class="stage-chips mb-4" aria-label="Lead durumu filtresi">
     <a class="stage-chip chip-all @(Model.Status is null && !Model.Due ? "is-active" : "")" href="@StatusUrl(null)">
         Tümü <span class="stage-chip-count">@Model.Total</span>
@@ -232,7 +240,7 @@ else
             var tenure = lead.Contact?.TenureText();
 
             <article class="lead-card">
-                @if (Model.Sequences.Count > 0)
+                @if (Model.SelectMode && Model.Sequences.Count > 0)
                 {
                     <label class="lead-select" title="Diziye eklemek için seç">
                         <input type="checkbox" name="leadIds" value="@lead.Id" form="bulkEnrollForm" aria-label="@person seç" />
@@ -339,7 +347,7 @@ else
     <partial name="_Pager" model="Model.Pager" />
 }
 
-@if (Model.Sequences.Count > 0)
+@if (Model.SelectMode && Model.Sequences.Count > 0)
 {
     <form id="bulkEnrollForm" method="post" asp-controller="Sequence" asp-action="Enroll" class="bulk-bar" hidden>
         @Html.AntiForgeryToken()

@@ -23,6 +23,12 @@ public class SearchCriteria
     public string? ProfileName { get; set; }
 
     /// <summary>
+    /// Duzenlenen kayitli profilin Id'si. Doluysa profil adi da dahil tum alanlar bu
+    /// kaydin uzerine yazilir (ad degisikligi yeni profil olusturmaz).
+    /// </summary>
+    public int? ProfileId { get; set; }
+
+    /// <summary>
     /// Doluysa sektor yerine belirli bir firma aranir ("Toyota", "Egebis"). Sorgular
     /// firma adina gore kurulur ve sadece birkac aday site islenir.
     /// </summary>

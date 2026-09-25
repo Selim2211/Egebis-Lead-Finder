@@ -4323,3 +4323,33 @@ a.pager-btn:hover { border-color: var(--eg-mailed-border); background: var(--eg-
 .bulk-bar .form-select { max-width: 220px; }
 .bulk-count { font-size: .88rem; white-space: nowrap; }
 .board-card > .d-flex > :last-child { flex-shrink: 0; align-self: flex-start; }
+
+.select-mode-banner {
+    display: flex;
+    gap: .75rem;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    padding: .6rem .9rem;
+    border-radius: 10px;
+    border: 1px dashed var(--eg-border-strong);
+    background: var(--eg-surface);
+    font-size: .9rem;
+}
+
+/* Firma Ara: kapsam yanindaki bolge degistirme dugmesi */
+.search-scope-row { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.scope-edit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    padding: 0;
+    border: 1px solid var(--eg-border-strong);
+    border-radius: 6px;
+    background: var(--eg-surface);
+    color: inherit;
+    cursor: pointer;
+}
+.scope-edit:hover, .scope-edit[aria-expanded="true"] { border-color: var(--eg-accent, #f59e0b); color: var(--eg-accent, #f59e0b); }

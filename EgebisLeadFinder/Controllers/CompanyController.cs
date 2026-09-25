@@ -126,9 +126,14 @@ public class CompanyController : Controller
     private async Task<string?> PrepareCriteriaAsync(CompanySearchViewModel model, CancellationToken ct)
     {
         var c = model.Criteria;
-        var (maxCompanies, region) = await GetSearchLimitsAsync(ct);
+        var (maxCompanies, defaultRegion) = await GetSearchLimitsAsync(ct);
+
+        // Bolge her aramada formdan secilebilir; secim yoksa Ayarlar'daki bolge kullanilir.
+        var region = SearchRegions.IsKnown(c.RegionKey) ? SearchRegions.Get(c.RegionKey) : defaultRegion;
         c.Country = region.Country;
         c.RegionKey = region.Key;
+        model.Region = region;
+        model.DefaultCountry = region.Name;
 
         if (model.SubmitMode == CompanySearchViewModel.ModeCompany)
         {
@@ -210,7 +215,19 @@ public class CompanyController : Controller
         if (string.IsNullOrWhiteSpace(name)) return null;
         if (name.Length > 150) name = name[..150].TrimEnd();
 
-        var profile = await _db.SearchProfiles.FirstOrDefaultAsync(p => p.Name == name, ct);
+        // Duzenleme: ayni Id'li kayit bulunursa yeniden adlandirma dahil uzerine yazilir.
+        // Yeni ad baska bir profilde varsa o profil guncellenir (eski davranis).
+        SearchProfile? profile = null;
+        if (criteria.ProfileId is int editId)
+        {
+            profile = await _db.SearchProfiles.FirstOrDefaultAsync(p => p.Id == editId, ct);
+            if (profile is not null
+                && await _db.SearchProfiles.AnyAsync(p => p.Name == name && p.Id != editId, ct))
+                profile = null;
+            if (profile is not null) profile.Name = name;
+        }
+
+        profile ??= await _db.SearchProfiles.FirstOrDefaultAsync(p => p.Name == name, ct);
         if (profile is null)
         {
             profile = new SearchProfile { Name = name };
@@ -243,6 +260,8 @@ public class CompanyController : Controller
             name = profile.Name,
             industry = profile.Industry,
             city = profile.City,
+            regionKey = profile.RegionKey,
+            regionName = SearchRegions.Get(profile.RegionKey).Name,
             createdAt = profile.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
         });
     }
