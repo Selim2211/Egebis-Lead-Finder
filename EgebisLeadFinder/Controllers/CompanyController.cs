@@ -535,28 +535,6 @@ public class CompanyController : Controller
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"firmalar-{stamp}.xlsx");
     }
 
-    /// <summary>Tek firmanin Excel (firma + kisiler sayfasi) veya CSV dosyasi.</summary>
-    [HttpGet]
-    public async Task<IActionResult> ExportOne(int id, string format, CancellationToken ct)
-    {
-        var company = await _db.Companies.AsNoTracking()
-            .Include(c => c.Contacts)
-            .Include(c => c.Leads)
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(c => c.Id == id, ct);
-        if (company is null) return NotFound();
-
-        var tables = ExportService.CompanyTables(new[] { company });
-        var stamp = DateTime.Now.ToString("yyyy-MM-dd-HHmm");
-        var slug = new string(company.Name.Where(char.IsLetterOrDigit).Take(40).ToArray());
-        if (slug.Length == 0) slug = "firma";
-
-        return format == "csv"
-            ? File(ExportService.ToCsv(tables[0]), "text/csv; charset=utf-8", $"{slug}-{stamp}.csv")
-            : File(ExportService.ToXlsx(tables),
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"{slug}-{stamp}.xlsx");
-    }
-
     /// <summary>Firmalar listesi ve disa aktarim ayni suzgeci kullanir: ekranda ne varsa o iner.</summary>
     private async Task<IQueryable<Company>> FilterCompaniesAsync(string? search, int minScore, bool onlyWithoutLead,
         int? profileId, string? stage, string? signal, GeoFilter geo, string? nace, bool icp, CancellationToken ct)
