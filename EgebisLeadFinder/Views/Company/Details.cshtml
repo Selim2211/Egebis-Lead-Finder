@@ -40,7 +40,15 @@
         </div>
     </div>
     <div class="d-flex align-items-center gap-3">
-        <a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+        <details class="export-menu">
+            <summary class="btn btn-sm btn-outline-secondary">Dışa aktar ▾</summary>
+            <div class="export-menu-list">
+                <a asp-action="ExportOne" asp-route-id="@Model.Company.Id" asp-route-format="xlsx">Excel (.xlsx)</a>
+                <a asp-action="ExportOne" asp-route-id="@Model.Company.Id" asp-route-format="csv">CSV (.csv)</a>
+                <div class="export-menu-hint">Bu firma ve kişileri.</div>
+            </div>
+        </details>
+        <a class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1"
            asp-action="Report" asp-route-id="@Model.Company.Id" target="_blank" rel="noopener">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M6 9V2h12v7" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><path d="M6 14h12v8H6z" />
