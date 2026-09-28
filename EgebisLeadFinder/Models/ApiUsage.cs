@@ -21,6 +21,12 @@ public class ApiUsage
     public DateTime? ResetAt { get; set; }
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Son kota/yetki hatasi (API Kullanimi ekraninda gosterilir).</summary>
+    public DateTime? LastErrorAt { get; set; }
+
+    [MaxLength(500)]
+    public string? LastError { get; set; }
 }
 
 /// <summary>

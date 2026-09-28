@@ -1,0 +1,145 @@
+@model List<ProviderUsage>
+@{
+    ViewData["Title"] = "API Kullanımı";
+    var isAdmin = User.IsInRole(nameof(UserRole.Admin));
+
+    static (string Css, string Label) Badge(UsageLevel level) => level switch
+    {
+        UsageLevel.Exhausted => ("tag-danger", "Doldu"),
+        UsageLevel.Critical => ("tag-danger", "Kritik (%95+)"),
+        UsageLevel.Warning => ("tag-amber", "Uyarı (%80+)"),
+        UsageLevel.Normal => ("tag-success", "Normal"),
+        _ => ("tag-muted", "Limit tanımsız")
+    };
+
+    static string BarCss(UsageLevel level) => level switch
+    {
+        UsageLevel.Exhausted or UsageLevel.Critical => "is-danger",
+        UsageLevel.Warning => "is-warning",
+        _ => "is-ok"
+    };
+}
+
+<div class="page-head">
+    <div>
+        <h1>API Kullanımı</h1>
+        <div class="page-sub">Hangi API ne kadar kredi kullandı, hangisinin kotası dolmak üzere</div>
+    </div>
+    <div class="d-flex gap-2">
+        <form method="post" asp-action="Refresh" class="m-0">
+            @Html.AntiForgeryToken()
+            <button class="btn btn-outline-secondary" type="submit" title="Apollo kredi bakiyesini Apollo'dan sorgular">Apollo bakiyesini yenile</button>
+        </form>
+        @if (isAdmin)
+        {
+            <a class="btn btn-outline-primary" asp-controller="Settings" asp-action="Index" asp-fragment="usage-limits">Limitleri düzenle</a>
+        }
+    </div>
+</div>
+
+@if (TempData["SettingsSaved"] is string ok)
+{
+    <div class="alert alert-success" data-flash="success">@ok</div>
+}
+@if (TempData["SettingsError"] is string err)
+{
+    <div class="alert alert-warning" data-flash="warning" data-flash-timeout="9000">@err</div>
+}
+
+@{
+    var alerts = Model.Where(p => p.Level >= UsageLevel.Warning).ToList();
+}
+@if (alerts.Count > 0)
+{
+    <div class="alert alert-warning">
+        <strong>Dikkat:</strong>
+        @string.Join(", ", alerts.Select(a => a.Name))
+        kotası dolmak üzere veya doldu. Yeni kredi yükleyin ya da anahtarı yenileyin; aksi halde aramalar yarıda kalır.
+    </div>
+}
+
+<div class="row g-4">
+    @foreach (var p in Model)
+    {
+        var (css, label) = Badge(p.Level);
+        var max = Math.Max(1, p.Last30Days.DefaultIfEmpty(0).Max());
+        <div class="col-lg-4">
+            <div class="card h-100 usage-card">
+                <div class="card-header d-flex justify-content-between align-items-center gap-2">
+                    <span>@p.Name</span>
+                    <span class="tag @css">@label</span>
+                </div>
+                <div class="card-body">
+                    <div class="small text-muted-2 mb-3">@p.Purpose</div>
+
+                    @if (!p.KeyConfigured)
+                    {
+                        <div class="alert alert-secondary py-2 small">API anahtarı girilmemiş@(isAdmin ? " — Ayarlar'dan ekleyin." : ".")</div>
+                    }
+
+                    @if (p.Limit > 0)
+                    {
+                        <div class="d-flex justify-content-between align-items-baseline mb-1">
+                            <span class="stat-label mb-0">@p.LimitLabel</span>
+                            <span class="cell-title">@p.Used / @p.Limit <span class="text-muted-2 fw-normal">(%@p.Percent)</span></span>
+                        </div>
+                        <div class="usage-bar" role="progressbar" aria-valuenow="@p.Percent" aria-valuemin="0" aria-valuemax="100">
+                            <div class="usage-bar-fill @BarCss(p.Level)" style="width:@(p.Percent)%"></div>
+                        </div>
+                        <div class="small mt-1"><strong>@p.Remaining</strong> @p.Unit kaldı</div>
+                    }
+                    else
+                    {
+                        <div class="small text-muted-2">Limit tanımlı değil@(isAdmin ? " — Ayarlar'dan girebilirsiniz." : ".")</div>
+                    }
+
+                    <div class="row text-center g-2 my-3">
+                        <div class="col"><div class="stat-value usage-num">@p.Today</div><div class="stat-label">bugün</div></div>
+                        <div class="col"><div class="stat-value usage-num">@p.ThisWeek</div><div class="stat-label">7 gün</div></div>
+                        <div class="col"><div class="stat-value usage-num">@p.ThisMonth</div><div class="stat-label">bu ay</div></div>
+                    </div>
+
+                    @* Son 30 gun: kutuphanesiz mini sutun grafigi *@
+                    <div class="usage-spark" aria-label="Son 30 gün">
+                        <svg viewBox="0 0 300 48" preserveAspectRatio="none" role="img">
+                            <title>Son 30 günlük kullanım</title>
+                            @for (var i = 0; i < p.Last30Days.Length; i++)
+                            {
+                                var v = p.Last30Days[i];
+                                var h = v == 0 ? 1.5 : Math.Max(3, 46.0 * v / max);
+                                <rect x="@(i * 10 + 1)" y="@((48 - h).ToString(System.Globalization.CultureInfo.InvariantCulture))" width="8"
+                                      height="@(h.ToString(System.Globalization.CultureInfo.InvariantCulture))" rx="1.5" class="@(v == 0 ? "is-zero" : "")">
+                                    <title>@DateTime.Today.AddDays(i - p.Last30Days.Length + 1).ToString("dd.MM"): @v</title>
+                                </rect>
+                            }
+                        </svg>
+                        <div class="d-flex justify-content-between small text-muted-2"><span>30 gün önce</span><span>bugün</span></div>
+                    </div>
+
+                    @if (p.EstimatedCostTry is decimal cost)
+                    {
+                        <div class="small mt-2">Bu ayın tahmini maliyeti: <strong>≈ @cost.ToString("0.00") TL</strong></div>
+                    }
+                    @if (p.ResetAt is not null)
+                    {
+                        <div class="small text-muted-2 mt-1">Sayaç sıfırlama: @p.ResetAt.Value.ToLocalTime().ToString("dd.MM.yyyy") · o tarihten beri @p.SinceReset</div>
+                    }
+                    @if (p.LiveInfo is not null)
+                    {
+                        <div class="small mt-2">@p.LiveInfo</div>
+                    }
+                    @if (p.LastErrorAt is not null)
+                    {
+                        <div class="small text-danger mt-2">
+                            Son hata: @p.LastErrorAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") — @p.LastError
+                        </div>
+                    }
+                    @if (p.Note is not null)
+                    {
+                        <div class="small text-muted-2 mt-2">@p.Note</div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>

@@ -17,6 +17,12 @@ public class ApolloPersonEmailFinder : IPersonEmailFinder
     private readonly ApolloOptions _options;
     private readonly ISettingsService _settings;
     private readonly ILogger<ApolloPersonEmailFinder> _logger;
+    private readonly IApiUsageTracker? _usage;
+
+    public const string UsageProvider = "Apollo";
+
+    /// <summary>E-postasi acilan kisi = harcanan Apollo kredisi (ayri sayac).</summary>
+    public const string CreditUsageProvider = "ApolloCredit";
 
     /// <summary>
     /// .NET varsayilan encoder'i "ş, ı, İ, ğ, ç, ü" gibi karakterleri \uXXXX
@@ -33,8 +39,10 @@ public class ApolloPersonEmailFinder : IPersonEmailFinder
         HttpClient http,
         IOptions<ApolloOptions> options,
         ISettingsService settings,
-        ILogger<ApolloPersonEmailFinder> logger)
+        ILogger<ApolloPersonEmailFinder> logger,
+        IApiUsageTracker? usage = null)
     {
+        _usage = usage;
         _http = http;
         _options = options.Value;
         _settings = settings;
@@ -80,6 +88,10 @@ public class ApolloPersonEmailFinder : IPersonEmailFinder
 
             using var response = await _http.SendAsync(request, ct);
             var body = await response.Content.ReadAsStringAsync(ct);
+            if (_usage is not null) await _usage.IncrementAsync(UsageProvider, ct);
+
+            if (_usage is not null && (int)response.StatusCode is 401 or 402 or 403 or 429)
+                await _usage.RecordErrorAsync(UsageProvider, $"E-posta açma reddedildi (HTTP {(int)response.StatusCode})", ct);
 
             if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
             {
@@ -96,7 +108,10 @@ public class ApolloPersonEmailFinder : IPersonEmailFinder
                 return PersonMatchResult.NotFound($"Apollo API {(int)response.StatusCode}: {Truncate(body, 150)}");
             }
 
-            return ParseMatch(body);
+            var match = ParseMatch(body);
+            if (_usage is not null && !string.IsNullOrWhiteSpace(match.Email))
+                await _usage.IncrementAsync(CreditUsageProvider, ct);
+            return match;
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {

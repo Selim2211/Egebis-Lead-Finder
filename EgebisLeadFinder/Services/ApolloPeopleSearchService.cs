@@ -18,6 +18,7 @@ public class ApolloPeopleSearchService : IPeopleSearchService
     private readonly ApolloOptions _options;
     private readonly ISettingsService _settings;
     private readonly ILogger<ApolloPeopleSearchService> _logger;
+    private readonly IApiUsageTracker? _usage;
 
     /// <summary>
     /// .NET'in varsayilan JSON encoder'i "ü, ş, ı, İ, ğ, ç" gibi ASCII-disi
@@ -43,8 +44,10 @@ public class ApolloPeopleSearchService : IPeopleSearchService
         HttpClient http,
         IOptions<ApolloOptions> options,
         ISettingsService settings,
-        ILogger<ApolloPeopleSearchService> logger)
+        ILogger<ApolloPeopleSearchService> logger,
+        IApiUsageTracker? usage = null)
     {
+        _usage = usage;
         _http = http;
         _options = options.Value;
         _settings = settings;
@@ -158,6 +161,10 @@ public class ApolloPeopleSearchService : IPeopleSearchService
 
             using var response = await _http.SendAsync(request, ct);
             var body = await response.Content.ReadAsStringAsync(ct);
+            if (_usage is not null) await _usage.IncrementAsync(ApolloPersonEmailFinder.UsageProvider, ct);
+
+            if (_usage is not null && (int)response.StatusCode is 402 or 429)
+                await _usage.RecordErrorAsync(ApolloPersonEmailFinder.UsageProvider, $"Kişi araması reddedildi (HTTP {(int)response.StatusCode})", ct);
 
             if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized
                                     or System.Net.HttpStatusCode.Forbidden

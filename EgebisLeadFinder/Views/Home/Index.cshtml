@@ -1,4 +1,5 @@
 @model DashboardViewModel
+@inject EgebisLeadFinder.Services.UsageService Usage
 @{
     ViewData["Title"] = "Panel";
     var tr = new System.Globalization.CultureInfo("tr-TR");
@@ -23,6 +24,25 @@
         Firma Ara
     </a>
 </div>
+
+@{
+    var usageAlert = await Usage.GetAlertAsync();
+}
+@if (usageAlert.Items.Count > 0)
+{
+    <a class="card card-link mb-4 d-block text-decoration-none usage-alert-card" asp-controller="Usage" asp-action="Index">
+        <div class="card-body d-flex align-items-center gap-3">
+            <span class="tag @(usageAlert.Level >= EgebisLeadFinder.Services.UsageLevel.Critical ? "tag-danger" : "tag-amber")">Kota</span>
+            <div class="flex-grow-1">
+                <div class="fw-semibold">Kotası dolmak üzere olan API var</div>
+                <div class="small text-muted-2">
+                    @string.Join(" · ", usageAlert.Items.Select(i => i.Limit > 0 ? $"{i.Name}: %{i.Percent}" : $"{i.Name}: son 24 saatte kota hatası"))
+                </div>
+            </div>
+            <span>→</span>
+        </div>
+    </a>
+}
 
 <div class="row g-3 mb-4">
     <div class="col-6 col-lg-3">

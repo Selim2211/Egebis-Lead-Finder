@@ -33,6 +33,8 @@ builder.Services.AddControllersWithViews(o =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<IPasswordHasher<AppUser>, PasswordHasher<AppUser>>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<UsageService>();
 builder.Services.AddSingleton<IAuditLogger, AuditLogger>();
 builder.Services.AddScoped<AuditActionFilter>();
 builder.Services.AddHostedService<AuditCleanupWorker>();

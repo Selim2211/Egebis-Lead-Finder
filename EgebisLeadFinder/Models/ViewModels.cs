@@ -496,6 +496,11 @@ public class SettingsViewModel
     /// <summary>Kullanicinin girdigi toplam kredi (ör. yeni anahtarda 2500).</summary>
     public int SerperCreditLimit { get; set; } = 2500;
 
+    /// <summary>API Kullanimi ekrani icin limitler (0 = tanimsiz) ve audit log saklama suresi.</summary>
+    public int GeminiMonthlyLimit { get; set; }
+    public int ApolloCreditLimit { get; set; }
+    public int AuditRetentionDays { get; set; } = 365;
+
     /// <summary>Son sifirlamadan bu yana yapilan Serper cagri sayisi.</summary>
     public int SerperCreditsUsed { get; set; }
 

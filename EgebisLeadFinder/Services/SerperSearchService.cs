@@ -422,15 +422,21 @@ public class SerperSearchService : ISearchService
         ex is not SearchProviderException and not QuotaExceededException and not OperationCanceledException;
 
     /// <summary>Basarisiz Serper yanitini aciklayici hataya cevirir.</summary>
-    private static async Task EnsureOkAsync(HttpResponseMessage response, CancellationToken ct)
+    private async Task EnsureOkAsync(HttpResponseMessage response, CancellationToken ct)
     {
         if (response.IsSuccessStatusCode) return;
 
         string? body = null;
         try { body = await response.Content.ReadAsStringAsync(ct); } catch { /* govde okunamazsa durum koduyla yetin */ }
 
-        throw (Exception?)SearchProviderException.FromSerper((int)response.StatusCode, body)
-            ?? new HttpRequestException($"Serper HTTP {(int)response.StatusCode}", null, response.StatusCode);
+        var provider = SearchProviderException.FromSerper((int)response.StatusCode, body);
+        if (provider is not null)
+        {
+            await _usage.RecordErrorAsync(UsageProvider, provider.Message, ct);
+            throw provider;
+        }
+
+        throw new HttpRequestException($"Serper HTTP {(int)response.StatusCode}", null, response.StatusCode);
     }
 
     /// <summary>Aylik kredi tavani asildiysa hicbir cagri yapilmaz.</summary>
@@ -443,8 +449,11 @@ public class SerperSearchService : ISearchService
             UsageProvider, new DateOnly(today.Year, today.Month, 1), today, ct);
 
         if (used >= _options.MonthlyCreditCap)
+        {
+            await _usage.RecordErrorAsync(UsageProvider, $"Aylık {_options.MonthlyCreditCap} kredi tavanına ulaşıldı", ct);
             throw new QuotaExceededException(
                 $"Serper (aylık {_options.MonthlyCreditCap} kredi tavanı, kullanılan {used})");
+        }
     }
 
     private Task<List<SerperOrganic>> QueryAsync(string query, string apiKey, CancellationToken ct, int? num = null) =>

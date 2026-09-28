@@ -165,6 +165,7 @@ public class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INa
             if (status == 429 && QuotaExceededException.LooksLikeQuota(body))
             {
                 _logger.LogWarning("Gemini kotası doldu: {Body}", Truncate(body, 300));
+                await _usage.RecordErrorAsync(UsageProvider, "Kota doldu (HTTP 429)", ct);
                 throw new QuotaExceededException("Gemini");
             }
 

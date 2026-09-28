@@ -130,6 +130,10 @@ public static class SettingKeys
     /// </summary>
     public const string SalesforcePublicBaseUrl = "Salesforce:PublicBaseUrl";
 
+    /// <summary>API Kullanimi ekrani: Gemini aylik cagri limiti ve Apollo aylik kredi limiti (0 = tanimsiz).</summary>
+    public const string GeminiMonthlyLimit = "Usage:GeminiMonthlyLimit";
+    public const string ApolloCreditLimit = "Usage:ApolloCreditLimit";
+
     /// <summary>Audit log kac gun saklansin (varsayilan 365, en az 30).</summary>
     public const string AuditRetentionDays = "Audit:RetentionDays";
 
@@ -146,7 +150,7 @@ public static class SettingKeys
         SalesforceConsumerKey, SalesforceConsumerSecret, SalesforceUsername, SalesforcePassword,
         SalesforceSecurityToken, SalesforceLoginUrl, SalesforceRefreshToken, SalesforceInstanceUrl,
         SalesforcePublicBaseUrl, SequenceDailyCap, ImapHost, ImapPort, ImapUsername, ImapPassword,
-        ImapCursor, ImapLastCheck, ImapLastError, AuditRetentionDays
+        ImapCursor, ImapLastCheck, ImapLastError, AuditRetentionDays, GeminiMonthlyLimit, ApolloCreditLimit
     };
 
     /// <summary>Deger gizlenmeli mi? API anahtarlari ve e-posta sifresi ekranda maskeli gosterilir.</summary>

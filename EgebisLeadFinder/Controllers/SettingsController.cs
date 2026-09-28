@@ -62,6 +62,9 @@ public class SettingsController : Controller
             [SettingKeys.SerperCreditLimit] = form.SerperCreditLimit > 0
                 ? form.SerperCreditLimit.ToString()
                 : null,
+            [SettingKeys.GeminiMonthlyLimit] = form.GeminiMonthlyLimit > 0 ? form.GeminiMonthlyLimit.ToString() : null,
+            [SettingKeys.ApolloCreditLimit] = form.ApolloCreditLimit > 0 ? form.ApolloCreditLimit.ToString() : null,
+            [SettingKeys.AuditRetentionDays] = form.AuditRetentionDays is >= 30 and <= 3650 ? form.AuditRetentionDays.ToString() : null,
             [SettingKeys.SearchMaxCompanies] = form.SearchMaxCompanies > 0
                 ? Math.Min(form.SearchMaxCompanies, SettingKeys.SearchMaxCompaniesUpperLimit).ToString()
                 : null,
@@ -276,6 +279,9 @@ public class SettingsController : Controller
             ExtraBlockedDomains = Stored(SettingKeys.ExtraBlockedDomains),
 
             SerperCreditLimit = creditLimit,
+            GeminiMonthlyLimit = int.TryParse(Stored(SettingKeys.GeminiMonthlyLimit), out var gl) ? gl : 0,
+            ApolloCreditLimit = int.TryParse(Stored(SettingKeys.ApolloCreditLimit), out var al) ? al : 0,
+            AuditRetentionDays = int.TryParse(Stored(SettingKeys.AuditRetentionDays), out var rd) && rd >= 30 ? rd : 365,
             SerperCallsThisMonth = await _usage.GetRangeCountAsync(
                 SerperSearchService.UsageProvider, new DateOnly(today.Year, today.Month, 1), today, ct),
             SerperMonthlyCap = _searchOptions.MonthlyCreditCap,

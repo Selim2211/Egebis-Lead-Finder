@@ -17,6 +17,12 @@ public interface IApiUsageTracker
 
     /// <summary>Belirtilen tarih araligindaki (dahil) gunluk cagri toplami.</summary>
     Task<int> GetRangeCountAsync(string provider, DateOnly from, DateOnly to, CancellationToken ct = default);
+
+    /// <summary>Kota doldu / anahtar gecersiz gibi hatayi kaydeder (API Kullanimi ekrani).</summary>
+    Task RecordErrorAsync(string provider, string message, CancellationToken ct = default) => Task.CompletedTask;
+
+    /// <summary>Son 'days' gunun gunluk sayilari (bugun dahil, eskiden yeniye).</summary>
+    Task<int[]> GetDailySeriesAsync(string provider, int days, CancellationToken ct = default) => Task.FromResult(new int[days]);
 }
 
 /// <summary>
@@ -147,5 +153,44 @@ public class ApiUsageTracker : IApiUsageTracker
         }
 
         _logger.LogInformation("{Provider} kullanım sayacı sıfırlandı.", provider);
+    }
+
+    public async Task RecordErrorAsync(string provider, string message, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var text = message.Length > 500 ? message[..500] : message;
+
+            var updated = await db.ApiUsages.Where(x => x.Provider == provider)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(x => x.LastErrorAt, DateTime.UtcNow)
+                    .SetProperty(x => x.LastError, text), CancellationToken.None);
+
+            if (updated == 0)
+            {
+                db.ApiUsages.Add(new ApiUsage { Provider = provider, LastErrorAt = DateTime.UtcNow, LastError = text });
+                await db.SaveChangesAsync(CancellationToken.None);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "API hata kaydı yazılamadı: {Provider}", provider);
+        }
+    }
+
+    public async Task<int[]> GetDailySeriesAsync(string provider, int days, CancellationToken ct = default)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var today = TurkeyToday;
+        var from = today.AddDays(-(days - 1));
+        var rows = await db.ApiUsageDailies.AsNoTracking()
+            .Where(x => x.Provider == provider && x.Date >= from && x.Date <= today)
+            .ToDictionaryAsync(x => x.Date, x => x.Count, ct);
+
+        return Enumerable.Range(0, days).Select(i => rows.GetValueOrDefault(from.AddDays(i))).ToArray();
     }
 }
