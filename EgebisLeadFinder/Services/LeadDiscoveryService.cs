@@ -176,6 +176,7 @@ public class LeadDiscoveryService
         await db.SaveChangesAsync(ct);
 
         result.Processed = toInsert.Count;
+        result.NewCompanyIds = toInsert.Select(c => c.Id).ToHashSet();
         result.Failed = toInsert.Count(c => c.ProcessingError is not null);
 
         // Daha once kaydedilmis firmalar tekrar islenmiyor ama kullanici
@@ -344,6 +345,12 @@ public class DiscoveryResult
     /// </summary>
     public int? ProfileId { get; set; }
     public string? ProfileName { get; set; }
+
+    /// <summary>Bu aramanin kaydi (Firmalar ekraninda "bu aramanin sonuclari").</summary>
+    public int? RunId { get; set; }
+
+    /// <summary>Bu aramada yeni eklenen firmalar (digerleri daha once kayitliydi).</summary>
+    public HashSet<int> NewCompanyIds { get; set; } = new();
 
     /// <summary>API kotasi bittigi icin arama yarida kesildiyse sebebi; null ise tamamlandi.</summary>
     public string? AbortReason { get; set; }

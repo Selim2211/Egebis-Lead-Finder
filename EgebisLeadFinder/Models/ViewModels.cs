@@ -89,6 +89,17 @@ public class CompanyListViewModel
 {
     public PoolCounts? Pool { get; set; }
 
+    /// <summary>Firmalar ekranindaki arama secicisi: son aramalar ve secili olan (null = tum firmalar).</summary>
+    public List<SearchRun> Runs { get; set; } = new();
+    public int? RunId { get; set; }
+    public SearchRun? SelectedRun { get; set; }
+
+    /// <summary>Bu sayfadaki firmalardan secili aramada yeni eklenenler ("yeni" etiketi).</summary>
+    public HashSet<int> RunNewIds { get; set; } = new();
+
+    public bool NotEvaluated { get; set; }
+    public int NotEvaluatedCount { get; set; }
+
     public List<Company> Companies { get; set; } = new();
     public string? Search { get; set; }
     public int MinScore { get; set; }

@@ -187,19 +187,25 @@ public class CompanyController : Controller
             return View(model);
         }
 
+        var runs = HttpContext.RequestServices.GetRequiredService<SearchRunService>();
+        SearchRun? run = null;
         try
         {
             var profile = await SaveProfileAsync(model.Criteria, ct);
+            run = await runs.StartAsync(model.Criteria, profile, User.UserId(), ct);
             model.Result = await _discovery.RunAsync(model.Criteria, ct);
+            model.Result.RunId = run.Id;
             if (profile is not null)
             {
                 model.Result.ProfileId = profile.Id;
                 model.Result.ProfileName = profile.Name;
             }
+            await runs.CompleteAsync(run.Id, model.Result, ct);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Firma araması başarısız.");
+            if (run is not null) await runs.FailAsync(run.Id, ex.Message, CancellationToken.None);
             model.Error = ex.Message;
         }
 
@@ -291,21 +297,28 @@ public class CompanyController : Controller
         var actor = AuditActor.From(HttpContext);
         AuditActionFilter.SetAuditSummary(HttpContext, $"Arama başlatıldı: {describe}");
         var audit = HttpContext.RequestServices.GetRequiredService<IAuditLogger>();
+        var run = await HttpContext.RequestServices.GetRequiredService<SearchRunService>()
+            .StartAsync(criteria, profile, User.UserId(), ct);
 
         _ = Task.Run(async () =>
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var discovery = scope.ServiceProvider.GetRequiredService<LeadDiscoveryService>();
+            var runs = scope.ServiceProvider.GetRequiredService<SearchRunService>();
             var reporter = new Progress<JobStep>(s => _progress.Report(job.Id, s.Percent, s.Stage, s.Detail));
 
             try
             {
                 var result = await discovery.RunAsync(criteria, job.Token, reporter);
+                result.RunId = run.Id;
                 if (profile is not null)
                 {
                     result.ProfileId = profile.Id;
                     result.ProfileName = profile.Name;
                 }
+
+                // Sonuc sayfasi acilmadan once firmalar aramaya (ve profile) baglanir.
+                await runs.CompleteAsync(run.Id, result);
 
                 if (result.Cancelled)
                     _progress.MarkCancelled(job.Id, resultUrl, result, $"{result.Processed} firma kaydedildi");
@@ -320,11 +333,13 @@ public class CompanyController : Controller
             }
             catch (MissingApiKeyException ex)
             {
+                await runs.FailAsync(run.Id, ex.Message);
                 _progress.Fail(job.Id, ex.Message);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Firma araması başarısız (arka plan).");
+                await runs.FailAsync(run.Id, ex.Message);
                 _progress.Fail(job.Id, ex.Message);
             }
         });
@@ -457,13 +472,15 @@ public class CompanyController : Controller
         int? profileId = null, string? stage = null, string? signal = null, string? sort = null,
         [FromQuery(Name = "region")] string[]? regions = null, [FromQuery(Name = "city")] string[]? cities = null,
         [FromQuery(Name = "country")] string[]? countries = null, string? nace = null, bool icp = false,
-        int page = 1, CancellationToken ct = default)
+        int page = 1, string? run = null, bool notEvaluated = false, CancellationToken ct = default)
     {
         var geo = GeoFilter.From(regions, cities, countries);
         if (signal is not ("guclu" or "incelenmeli" or "riskli" or "none")) signal = null;
         sort = CompanySort.Options.Any(o => o.Key == sort) ? sort! : CompanySort.Default;
         nace = NaceCatalog.DivisionCode(nace);
-        var query = await FilterCompaniesAsync(search, minScore, onlyWithoutLead, profileId, stage, signal, geo, nace, icp, ct);
+        var runId = await ResolveRunAsync(run, profileId, ct);
+        var query = await FilterCompaniesAsync(search, minScore, onlyWithoutLead, profileId, stage, signal, geo, nace, icp, ct,
+            runId, notEvaluated);
         var ordered = OrderCompanies(query, sort);
 
         var total = await query.CountAsync(ct);
@@ -484,8 +501,14 @@ public class CompanyController : Controller
 
         geo.CountryCounts = CountryCounts(countryRows.Select(r => ((string?)r.Key, r.Count)));
 
+        var runs = HttpContext.RequestServices.GetRequiredService<SearchRunService>();
         var model = new CompanyListViewModel
         {
+            Runs = await runs.RecentAsync(30, ct),
+            RunId = runId,
+            NotEvaluated = notEvaluated,
+            NotEvaluatedCount = await ScopeToRun(_db.Companies.AsNoTracking(), runId)
+                .CountAsync(c => c.EvaluationStatus == EvaluationStatus.NotEvaluated, ct),
             Pool = await PoolCountsAsync(ct),
             Search = search,
             MinScore = minScore,
@@ -517,7 +540,18 @@ public class CompanyController : Controller
                 .ToListAsync(ct)
         };
 
-        var counts = await _db.Companies.AsNoTracking()
+        if (runId is int rid)
+        {
+            model.SelectedRun = model.Runs.FirstOrDefault(r => r.Id == rid)
+                ?? await _db.SearchRuns.AsNoTracking().Include(r => r.User).FirstOrDefaultAsync(r => r.Id == rid, ct);
+            var pageIds = model.Companies.Select(c => c.Id).ToList();
+            model.RunNewIds = (await _db.SearchRunCompanies.AsNoTracking()
+                .Where(x => x.SearchRunId == rid && x.IsNew && pageIds.Contains(x.CompanyId))
+                .Select(x => x.CompanyId).ToListAsync(ct)).ToHashSet();
+        }
+
+        // Asama sayilari secili aramanin icinden (arama secili degilse tum firmalar).
+        var counts = await ScopeToRun(_db.Companies.AsNoTracking(), runId)
             .GroupBy(_ => 1)
             .Select(g => new
             {
@@ -547,14 +581,15 @@ public class CompanyController : Controller
         int? profileId = null, string? stage = null, string? signal = null, string? sort = null,
         [FromQuery(Name = "region")] string[]? regions = null, [FromQuery(Name = "city")] string[]? cities = null,
         [FromQuery(Name = "country")] string[]? countries = null, string? nace = null, bool icp = false,
-        CancellationToken ct = default)
+        string? run = null, bool notEvaluated = false, CancellationToken ct = default)
     {
         var geo = GeoFilter.From(regions, cities, countries);
+        var runId = await ResolveRunAsync(run, profileId, ct);
         if (signal is not ("guclu" or "incelenmeli" or "riskli" or "none")) signal = null;
         sort = CompanySort.Options.Any(o => o.Key == sort) ? sort! : CompanySort.Default;
 
         var query = await FilterCompaniesAsync(search, minScore, onlyWithoutLead, profileId, stage, signal, geo,
-            NaceCatalog.DivisionCode(nace), icp, ct);
+            NaceCatalog.DivisionCode(nace), icp, ct, runId, notEvaluated);
         var companies = await OrderCompanies(query, sort).ThenBy(c => c.Id)
             .Take(ExportService.MaxRows)
             .Include(c => c.Contacts)
@@ -571,11 +606,29 @@ public class CompanyController : Controller
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"firmalar-{stamp}.xlsx");
     }
 
+    /// <summary>
+    /// Hangi aramanin sonuclari gosterilecek? run=all: tum firmalar (havuz), run=5: o arama,
+    /// parametre yoksa kullanicinin son aramasi. Profil filtresi secildiyse varsayilan arama uygulanmaz.
+    /// </summary>
+    private async Task<int?> ResolveRunAsync(string? run, int? profileId, CancellationToken ct)
+    {
+        if (string.Equals(run, "all", StringComparison.OrdinalIgnoreCase)) return null;
+        if (int.TryParse(run, out var id) && id > 0) return id;
+        if (profileId is > 0) return null;
+        return await HttpContext.RequestServices.GetRequiredService<SearchRunService>().DefaultRunIdAsync(User.UserId(), ct);
+    }
+
+    private IQueryable<Company> ScopeToRun(IQueryable<Company> query, int? runId) =>
+        runId is int id ? query.Where(c => _db.SearchRunCompanies.Any(x => x.SearchRunId == id && x.CompanyId == c.Id)) : query;
+
     /// <summary>Firmalar listesi ve disa aktarim ayni suzgeci kullanir: ekranda ne varsa o iner.</summary>
     private async Task<IQueryable<Company>> FilterCompaniesAsync(string? search, int minScore, bool onlyWithoutLead,
-        int? profileId, string? stage, string? signal, GeoFilter geo, string? nace, bool icp, CancellationToken ct)
+        int? profileId, string? stage, string? signal, GeoFilter geo, string? nace, bool icp, CancellationToken ct,
+        int? runId = null, bool notEvaluated = false)
     {
-        var query = _db.Companies.AsNoTracking().Where(c => c.Score >= minScore);
+        var query = ScopeToRun(_db.Companies.AsNoTracking(), runId).Where(c => c.Score >= minScore);
+
+        if (notEvaluated) query = query.Where(c => c.EvaluationStatus == EvaluationStatus.NotEvaluated);
 
         if (nace is not null) query = query.Where(c => c.NaceCode != null && c.NaceCode.StartsWith(nace));
         if (icp) query = query.Where(c => c.IcpMatch);

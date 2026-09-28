@@ -4429,3 +4429,23 @@ a.pager-btn:hover { border-color: var(--eg-mailed-border); background: var(--eg-
     .eg-navbar .navbar-nav .nav-link { padding-left: .45rem; padding-right: .45rem; font-size: .92rem; }
     .eg-navbar .navbar-nav.gap-lg-1 { gap: 0 !important; }
 }
+
+/* Firmalar: hangi aramanin sonuclari gosteriliyor */
+.run-picker { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.run-picker-label { font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--eg-text-muted); }
+.run-picker-menu { position: relative; flex: 1 1 22rem; max-width: 46rem; }
+.run-picker-menu > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 1fr auto; column-gap: .75rem; align-items: center;
+    padding: .55rem .85rem; border: 1px solid var(--eg-border-strong); border-radius: 10px; background: var(--eg-surface); }
+.run-picker-menu > summary::-webkit-details-marker { display: none; }
+.run-picker-menu > summary svg { grid-row: 1 / span 2; grid-column: 2; }
+.run-picker-menu[open] > summary { border-color: var(--eg-accent, #f59e0b); }
+.run-picker-title { font-weight: 600; font-size: .92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-picker-sub { font-size: .78rem; color: var(--eg-text-muted); }
+.run-picker-list { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; right: 0; max-height: 22rem; overflow-y: auto;
+    background: var(--eg-surface); border: 1px solid var(--eg-border); border-radius: 10px; box-shadow: var(--eg-shadow-lg); padding: .3rem; }
+.run-picker-item { display: flex; flex-direction: column; padding: .5rem .65rem; border-radius: 8px; color: var(--eg-text); text-decoration: none; }
+.run-picker-item:hover { background: var(--eg-surface-alt); }
+.run-picker-item.is-active { background: var(--eg-surface-alt); box-shadow: inset 3px 0 0 var(--eg-accent, #f59e0b); }
+.run-picker-empty { padding: .6rem; font-size: .85rem; color: var(--eg-text-muted); }
+.run-tag { font-size: .68rem; margin-left: .3rem; vertical-align: middle; }
+.stage-chip.chip-unknown.is-active { background: var(--eg-warning-bg); border-color: #fcd34d; color: #92400e; }

@@ -31,6 +31,16 @@
     // Aktif filtre cipleri (x ile tek tek kaldirilir).
     var chips = new List<(string Label, string Url)>();
     if (!string.IsNullOrWhiteSpace(Model.Search)) chips.Add(($"“{Model.Search}”", QueryUrl.Without(req, "search")));
+    if (Model.NotEvaluated) chips.Add(("İncelenemeyenler", QueryUrl.Without(req, "notEvaluated")));
+
+    // Arama secicisi: secili aramanin etiketi ve baska aramaya gecis adresi (diger filtreler korunur).
+    var nowUtc = DateTime.UtcNow;
+    string RunUrl(string value) => QueryUrl.With(req, "run", value);
+    string RunLabel(SearchRun r) =>
+        $"{r.StartedAt.ToLocalTime():dd.MM.yyyy HH:mm} · {r.Describe()}";
+    string RunStats(SearchRun r) =>
+        $"{r.Found} bulundu · {r.NewCount} yeni · {r.KnownCount} zaten kayıtlı" + (r.User is null ? "" : $" · {r.User.DisplayName}")
+        + (r.Status == SearchRunStatus.Done && !r.IsStale(nowUtc) ? "" : $" · {r.StatusLabel(nowUtc)}");
     if (profile is not null) chips.Add(($"Profil: {profile.Name} ({SearchRegions.Get(profile.RegionKey ?? SearchRegions.ByCountry(profile.Country)?.Key).Name})", QueryUrl.Without(req, "profileId")));
     if (Model.MinScore > 0) chips.Add(($"Skor ≥ {Model.MinScore}", QueryUrl.Without(req, "minScore")));
     if (Model.OnlyWithoutLead) chips.Add(("Lead açılmamış", QueryUrl.Without(req, "onlyWithoutLead")));
@@ -72,6 +82,46 @@
 {
     <div class="alert alert-danger" data-flash="error">@TempData["SettingsError"]</div>
 }
+
+<div class="run-picker mb-3">
+    <div class="run-picker-label">Gösterilen</div>
+    <details class="run-picker-menu">
+        <summary>
+            @if (Model.SelectedRun is { } sel)
+            {
+                <span class="run-picker-title">Arama: @RunLabel(sel)</span>
+                <span class="run-picker-sub">@RunStats(sel)</span>
+            }
+            else
+            {
+                <span class="run-picker-title">Tüm firmalar</span>
+                <span class="run-picker-sub">Bugüne kadar bulunan bütün firmalar (@(Model.Pool?.Companies ?? 0) firma)</span>
+            }
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+        </summary>
+        <div class="run-picker-list">
+            <a class="run-picker-item @(Model.RunId is null ? "is-active" : "")" href="@RunUrl("all")">
+                <span class="run-picker-title">Tüm firmalar</span>
+                <span class="run-picker-sub">Bütün aramaların sonuçları bir arada</span>
+            </a>
+            @if (Model.Runs.Count == 0)
+            {
+                <div class="run-picker-empty">Henüz kayıtlı arama yok. Yeni aramalar burada listelenecek.</div>
+            }
+            @foreach (var r in Model.Runs)
+            {
+                <a class="run-picker-item @(Model.RunId == r.Id ? "is-active" : "")" href="@RunUrl(r.Id.ToString())">
+                    <span class="run-picker-title">@RunLabel(r)</span>
+                    <span class="run-picker-sub">@RunStats(r)</span>
+                </a>
+            }
+        </div>
+    </details>
+    @if (Model.SelectedRun is not null)
+    {
+        <a class="btn btn-sm btn-outline-secondary" href="@RunUrl("all")">Tüm firmaları göster</a>
+    }
+</div>
 
 <div class="list-toolbar">
     <form method="get" class="list-search" role="search">
@@ -124,6 +174,7 @@
                 <input type="hidden" name="SubmitMode" value="@CompanySearchViewModel.ModeAdvancedSave" />
                 <input type="hidden" name="Criteria.Industry" value="@profile.Industry" />
                 <input type="hidden" name="Criteria.City" value="@profile.City" />
+                <input type="hidden" name="Criteria.RegionKey" value="@profile.RegionKey" />
                 <input type="hidden" name="Criteria.ProfileName" value="@profile.Name" />
                 <button type="submit" class="filter-chip-action">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -166,6 +217,14 @@
        title="İdeal Müşteri Profili'ne uyan firmalar">
         ICP'ye uyanlar <span class="stage-chip-count">@Model.IcpCount</span>
     </a>
+    @if (Model.NotEvaluatedCount > 0 || Model.NotEvaluated)
+    {
+        <a class="stage-chip chip-unknown @(Model.NotEvaluated ? "is-active" : "")"
+           href="@(Model.NotEvaluated ? QueryUrl.Without(req, "notEvaluated") : QueryUrl.With(req, "notEvaluated", "true"))"
+           title="Site okunamadığı veya servis hata verdiği için değerlendirilemeyen firmalar">
+            İncelenemedi <span class="stage-chip-count">@Model.NotEvaluatedCount</span>
+        </a>
+    }
     <a class="stage-chip" asp-controller="Icp" asp-action="Index" title="İdeal müşteri profilini düzenle">ICP ayarla</a>
 </nav>
 
@@ -176,6 +235,8 @@
         {
             <input type="hidden" name="stage" value="@Model.Stage" />
         }
+        @* Filtreler secili aramanin icinde calisir. *@
+        <input type="hidden" name="run" value="@(Model.RunId?.ToString() ?? "all")" />
 
         <div class="fd-head">
             <span class="fd-head-icon">
@@ -338,7 +399,20 @@ else
                         <span class="company-logo avatar-hue-@PersonDisplay.Hue(company.Name)">@PersonDisplay.Initials(company.Name)</span>
                         <div class="company-card-titles">
                             <div class="company-card-name">@company.Name</div>
-                            <div class="company-card-domain">@company.Domain</div>
+                            <div class="company-card-domain">
+                                @company.Domain
+                                @if (Model.SelectedRun is not null)
+                                {
+                                    @if (Model.RunNewIds.Contains(company.Id))
+                                    {
+                                        <span class="tag tag-success run-tag">yeni</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="tag tag-muted run-tag" title="Bu firma daha önceki bir aramada bulunmuştu">önceden bulunmuştu</span>
+                                    }
+                                }
+                            </div>
                         </div>
                         <div class="company-card-score">
                             <partial name="_CompanyScore" model="company" />

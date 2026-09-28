@@ -30,6 +30,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<LeadSequence> LeadSequences => Set<LeadSequence>();
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<SearchRun> SearchRuns => Set<SearchRun>();
+    public DbSet<SearchRunCompany> SearchRunCompanies => Set<SearchRunCompany>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -190,6 +192,22 @@ public class ApplicationDbContext : DbContext
         // Kullanici silinirse eklediği lead ve gonderdigi mailler kalir, sadece "kim" bilgisi bosalir.
         b.Entity<Lead>().HasOne(x => x.CreatedBy).WithMany().HasForeignKey(x => x.CreatedByUserId).OnDelete(DeleteBehavior.SetNull);
         b.Entity<SentEmail>().HasOne(x => x.SentBy).WithMany().HasForeignKey(x => x.SentByUserId).OnDelete(DeleteBehavior.SetNull);
+
+        b.Entity<SearchRun>(e =>
+        {
+            e.HasIndex(x => x.StartedAt);
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.SearchProfile).WithMany().HasForeignKey(x => x.SearchProfileId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Firma veya arama silinirse bag da gider.
+        b.Entity<SearchRunCompany>(e =>
+        {
+            e.HasIndex(x => new { x.SearchRunId, x.CompanyId }).IsUnique();
+            e.HasIndex(x => x.CompanyId);
+            e.HasOne(x => x.SearchRun).WithMany(r => r.Companies).HasForeignKey(x => x.SearchRunId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
+        });
 
         b.Entity<EmailTemplate>().HasData(EmailTemplateSeed.All);
     }

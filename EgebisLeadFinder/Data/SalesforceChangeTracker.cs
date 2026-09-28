@@ -56,6 +56,9 @@ public static class SalesforceChangeTracker
     /// <summary>Kayit sonrasi calisir: eklenen kayitlarin Id'leri artik bellidir.</summary>
     public static async Task MarkDirtyAsync(ApplicationDbContext db, Pending pending, CancellationToken ct)
     {
+        // Toplu guncelleme (ExecuteUpdate) yalnizca iliskisel veritabaninda var; bellek-ici test veritabaninda atlanir.
+        if (!db.Database.IsRelational()) return;
+
         // Lead eklenmesi firmayi otomatik senkron kapsamina alir.
         var companyIds = pending.Companies.Select(c => c.Id)
             .Concat(pending.Contacts.Select(c => c.CompanyId))
