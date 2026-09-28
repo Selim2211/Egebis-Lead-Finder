@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 namespace EgebisLeadFinder.Services.Progress;
 
 /// <summary>Uzun suren bir islemin (firma aramasi, on arastirma) anlik durumu.</summary>
-public enum JobState { Running, Done, Failed }
+public enum JobState { Running, Done, Failed, Cancelled }
 
 /// <summary>Servislerin ilerleme bildirmek icin kullandigi tek adim.</summary>
 public readonly record struct JobStep(int Percent, string Stage, string? Detail = null);
@@ -22,6 +22,13 @@ public class JobProgress
     public object? Payload { get; set; }
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Kullanici "Iptal et" dediginde isin token'i iptal edilir; is o ana kadarkini kaydedip biter.</summary>
+    internal CancellationTokenSource Cancellation { get; } = new();
+
+    public CancellationToken Token => Cancellation.Token;
+
+    public bool CancelRequested => Cancellation.IsCancellationRequested;
 }
 
 /// <summary>
@@ -59,6 +66,29 @@ public class JobProgressStore
         job.Percent = 100;
         job.State = JobState.Done;
         job.Stage = "Tamamlandı";
+        job.ResultUrl = resultUrl;
+        job.Payload = payload;
+        job.UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Iptal istegi: is token'i iptal edilir, ekranda "Iptal ediliyor" gorunur.</summary>
+    public bool Cancel(string id)
+    {
+        if (!_jobs.TryGetValue(id, out var job) || job.State != JobState.Running) return false;
+        job.Stage = "İptal ediliyor…";
+        job.Detail = "Devam eden adım bitince durdurulacak.";
+        job.UpdatedAt = DateTime.UtcNow;
+        job.Cancellation.Cancel();
+        return true;
+    }
+
+    /// <summary>Is iptal nedeniyle erken bitti; sonuc adresi varsa oraya yonlendirilir.</summary>
+    public void MarkCancelled(string id, string? resultUrl, object? payload = null, string? detail = null)
+    {
+        if (!_jobs.TryGetValue(id, out var job)) return;
+        job.State = JobState.Cancelled;
+        job.Stage = "İptal edildi";
+        job.Detail = detail;
         job.ResultUrl = resultUrl;
         job.Payload = payload;
         job.UpdatedAt = DateTime.UtcNow;

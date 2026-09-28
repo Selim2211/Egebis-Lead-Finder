@@ -54,7 +54,28 @@ public class LeadDiscoveryService
 
         progress?.Report(new JobStep(3, "Arama sorguları hazırlanıyor"));
 
-        var searchResults = await _search.SearchCompaniesAsync(criteria, ct);
+        List<SearchResult> searchResults;
+        try
+        {
+            searchResults = await _search.SearchCompaniesAsync(criteria, ct);
+        }
+        catch (SearchProviderException ex) when (ex.Partial.Count > 0)
+        {
+            searchResults = ex.Partial;
+            result.Warning = $"{ex.Message} Bulunabilen {ex.Partial.Count} firma ile devam edildi.";
+        }
+        catch (Exception ex) when (ex is SearchProviderException or QuotaExceededException)
+        {
+            // Arama servisi hic sonuc donduremedi: "sonuc yok" yerine gercek neden gosterilir.
+            result.AbortReason = ex.Message;
+            return result;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            result.Cancelled = true;
+            return result;
+        }
+
         result.FoundBySearch = searchResults.Count;
 
         progress?.Report(new JobStep(8, "Firmalar bulundu",
@@ -63,7 +84,7 @@ public class LeadDiscoveryService
         if (searchResults.Count == 0) return result;
 
         // Ayni domain daha once islendiyse tekrar isleme; arama kotasi ve AI maliyeti bosa gitmesin.
-        var knownDomains = await GetKnownDomainsAsync(searchResults.Select(r => r.Domain), ct);
+        var knownDomains = await GetKnownDomainsAsync(searchResults.Select(r => r.Domain), CancellationToken.None);
 
         var toProcess = searchResults.Where(r => !knownDomains.Contains(r.Domain)).ToList();
         result.AlreadyKnown = searchResults.Count - toProcess.Count;
@@ -82,12 +103,18 @@ public class LeadDiscoveryService
 
         var tasks = toProcess.Select(async Task<Company?> (searchResult) =>
         {
-            if (Volatile.Read(ref quotaHit) == 1) return null;
+            if (Volatile.Read(ref quotaHit) == 1 || ct.IsCancellationRequested) return null;
 
-            await throttle.WaitAsync(ct);
+            await throttle.WaitAsync(CancellationToken.None);
             try
             {
+                // Iptal istendiyse siradaki firmalar baslatilmaz; bitenler yine kaydedilir.
+                if (ct.IsCancellationRequested) return null;
                 return await ProcessCompanyAsync(searchResult, criteria, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                return null;
             }
             catch (QuotaExceededException ex)
             {
@@ -111,7 +138,11 @@ public class LeadDiscoveryService
         });
 
         var companies = (await Task.WhenAll(tasks)).Where(c => c is not null).Select(c => c!).ToList();
+        result.Cancelled = ct.IsCancellationRequested;
         result.SkippedByQuota = toProcess.Count - companies.Count;
+
+        // Iptal edilse bile bitmis firmalar kaydedilmeli: bundan sonrasi iptalden etkilenmez.
+        ct = CancellationToken.None;
 
         progress?.Report(new JobStep(92, "Sonuçlar kaydediliyor"));
 
@@ -194,6 +225,7 @@ public class LeadDiscoveryService
             if (!site.Success)
             {
                 company.ProcessingError = site.Error;
+                company.MarkNotEvaluated($"Site okunamadı: {site.Error}");
                 return company;
             }
 
@@ -235,6 +267,7 @@ public class LeadDiscoveryService
             // Tek firmanin hatasi tum aramayi durdurmaz.
             _logger.LogWarning(ex, "Firma işlenemedi: {Domain}", searchResult.Domain);
             company.ProcessingError = ex.Message;
+            company.MarkNotEvaluated($"İşlenirken hata oluştu: {ex.Message}");
         }
 
         return company;
@@ -319,4 +352,10 @@ public class DiscoveryResult
     public int SkippedByQuota { get; set; }
 
     public bool Aborted => AbortReason is not null;
+
+    /// <summary>Kullanici "Iptal et" dedi; o ana kadar islenen firmalar kaydedildi.</summary>
+    public bool Cancelled { get; set; }
+
+    /// <summary>Arama durmadi ama kismen etkilendi (ör. kota bir kisim sorgudan sonra doldu).</summary>
+    public string? Warning { get; set; }
 }

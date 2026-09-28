@@ -49,6 +49,17 @@
     </div>
     <div class="d-flex gap-2 align-items-center">
         <partial name="_ExportMenu" model="@("/Company/Export")" />
+        @if (Model.Pool is { Companies: > 0 } pool && User.IsInRole("Admin"))
+        {
+            <form method="post" asp-action="DeleteAll" class="m-0"
+                  data-confirm="@($"{pool.Companies} firma, {pool.Contacts} kişi, {pool.Leads} lead ve {pool.Emails} gönderilmiş mail kaydı kalıcı olarak silinecek. Bu işlem geri alınamaz. Salesforce'a aktarılmış kayıtlar orada kalır.")"
+                  data-confirm-title="Tüm firmalar silinsin mi?" data-confirm-ok="Evet, hepsini sil"
+                  data-confirm-tone="danger" data-confirm-require="SİL">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="confirm" value="SİL" />
+                <button type="submit" class="btn btn-outline-danger">Tümünü sil</button>
+            </form>
+        }
         <a class="btn btn-accent" asp-action="Search">Firma Ara</a>
     </div>
 </div>
@@ -330,7 +341,7 @@ else
                             <div class="company-card-domain">@company.Domain</div>
                         </div>
                         <div class="company-card-score">
-                            <partial name="_ScoreBadge" model="company.Score" />
+                            <partial name="_CompanyScore" model="company" />
                         </div>
                     </div>
 

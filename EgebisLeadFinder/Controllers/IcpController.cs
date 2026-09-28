@@ -80,9 +80,13 @@ public class IcpController : Controller
             var reporter = new Progress<JobStep>(s => progress.Report(job.Id, s.Percent, s.Stage, s.Detail));
             try
             {
-                var (filled, total) = await icp.FillMissingNaceAsync(reporter, CancellationToken.None);
+                var (filled, total) = await icp.FillMissingNaceAsync(reporter, job.Token);
                 progress.Report(job.Id, 100, "Tamamlandı", $"{filled}/{total} firmaya NACE kodu atandı");
                 progress.Complete(job.Id, resultUrl);
+            }
+            catch (OperationCanceledException) when (job.CancelRequested)
+            {
+                progress.MarkCancelled(job.Id, resultUrl, detail: "İptal edildi; o ana kadar atanan kodlar kaydedildi.");
             }
             catch (Exception ex)
             {

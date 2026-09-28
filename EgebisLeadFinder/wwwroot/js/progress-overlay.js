@@ -38,12 +38,16 @@
                 '<div class="eg-progress__detail"></div>' +
                 '<div class="eg-progress__hint"></div>' +
                 '<div class="eg-progress__error" hidden></div>' +
+                '<button type="button" class="btn btn-outline-danger btn-sm eg-progress__cancel" hidden>İptal et</button>' +
                 '<button type="button" class="btn btn-outline-secondary btn-sm eg-progress__close" hidden>Kapat</button>' +
             "</div>";
 
         document.body.appendChild(el);
         el.querySelector(".eg-progress__close").addEventListener("click", function () {
             close(el);
+        });
+        el.querySelector(".eg-progress__cancel").addEventListener("click", function () {
+            requestCancel(el);
         });
         return el;
     }
@@ -64,6 +68,12 @@
         err.textContent = "";
         err.hidden = true;
         el.querySelector(".eg-progress__close").hidden = true;
+        var cancel = el.querySelector(".eg-progress__cancel");
+        cancel.hidden = true;
+        cancel.disabled = false;
+        cancel.textContent = "İptal et";
+        el._cancelUrl = null;
+        el._token = opts.token || "";
         el.classList.remove("is-error");
         setPercent(el, 0);
         el.classList.add("is-open");
@@ -84,6 +94,34 @@
         err.textContent = message || "Bilinmeyen bir hata oluştu.";
         err.hidden = false;
         el.querySelector(".eg-progress__close").hidden = false;
+        el.querySelector(".eg-progress__cancel").hidden = true;
+    }
+
+    // Is calisirken "Iptal et": sunucu o ana kadar yapilani kaydedip isi bitirir.
+    function requestCancel(el) {
+        if (!el._cancelUrl) return;
+        var btn = el.querySelector(".eg-progress__cancel");
+        btn.disabled = true;
+        btn.textContent = "İptal ediliyor…";
+
+        var body = new FormData();
+        if (el._token) body.append("__RequestVerificationToken", el._token);
+
+        fetch(el._cancelUrl, { method: "POST", body: body, headers: { Accept: "application/json" } })
+            .then(function (r) {
+                if (!r.ok) throw new Error();
+                el.querySelector(".eg-progress__stage").textContent = "İptal ediliyor…";
+            })
+            .catch(function () {
+                btn.disabled = false;
+                btn.textContent = "İptal et";
+            });
+    }
+
+    function tokenFor(form) {
+        var input = (form && form.querySelector('input[name="__RequestVerificationToken"]'))
+            || document.querySelector('input[name="__RequestVerificationToken"]');
+        return input ? input.value : "";
     }
 
     function readJson(response) {
@@ -116,6 +154,16 @@
                     fail(el, d.error);
                     return;
                 }
+                if (d.state === "cancelled") {
+                    el.querySelector(".eg-progress__cancel").hidden = true;
+                    el.querySelector(".eg-progress__stage").textContent = "İptal edildi";
+                    if (d.resultUrl) {
+                        window.location.href = d.resultUrl;
+                    } else {
+                        el.querySelector(".eg-progress__close").hidden = false;
+                    }
+                    return;
+                }
                 window.setTimeout(function () { poll(el, url); }, POLL_MS);
             })
             .catch(function () {
@@ -125,6 +173,7 @@
     }
 
     function start(opts) {
+        if (!opts.token) opts.token = tokenFor(opts.form);
         var el = open(opts);
         // submitter: hangi butona basildiysa (ör. "Kaydet ve Ara") onun name/value'su da gitsin.
         var body = opts.form
@@ -144,6 +193,8 @@
                     fail(el, (res.data && res.data.error) || "İşlem başlatılamadı.");
                     return;
                 }
+                el._cancelUrl = res.data.cancelUrl || res.data.progressUrl.replace("JobStatus", "CancelJob");
+                el.querySelector(".eg-progress__cancel").hidden = false;
                 poll(el, res.data.progressUrl);
             })
             .catch(function () {

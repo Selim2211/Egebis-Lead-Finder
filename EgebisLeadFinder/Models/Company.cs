@@ -45,6 +45,16 @@ public class Company
     /// <summary>Scrape veya AI adiminda olusan hata. Null ise sorun yok.</summary>
     public string? ProcessingError { get; set; }
 
+    /// <summary>
+    /// Firma gercekten degerlendirildi mi? Puan 0 iki farkli anlama gelebilir: hedef disi
+    /// oldugu icin elendi ya da site okunamadigi/servis hata verdigi icin hic incelenemedi.
+    /// </summary>
+    public EvaluationStatus EvaluationStatus { get; set; } = EvaluationStatus.Evaluated;
+
+    /// <summary>Eleme nedeni veya neden incelenemedigi (kullaniciya gosterilir).</summary>
+    [MaxLength(500)]
+    public string? EvaluationNote { get; set; }
+
     // --- Faz-II: on arastirma / rating. Lead puanindan bagimsiz bir eksen. ---
 
     /// <summary>On arastirma AI ciktisinin ham JSON'i (jsonb). Null ise henuz arastirilmadi.</summary>
@@ -88,4 +98,27 @@ public class Company
 
     public List<Contact> Contacts { get; set; } = new();
     public List<Lead> Leads { get; set; } = new();
+
+    public void MarkNotEvaluated(string note)
+    {
+        EvaluationStatus = EvaluationStatus.NotEvaluated;
+        EvaluationNote = note.Length > 500 ? note[..500] : note;
+    }
+}
+
+public enum EvaluationStatus
+{
+    /// <summary>Site okundu, yapay zeka analiz etti, puanlandi.</summary>
+    Evaluated = 0,
+
+    /// <summary>Degerlendirildi ve hedef disi bulundu (bayi, rakip, ICP disi...).</summary>
+    Disqualified = 1,
+
+    /// <summary>Site okunamadi, servis hata verdi veya kota doldu: firma hakkinda karar verilmedi.</summary>
+    NotEvaluated = 2
+}
+
+public static class EvaluationDisplay
+{
+    public static bool IsNotEvaluated(Company c) => c.EvaluationStatus == EvaluationStatus.NotEvaluated;
 }

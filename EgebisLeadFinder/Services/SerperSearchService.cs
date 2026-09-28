@@ -100,12 +100,20 @@ public class SerperSearchService : ISearchService
         // sonuclarda ust siralara cikamiyorlar, ama Haritalar kaydi neredeyse
         // hepsinde var. Olculen fark: ayni sorguda organik 9 link, Haritalar
         // 3 sayfada 30 firma (29'unda web sitesi).
-        if (_options.UsePlaces)
-            await CollectFromPlacesAsync(criteria, found, apiKey, ct);
+        try
+        {
+            if (_options.UsePlaces)
+                await CollectFromPlacesAsync(criteria, found, apiKey, ct);
 
-        // Haritalar hedefi dolduramadiysa organik arama ile tamamla.
-        if (found.Count < criteria.MaxCompanies)
-            await CollectFromOrganicAsync(criteria, found, apiKey, ct);
+            // Haritalar hedefi dolduramadiysa organik arama ile tamamla.
+            if (found.Count < criteria.MaxCompanies)
+                await CollectFromOrganicAsync(criteria, found, apiKey, ct);
+        }
+        catch (Exception ex) when (ex is SearchProviderException or QuotaExceededException && found.Count > 0)
+        {
+            // Kota/anahtar hatasi geldi ama bir kisim firma bulunmustu: onlarla devam edilebilsin.
+            throw new SearchProviderException(ex.Message) { Partial = found.Values.ToList() };
+        }
 
         _logger.LogInformation("{Count} firma bulundu.", found.Count);
         return found.Values.ToList();
@@ -149,7 +157,7 @@ public class SerperSearchService : ISearchService
                 foreach (var organic in await QueryAsync(query, apiKey, ct))
                     Add(organic.Link, organic.Title, organic.Snippet);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (IsQueryLocal(ex))
             {
                 _logger.LogWarning(ex, "Firma adı sorgusu başarısız: {Query}", query);
             }
@@ -162,7 +170,7 @@ public class SerperSearchService : ISearchService
                 foreach (var place in await QueryPlacesAsync($"{name} {country}".Trim(), 1, apiKey, ct))
                     Add(place.Website, place.Title, null, place.PhoneNumber, place.Address, place.Category);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (IsQueryLocal(ex))
             {
                 _logger.LogWarning(ex, "Firma adı Haritalar sorgusu başarısız: {Name}", name);
             }
@@ -263,7 +271,7 @@ public class SerperSearchService : ISearchService
                         if (found.Count >= criteria.MaxCompanies) return;
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (IsQueryLocal(ex))
                 {
                     // Tek sorgu/sayfa patlarsa digerleri devam etsin.
                     _logger.LogWarning(ex, "Haritalar sorgusu başarısız: {Query} (sayfa {Page})", query, page);
@@ -306,7 +314,7 @@ public class SerperSearchService : ISearchService
                     if (found.Count >= criteria.MaxCompanies) return;
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (IsQueryLocal(ex))
             {
                 // Tek sorgu patlarsa digerleri devam etsin.
                 _logger.LogWarning(ex, "Arama sorgusu başarısız: {Query}", query);
@@ -406,6 +414,25 @@ public class SerperSearchService : ISearchService
         return fresh;
     }
 
+    /// <summary>
+    /// Tek sorguya ozel (gecici ag, bozuk yanit) hatalar atlanir; kota, gecersiz anahtar ve
+    /// iptal ise aramanin tamamini ilgilendirir, yukari tasinir.
+    /// </summary>
+    private static bool IsQueryLocal(Exception ex) =>
+        ex is not SearchProviderException and not QuotaExceededException and not OperationCanceledException;
+
+    /// <summary>Basarisiz Serper yanitini aciklayici hataya cevirir.</summary>
+    private static async Task EnsureOkAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        if (response.IsSuccessStatusCode) return;
+
+        string? body = null;
+        try { body = await response.Content.ReadAsStringAsync(ct); } catch { /* govde okunamazsa durum koduyla yetin */ }
+
+        throw (Exception?)SearchProviderException.FromSerper((int)response.StatusCode, body)
+            ?? new HttpRequestException($"Serper HTTP {(int)response.StatusCode}", null, response.StatusCode);
+    }
+
     /// <summary>Aylik kredi tavani asildiysa hicbir cagri yapilmaz.</summary>
     private async Task EnsureUnderCapAsync(CancellationToken ct)
     {
@@ -439,7 +466,7 @@ public class SerperSearchService : ISearchService
         });
 
         using var response = await _http.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
+        await EnsureOkAsync(response, ct);
 
         // Basarili istek = 1 Serper kredisi. Sayac kritik degil; Ayarlar
         // ekranindaki "kalan kredi" barini besler.
@@ -468,7 +495,7 @@ public class SerperSearchService : ISearchService
         });
 
         using var response = await _http.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
+        await EnsureOkAsync(response, ct);
 
         await _usage.IncrementAsync(UsageProvider, ct);
 

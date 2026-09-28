@@ -295,13 +295,17 @@ public class CompanyController : Controller
 
             try
             {
-                var result = await discovery.RunAsync(criteria, CancellationToken.None, reporter);
+                var result = await discovery.RunAsync(criteria, job.Token, reporter);
                 if (profile is not null)
                 {
                     result.ProfileId = profile.Id;
                     result.ProfileName = profile.Name;
                 }
-                _progress.Complete(job.Id, resultUrl, result);
+
+                if (result.Cancelled)
+                    _progress.MarkCancelled(job.Id, resultUrl, result, $"{result.Processed} firma kaydedildi");
+                else
+                    _progress.Complete(job.Id, resultUrl, result);
             }
             catch (MissingApiKeyException ex)
             {
@@ -315,6 +319,22 @@ public class CompanyController : Controller
         });
 
         return Json(new { jobId = job.Id, progressUrl = Url.Action(nameof(JobStatus), new { jobId = job.Id }) });
+    }
+
+    /// <summary>
+    /// Calisan arka plan isini iptal eder (arama, firma analizi, NACE doldurma). Is o ana kadar
+    /// yaptigini kaydedip biter; tarayici durum yoklamasinda "cancelled" gorur.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult CancelJob(string jobId)
+    {
+        var job = _progress.Get(jobId);
+        if (job is null)
+            return NotFound(new { error = "İş bulunamadı veya süresi doldu." });
+
+        _progress.Cancel(jobId);
+        return Json(new { ok = true });
     }
 
     /// <summary>Bir arka plan isinin anlik durumu (yuzde, asama, hata, sonuc adresi).</summary>
@@ -388,7 +408,7 @@ public class CompanyController : Controller
             try
             {
                 var company = await db.Companies.FirstAsync(c => c.Id == id);
-                var result = await research.ResearchAsync(company, CancellationToken.None, reporter);
+                var result = await research.ResearchAsync(company, job.Token, reporter);
 
                 if (!result.Success)
                 {
@@ -402,6 +422,10 @@ public class CompanyController : Controller
                 await db.SaveChangesAsync();
 
                 _progress.Complete(job.Id, resultUrl);
+            }
+            catch (OperationCanceledException) when (job.CancelRequested)
+            {
+                _progress.MarkCancelled(job.Id, resultUrl, detail: "Firma analizi iptal edildi, önceki analiz korundu.");
             }
             catch (MissingApiKeyException ex)
             {
@@ -451,6 +475,7 @@ public class CompanyController : Controller
 
         var model = new CompanyListViewModel
         {
+            Pool = await PoolCountsAsync(ct),
             Search = search,
             MinScore = minScore,
             OnlyWithoutLead = onlyWithoutLead,
@@ -668,6 +693,40 @@ public class CompanyController : Controller
         TempData["SettingsSaved"] = $"\"{company.Name}\" silindi.";
         return RedirectToLocal(returnUrl);
     }
+
+    /// <summary>
+    /// Tum firmalari ve bagli kayitlari (kisiler, lead'ler, gonderilen mailler, dizi kayitlari,
+    /// profil baglari) siler. Geri alinamaz; arayuzde "SİL" yazilarak onaylanir. Salesforce'a
+    /// aktarilmis kayitlar orada kalir.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteAll(string? confirm, CancellationToken ct)
+    {
+        if (!string.Equals(confirm?.Trim(), "SİL", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(confirm?.Trim(), "SIL", StringComparison.OrdinalIgnoreCase))
+        {
+            TempData["SettingsError"] = "Silme onaylanmadı.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var counts = await PoolCountsAsync(ct);
+
+        // Iliskiler veritabaninda cascade: kisiler, lead'ler, mailler ve dizi kayitlari da gider.
+        var deleted = await _db.Companies.ExecuteDeleteAsync(ct);
+
+        _logger.LogWarning("Tüm firmalar silindi: {Companies} firma, {Contacts} kişi, {Leads} lead, {Emails} mail.",
+            counts.Companies, counts.Contacts, counts.Leads, counts.Emails);
+
+        TempData["SettingsSaved"] = $"{deleted} firma, {counts.Contacts} kişi, {counts.Leads} lead ve {counts.Emails} gönderilmiş mail kaydı silindi.";
+        return RedirectToAction(nameof(Index), new { run = "all" });
+    }
+
+    internal async Task<PoolCounts> PoolCountsAsync(CancellationToken ct) => new(
+        await _db.Companies.CountAsync(ct),
+        await _db.Contacts.CountAsync(ct),
+        await _db.Leads.CountAsync(ct),
+        await _db.SentEmails.CountAsync(ct));
 
     /// <summary>Firmayi (ve kisilerini) Salesforce'a Account/Contact olarak gonderir.</summary>
     [HttpPost]

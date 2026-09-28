@@ -1,0 +1,14 @@
+@model Company
+@* Firma puani: 0 puan "Elendi" (hedef disi) ile "Incelenemedi" (site okunamadi / servis hatasi) ayrilir. *@
+@if (Model.EvaluationStatus == EvaluationStatus.NotEvaluated)
+{
+    <span class="score score-unknown" title="@(Model.EvaluationNote ?? "Firma incelenemedi")">İncelenemedi</span>
+}
+else if (Model.Score == 0)
+{
+    <span class="score score-out" title="@(Model.EvaluationNote ?? "Hedef müşteri kriterlerine uymuyor")">Elendi</span>
+}
+else
+{
+    <partial name="_ScoreBadge" model="Model.Score" />
+}

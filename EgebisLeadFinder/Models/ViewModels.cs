@@ -81,9 +81,14 @@ public class CompanySearchViewModel
     public SearchRegion Region { get; set; } = SearchRegions.Default;
 }
 
+/// <summary>Tum firmalar silinirse gidecek kayit sayilari (onay penceresinde gosterilir).</summary>
+public record PoolCounts(int Companies, int Contacts, int Leads, int Emails);
+
 /// <summary>Firma listesi ve filtreleri.</summary>
 public class CompanyListViewModel
 {
+    public PoolCounts? Pool { get; set; }
+
     public List<Company> Companies { get; set; } = new();
     public string? Search { get; set; }
     public int MinScore { get; set; }

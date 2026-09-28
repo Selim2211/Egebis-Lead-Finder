@@ -34,7 +34,7 @@
     // ---------------- Onay penceresi ----------------
 
     var dialog = (function () {
-        var root, box, icon, title, msg, subject, okBtn, cancelBtn, resolver, lastFocus, isAlert;
+        var root, box, icon, title, msg, subject, okBtn, cancelBtn, resolver, lastFocus, isAlert, typeWrap, typeInput, typeLabel, required;
 
         function build() {
             root = el('div', 'eg-dialog-root');
@@ -46,6 +46,7 @@
                 '  <h2 class="eg-dialog-title" id="egDialogTitle"></h2>' +
                 '  <div class="eg-dialog-subject"></div>' +
                 '  <p class="eg-dialog-msg" id="egDialogMsg"></p>' +
+                '  <label class="eg-dialog-type" hidden><span></span><input type="text" autocomplete="off" spellcheck="false" /></label>' +
                 '  <div class="eg-dialog-actions">' +
                 '    <button type="button" class="eg-dialog-btn is-cancel">Vazgeç</button>' +
                 '    <button type="button" class="eg-dialog-btn is-ok">Tamam</button>' +
@@ -60,6 +61,17 @@
             msg = root.querySelector('.eg-dialog-msg');
             okBtn = root.querySelector('.is-ok');
             cancelBtn = root.querySelector('.is-cancel');
+            typeWrap = root.querySelector('.eg-dialog-type');
+            typeLabel = typeWrap.querySelector('span');
+            typeInput = typeWrap.querySelector('input');
+
+            // Cok yikici islemlerde (ör. tumunu sil) kullanici onay kelimesini yazmadan "Tamam" acilmaz.
+            typeInput.addEventListener('input', function () {
+                okBtn.disabled = !typedOk();
+            });
+            typeInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); if (typedOk()) close(true); }
+            });
 
             okBtn.addEventListener('click', function () { close(true); });
             cancelBtn.addEventListener('click', function () { close(false); });
@@ -69,7 +81,7 @@
                 if (e.key === 'Escape') { e.preventDefault(); close(false); }
                 if (e.key === 'Tab') {
                     // Odak pencerenin disina cikmasin.
-                    var items = isAlert ? [okBtn] : [cancelBtn, okBtn];
+                    var items = isAlert ? [okBtn] : required ? [typeInput, cancelBtn, okBtn] : [cancelBtn, okBtn];
                     var i = items.indexOf(document.activeElement);
                     e.preventDefault();
                     items[(i + (e.shiftKey ? items.length - 1 : 1)) % items.length].focus();
@@ -96,6 +108,12 @@
             cancelBtn.textContent = opts.cancelText || 'Vazgeç';
             cancelBtn.hidden = isAlert;
 
+            required = !isAlert && opts.requireText ? String(opts.requireText) : null;
+            typeWrap.hidden = !required;
+            typeInput.value = '';
+            typeLabel.textContent = required ? 'Onaylamak için "' + required + '" yazın' : '';
+            okBtn.disabled = !!required;
+
             lastFocus = document.activeElement;
             root.hidden = false;
             document.documentElement.classList.add('eg-dialog-open');
@@ -103,13 +121,18 @@
             root.classList.add('is-open');
 
             // Geri alinamaz islemlerde varsayilan odak "Vazgec"te: yanlislikla Enter silmesin.
-            (tone === 'danger' && !isAlert ? cancelBtn : okBtn).focus();
+            (required ? typeInput : tone === 'danger' && !isAlert ? cancelBtn : okBtn).focus();
 
             return new Promise(function (resolve) { resolver = resolve; });
         }
 
+        function typedOk() {
+            return !!required && typeInput.value.trim().toLocaleUpperCase('tr') === required.toLocaleUpperCase('tr');
+        }
+
         function close(result) {
             if (!resolver) return;
+            if (result && required && !typedOk()) return;
             var r = resolver;
             resolver = null;
             root.classList.remove('is-open');
@@ -213,7 +236,8 @@
             title: d.confirmTitle,
             okText: d.confirmOk,
             tone: d.confirmTone || 'warning',
-            subject: d.confirmSubject
+            subject: d.confirmSubject,
+            requireText: d.confirmRequire
         };
     }
 

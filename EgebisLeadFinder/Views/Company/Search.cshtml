@@ -132,10 +132,11 @@
             </div>
         </div>
 
-        <div class="alert alert-secondary mt-3 small mb-0" data-flash="info" data-flash-title="Arama süresi">
-            Arama birkaç dakika sürebilir: her firmanın sitesi okunup yapay zeka ile
-            değerlendiriliyor. Sayfayı kapatmayın.
-        </div>
+        @* Bilgi notu sabit yazi: eskiden her sayfa acilisinda bildirim olarak cikiyordu. *@
+        <p class="small text-muted-2 mt-3 mb-0">
+            Arama birkaç dakika sürebilir: her firmanın sitesi okunup yapay zeka ile değerlendirilir.
+            İsterseniz ilerleme ekranından aramayı iptal edebilirsiniz.
+        </p>
     </div>
 
     <div class="col-lg-7">
@@ -159,6 +160,26 @@
                     }
                 </div>
                 <div class="card-body">
+                    @if (result.Cancelled)
+                    {
+                        <div class="alert alert-secondary py-2 small">
+                            <strong>Arama iptal edildi.</strong> O ana kadar işlenen @result.Processed firma kaydedildi@(result.SkippedByQuota > 0 ? $", {result.SkippedByQuota} firma işlenmedi" : "").
+                        </div>
+                    }
+                    @if (result.AbortReason is not null)
+                    {
+                        <div class="alert alert-warning py-2 small">
+                            <strong>Arama tamamlanamadı:</strong> @result.AbortReason
+                            @if (result.SkippedByQuota > 0)
+                            {
+                                <span> @result.SkippedByQuota firma incelenemedi; kota yenilenince aramayı tekrar çalıştırın.</span>
+                            }
+                        </div>
+                    }
+                    @if (result.Warning is not null)
+                    {
+                        <div class="alert alert-warning py-2 small">@result.Warning</div>
+                    }
                     <div class="row text-center g-3 mb-4">
                         <div class="col">
                             <div class="stat-value" style="font-size:1.7rem">@result.FoundBySearch</div>
@@ -179,7 +200,7 @@
                         </div>
                     </div>
 
-                    @if (result.Companies.Count == 0)
+                    @if (result.Companies.Count == 0 && result.AbortReason is null && !result.Cancelled)
                     {
                         <p class="text-muted-2 mb-0">
                             Sonuç bulunamadı. Sektör veya şehri değiştirip tekrar deneyin.
@@ -216,7 +237,7 @@
                                                    class="company-select" form="@formId" checked />
                                         </td>
                                     }
-                                    <td><partial name="_ScoreBadge" model="company.Score" /></td>
+                                    <td><partial name="_CompanyScore" model="company" /></td>
                                     <td>
                                         <div class="cell-title">@company.Name</div>
                                         <div class="cell-sub">

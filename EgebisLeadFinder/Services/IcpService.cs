@@ -131,6 +131,24 @@ public class IcpService
 
         company.Score = breakdown.Total;
         company.IcpMatch = breakdown.IcpMatch;
+
+        if (breakdown.DisqualifiedReason is not null)
+        {
+            company.EvaluationStatus = EvaluationStatus.Disqualified;
+            company.EvaluationNote = breakdown.DisqualifiedReason.Length > 500 ? breakdown.DisqualifiedReason[..500] : breakdown.DisqualifiedReason;
+        }
+        else if (analysis is null)
+        {
+            // Yapay zeka analizi yok: puan yalnizca kaba sinyallerden, firma incelenmedi sayilir.
+            company.MarkNotEvaluated(company.ProcessingError is { Length: > 0 } err
+                ? $"Yapay zekâ analizi yapılamadı: {err}"
+                : "Yapay zekâ analizi yapılamadı.");
+        }
+        else
+        {
+            company.EvaluationStatus = EvaluationStatus.Evaluated;
+            company.EvaluationNote = null;
+        }
         if (!string.IsNullOrWhiteSpace(analysis?.NaceCode))
             company.NaceCode = NaceCatalog.Normalize(analysis.NaceCode);
 

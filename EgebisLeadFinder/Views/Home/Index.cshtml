@@ -141,7 +141,7 @@
                     @foreach (var company in Model.TopCompanies)
                     {
                         <a class="top-item" asp-controller="Company" asp-action="Details" asp-route-id="@company.Id">
-                            <partial name="_ScoreBadge" model="company.Score" />
+                            <partial name="_CompanyScore" model="company" />
                             <span class="top-item-main">
                                 <span class="top-item-name">@company.Name</span>
                                 <span class="top-item-sub">

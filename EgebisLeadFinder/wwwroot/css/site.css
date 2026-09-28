@@ -547,12 +547,24 @@ code {
     font-size: .74rem;
 }
 
+/* Site okunamadi / servis hatasi: puan yok, karar verilmedi (Elendi ile karismasin). */
+.score-unknown {
+    background: var(--eg-warning-bg);
+    color: #92400e;
+    border-color: #fcd34d;
+    border-style: dashed;
+    font-weight: 600;
+    font-size: .74rem;
+    cursor: help;
+}
+
 /* Detay sayfasindaki buyuk skor: rozet partial'i degismeden buyur. */
 .score-xl .score {
     min-width: 4.8rem;
     padding: .5rem 1rem;
     font-size: 1.4rem;
 }
+.score-xl .score-out, .score-xl .score-unknown { font-size: .95rem; }
 
 /* --------------------------------------------------------------------------
    Rozetler / etiketler
@@ -1253,7 +1265,8 @@ body.eg-progress-lock {
     font-size: .85rem;
 }
 
-.eg-progress__close {
+.eg-progress__close,
+.eg-progress__cancel {
     margin-top: .9rem;
 }
 
@@ -4353,3 +4366,10 @@ a.pager-btn:hover { border-color: var(--eg-mailed-border); background: var(--eg-
     cursor: pointer;
 }
 .scope-edit:hover, .scope-edit[aria-expanded="true"] { border-color: var(--eg-accent, #f59e0b); color: var(--eg-accent, #f59e0b); }
+
+/* Onay penceresi: "SİL" gibi bir kelimeyi yazarak onaylama */
+.eg-dialog-type { display: flex; flex-direction: column; gap: .35rem; margin: .25rem 0 1rem; font-size: .85rem; color: var(--eg-text-muted); text-align: left; }
+.eg-dialog-type[hidden] { display: none; }
+.eg-dialog-type input { border: 1px solid var(--eg-border-strong); border-radius: 8px; padding: .5rem .65rem; font-size: .95rem; background: var(--eg-surface); color: var(--eg-text); letter-spacing: .04em; }
+.eg-dialog-type input:focus { outline: 2px solid var(--eg-danger, #dc2626); outline-offset: 1px; }
+.eg-dialog-btn:disabled { opacity: .45; cursor: not-allowed; }
