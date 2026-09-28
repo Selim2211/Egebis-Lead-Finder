@@ -4,9 +4,13 @@
     var action = ViewContext.RouteData.Values["action"]?.ToString();
 
     // Takip bekleyen (iletisim kurulmamis) lead sayisi — ust menude rozet.
+    var signedIn = User.Identity?.IsAuthenticated == true;
+    var isAdmin = User.IsInRole(nameof(UserRole.Admin));
     var openLeadCount = 0;
     try
     {
+        if (!signedIn) throw new InvalidOperationException();
+
         // Henuz temas edilmemis + cevap beklerken takip zamani gelmis lead'ler.
         var now = DateTime.UtcNow;
         var threshold = now.AddDays(-SettingKeys.DefaultFollowUpAfterDays);
@@ -62,6 +66,8 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="mainNav">
+                @if (signedIn)
+                {
                 <ul class="navbar-nav me-auto gap-lg-1 mt-3 mt-lg-0">
                     <li class="nav-item">
                         <a class="nav-link @(controller == "Home" ? "active" : "")"
@@ -107,6 +113,8 @@
                             </svg>
                         </button>
                     </li>
+                    @if (isAdmin)
+                    {
                     <li class="nav-item">
                         <a class="nav-link nav-link-icon @(controller == "Settings" ? "active" : "")"
                            asp-controller="Settings" asp-action="Index">
@@ -117,7 +125,31 @@
                             Ayarlar
                         </a>
                     </li>
+                    }
+                    <li class="nav-item dropdown">
+                        <button type="button" class="nav-link dropdown-toggle nav-user btn btn-link" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="avatar avatar-sm avatar-hue-@PersonDisplay.Hue(User.Identity!.Name ?? "")">@PersonDisplay.Initials(EgebisLeadFinder.Services.Auth.ClaimsPrincipalExtensions.DisplayName(User))</span>
+                            <span class="d-lg-none">@EgebisLeadFinder.Services.Auth.ClaimsPrincipalExtensions.DisplayName(User)</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end nav-user-menu">
+                            <li><span class="dropdown-item-text"><strong>@EgebisLeadFinder.Services.Auth.ClaimsPrincipalExtensions.DisplayName(User)</strong><br />@@@User.Identity.Name · @(isAdmin ? "Yönetici" : "Kullanıcı")</span></li>
+                            <li><hr class="dropdown-divider" /></li>
+                            @if (isAdmin)
+                            {
+                                <li><a class="dropdown-item" asp-controller="Users" asp-action="Index">Kullanıcılar</a></li>
+                                <li><a class="dropdown-item" asp-controller="Audit" asp-action="Index">Audit log</a></li>
+                            }
+                            <li><a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword">Şifremi değiştir</a></li>
+                            <li>
+                                <form method="post" asp-controller="Account" asp-action="Logout" class="m-0">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="dropdown-item">Çıkış yap</button>
+                                </form>
+                            </li>
+                        </ul>
+                    </li>
                 </ul>
+                }
             </div>
         </div>
     </nav>

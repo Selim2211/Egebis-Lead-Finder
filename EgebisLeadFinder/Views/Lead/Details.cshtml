@@ -291,7 +291,7 @@
                         <span class="timeline-dot"></span>
                         <div>
                             <div class="timeline-title">Lead oluşturuldu</div>
-                            <div class="timeline-date">@lead.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                            <div class="timeline-date">@lead.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")@(lead.CreatedBy is null ? "" : $" · {lead.CreatedBy.DisplayName}")</div>
                         </div>
                     </li>
                     <li class="timeline-item @(lead.ContactedAt is not null ? "is-done is-contacted" : "")">

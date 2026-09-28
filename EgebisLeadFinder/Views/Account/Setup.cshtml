@@ -1,0 +1,57 @@
+@model SetupViewModel
+@{
+    ViewData["Title"] = "İlk kurulum";
+    var min = EgebisLeadFinder.Services.Auth.UserService.MinPasswordLength;
+}
+<div class="auth-wrap">
+    <div class="card auth-card">
+        <div class="card-body">
+            <div class="auth-brand">
+                <img src="~/img/logo.png" asp-append-version="true" width="44" height="44" alt="" />
+                <div>
+                    <div class="auth-title">İlk kurulum</div>
+                    <div class="auth-sub">Yönetici hesabını oluşturun</div>
+                </div>
+            </div>
+
+            <p class="small text-muted-2">
+                Uygulamada henüz kullanıcı yok. Oluşturacağınız hesap <strong>yönetici</strong> olur: API anahtarlarını,
+                ayarları ve diğer kullanıcıları yönetir. Bu ekran yalnızca bir kez görünür.
+            </p>
+
+            @if (Model.Error is not null)
+            {
+                <div class="alert alert-danger py-2 small" role="alert">@Model.Error</div>
+            }
+
+            <form method="post" asp-action="Setup">
+                @Html.AntiForgeryToken()
+                <div class="mb-3">
+                    <label class="form-label" for="userName">Kullanıcı adı</label>
+                    <input class="form-control" id="userName" name="UserName" value="@Model.UserName" placeholder="ör. admin"
+                           autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus />
+                    <div class="form-text">Küçük harf, rakam, nokta, tire; 3-64 karakter.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="fullName">Ad soyad</label>
+                    <input class="form-control" id="fullName" name="FullName" value="@Model.FullName" autocomplete="name" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="email">E-posta</label>
+                    <input class="form-control" id="email" name="Email" type="email" value="@Model.Email" autocomplete="email" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="password">Şifre</label>
+                    <input class="form-control" id="password" name="Password" type="password" autocomplete="new-password"
+                           minlength="@min" required />
+                    <div class="form-text">En az @min karakter.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="confirm">Şifre (tekrar)</label>
+                    <input class="form-control" id="confirm" name="ConfirmPassword" type="password" autocomplete="new-password" required />
+                </div>
+                <button class="btn btn-primary w-100" type="submit">Yöneticiyi oluştur ve giriş yap</button>
+            </form>
+        </div>
+    </div>
+</div>

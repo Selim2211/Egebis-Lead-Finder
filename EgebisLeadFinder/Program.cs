@@ -1,7 +1,13 @@
 using EgebisLeadFinder.Configuration;
 using EgebisLeadFinder.Data;
+using EgebisLeadFinder.Models;
 using EgebisLeadFinder.Services;
+using EgebisLeadFinder.Services.Auth;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Polly;
@@ -17,7 +23,49 @@ builder.Host.UseSerilog((context, config) => config
     .WriteTo.Console()
     .WriteTo.File("logs/egebis-.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 14));
 
-builder.Services.AddControllersWithViews();
+// Her sayfa giris ister (AllowAnonymous olanlar haric); tum degistirici islemler audit log'a yazilir.
+builder.Services.AddControllersWithViews(o =>
+{
+    o.Filters.Add(new AuthorizeFilter());
+    o.Filters.Add<AuditActionFilter>();
+});
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<IPasswordHasher<AppUser>, PasswordHasher<AppUser>>();
+builder.Services.AddScoped<UserService>();
+builder.Services.AddSingleton<IAuditLogger, AuditLogger>();
+builder.Services.AddScoped<AuditActionFilter>();
+builder.Services.AddHostedService<AuditCleanupWorker>();
+
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(o =>
+    {
+        o.LoginPath = "/Account/Login";
+        o.LogoutPath = "/Account/Logout";
+        o.AccessDeniedPath = "/Account/Denied";
+        o.Cookie.Name = "egebis_auth";
+        o.Cookie.HttpOnly = true;
+        o.Cookie.SameSite = SameSiteMode.Lax;
+        o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        o.ExpireTimeSpan = TimeSpan.FromHours(8);
+        o.SlidingExpiration = true;
+
+        // Kullanici pasiflestirildi, silindi, rolu/sifresi degisti: eski cerez hemen gecersiz olur.
+        o.Events.OnValidatePrincipal = async ctx =>
+        {
+            var id = ctx.Principal?.UserId();
+            var stamp = ctx.Principal?.FindFirst(UserService.StampClaim)?.Value;
+            var users = ctx.HttpContext.RequestServices.GetRequiredService<UserService>();
+            var user = id is null ? null : await users.FindAsync(id.Value);
+
+            if (user is null || !user.IsActive || user.SecurityStamp != stamp)
+            {
+                ctx.RejectPrincipal();
+                await ctx.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            }
+        };
+    });
+builder.Services.AddAuthorization();
 
 // Konteynerde oturum/antiforgery anahtarlari kalici klasorde tutulur; yoksa her yeniden
 // baslatmada formlar ve Salesforce OAuth oturumu gecersiz kalir.
@@ -39,8 +87,12 @@ builder.Services.AddSession(o =>
 // Uzun suren islerin (firma aramasi, on arastirma) ilerlemesini tutan bellek-ici depo.
 builder.Services.AddSingleton<EgebisLeadFinder.Services.Progress.JobProgressStore>();
 
-builder.Services.AddDbContext<ApplicationDbContext>(o =>
-    o.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+// Database:Name verilirse ayni sunucuda baska bir veritabani kullanilir (ör. deneme/test veritabani).
+var connectionString = builder.Configuration.GetConnectionString("Default");
+if (builder.Configuration["Database:Name"] is { Length: > 0 } databaseName)
+    connectionString = new Npgsql.NpgsqlConnectionStringBuilder(connectionString) { Database = databaseName }.ConnectionString;
+
+builder.Services.AddDbContext<ApplicationDbContext>(o => o.UseNpgsql(connectionString));
 
 // Ayarlar servisi singleton: firma analizleri paralel calisiyor ve DbContext
 // thread-safe degil, bu yuzden servis her okumada kendi scope'unu aciyor.
@@ -191,6 +243,38 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseRouting();
 app.UseSession();
+app.UseAuthentication();
+
+// Hic kullanici yoksa (ilk kurulum) her istek yonetici olusturma ekranina gider.
+// Yonetici sifresini sifirladiysa kullanici once yeni sifre belirler.
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path;
+    var isAsset = path.StartsWithSegments("/css") || path.StartsWithSegments("/js") || path.StartsWithSegments("/lib")
+        || path.StartsWithSegments("/img") || path.StartsWithSegments("/health") || path.Value?.EndsWith(".ico") == true
+        || path.Value?.EndsWith(".css") == true;
+
+    if (!isAsset && !path.StartsWithSegments("/Account/Setup") && !SetupState.HasUsers)
+    {
+        var users = context.RequestServices.GetRequiredService<UserService>();
+        if (await users.AnyUsersAsync(context.RequestAborted)) SetupState.HasUsers = true;
+        else
+        {
+            context.Response.Redirect("/Account/Setup");
+            return;
+        }
+    }
+
+    if (!isAsset && context.User.HasClaim(UserService.MustChangeClaim, "1")
+        && !path.StartsWithSegments("/Account/ChangePassword") && !path.StartsWithSegments("/Account/Logout"))
+    {
+        context.Response.Redirect("/Account/ChangePassword");
+        return;
+    }
+
+    await next();
+});
+
 app.UseAuthorization();
 app.MapStaticAssets();
 

@@ -3,6 +3,7 @@ using EgebisLeadFinder.Configuration;
 using EgebisLeadFinder.Data;
 using EgebisLeadFinder.Models;
 using EgebisLeadFinder.Services;
+using EgebisLeadFinder.Services.Auth;
 using EgebisLeadFinder.Services.Progress;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -286,6 +287,10 @@ public class CompanyController : Controller
         var job = _progress.Create();
         var criteria = model.Criteria;
         var resultUrl = Url.Action(nameof(SearchResult), new { jobId = job.Id })!;
+        var describe = DescribeSearch(criteria, profile?.Name);
+        var actor = AuditActor.From(HttpContext);
+        AuditActionFilter.SetAuditSummary(HttpContext, $"Arama başlatıldı: {describe}");
+        var audit = HttpContext.RequestServices.GetRequiredService<IAuditLogger>();
 
         _ = Task.Run(async () =>
         {
@@ -306,6 +311,12 @@ public class CompanyController : Controller
                     _progress.MarkCancelled(job.Id, resultUrl, result, $"{result.Processed} firma kaydedildi");
                 else
                     _progress.Complete(job.Id, resultUrl, result);
+
+                await audit.LogAsync(result.Cancelled ? "search.cancelled" : "search.finished",
+                    $"{(result.Cancelled ? "Arama iptal edildi" : "Arama tamamlandı")}: {describe} — {result.FoundBySearch} bulundu, " +
+                    $"{result.Processed} yeni, {result.AlreadyKnown} zaten kayıtlı" +
+                    (result.AbortReason is null ? "" : $" — yarıda kaldı: {result.AbortReason}"),
+                    success: result.AbortReason is null, actor: actor);
             }
             catch (MissingApiKeyException ex)
             {
@@ -686,6 +697,7 @@ public class CompanyController : Controller
 
         _db.Companies.Remove(company);
         await _db.SaveChangesAsync(ct);
+        AuditActionFilter.SetAuditSummary(HttpContext, $"Firma silindi: {company.Name} ({company.Domain})");
 
         if (WantsJson())
             return Json(new { deleted = true, name = company.Name });
@@ -701,6 +713,7 @@ public class CompanyController : Controller
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Microsoft.AspNetCore.Authorization.Authorize(Roles = nameof(UserRole.Admin))]
     public async Task<IActionResult> DeleteAll(string? confirm, CancellationToken ct)
     {
         if (!string.Equals(confirm?.Trim(), "SİL", StringComparison.OrdinalIgnoreCase)
@@ -714,12 +727,30 @@ public class CompanyController : Controller
 
         // Iliskiler veritabaninda cascade: kisiler, lead'ler, mailler ve dizi kayitlari da gider.
         var deleted = await _db.Companies.ExecuteDeleteAsync(ct);
+        AuditActionFilter.SetAuditSummary(HttpContext,
+            $"Tüm firmalar silindi: {deleted} firma, {counts.Contacts} kişi, {counts.Leads} lead, {counts.Emails} mail");
 
         _logger.LogWarning("Tüm firmalar silindi: {Companies} firma, {Contacts} kişi, {Leads} lead, {Emails} mail.",
             counts.Companies, counts.Contacts, counts.Leads, counts.Emails);
 
         TempData["SettingsSaved"] = $"{deleted} firma, {counts.Contacts} kişi, {counts.Leads} lead ve {counts.Emails} gönderilmiş mail kaydı silindi.";
         return RedirectToAction(nameof(Index), new { run = "all" });
+    }
+
+    /// <summary>Audit ve arama listesi icin kisa tanim: "Otomotiv · Almanya · Bavyera (profil: X)".</summary>
+    public static string DescribeSearch(SearchCriteria c, string? profileName = null)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(c.CompanyName)) parts.Add($"firma adı “{c.CompanyName}”");
+        if (!string.IsNullOrWhiteSpace(c.Industry)) parts.Add(c.Industry);
+        parts.Add(SearchRegions.Get(c.RegionKey).Name);
+        if (!string.IsNullOrWhiteSpace(c.City))
+        {
+            var cities = c.City.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            parts.Add(cities.Length <= 3 ? string.Join(", ", cities) : $"{string.Join(", ", cities.Take(3))} +{cities.Length - 3}");
+        }
+        var text = string.Join(" · ", parts);
+        return profileName is null ? text : $"{text} (profil: {profileName})";
     }
 
     internal async Task<PoolCounts> PoolCountsAsync(CancellationToken ct) => new(

@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace EgebisLeadFinder.Controllers;
 
 /// <summary>Ideal musteri profili (ICP) ekrani.</summary>
+[Microsoft.AspNetCore.Authorization.Authorize(Roles = nameof(EgebisLeadFinder.Models.UserRole.Admin))]
 public class IcpController : Controller
 {
     private readonly IcpService _icp;

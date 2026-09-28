@@ -19,10 +19,12 @@ public class SequenceService
     private readonly EmailDraftService _drafts;
     private readonly ISettingsService _settings;
     private readonly ILogger<SequenceService> _logger;
+    private readonly Auth.IAuditLogger? _audit;
 
     public SequenceService(ApplicationDbContext db, IEmailSender sender, EmailTemplateService templates,
-        EmailDraftService drafts, ISettingsService settings, ILogger<SequenceService> logger)
+        EmailDraftService drafts, ISettingsService settings, ILogger<SequenceService> logger, Auth.IAuditLogger? audit = null)
     {
+        _audit = audit;
         _db = db;
         _sender = sender;
         _templates = templates;
@@ -185,6 +187,11 @@ public class SequenceService
                 SentEmailMethod.Smtp, result.MessageId, step.Id);
             if (domain is not null) domainsToday.Add(domain);
             sent++;
+
+            if (_audit is not null)
+                await _audit.LogAsync("sequence.sent",
+                    $"Otomatik dizi maili: {run.Sequence.Name} → {lead.Contact.Email} ({lead.Company?.Name}) — “{message.Value.Subject}”",
+                    "Lead", lead.Id.ToString(), actor: Auth.AuditActor.System, ct: ct);
 
             var next = run.Sequence.Steps.OrderBy(s => s.Order).FirstOrDefault(s => s.Order > step.Order);
             if (next is null) Complete(run);

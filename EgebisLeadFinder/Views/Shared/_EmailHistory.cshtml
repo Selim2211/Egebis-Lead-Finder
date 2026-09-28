@@ -28,6 +28,7 @@
             <div class="email-item-body">
                 <div class="email-item-fromto">
                     <div><span>Kimden</span> @(mail.FromAddress ?? "—")</div>
+                    <div><span>Gönderen</span> @(mail.SentBy?.DisplayName ?? (mail.SequenceStepId is not null ? "Otomatik dizi" : "—"))</div>
                     <div><span>Kime</span> @mail.ToAddress</div>
                 </div>
                 @if (!string.IsNullOrWhiteSpace(mail.BodyHtml))

@@ -11,6 +11,8 @@ namespace EgebisLeadFinder.Controllers;
 /// API anahtarlari ve lead arama unvanlari gibi calisma zamani ayarlari.
 /// Degerler veritabaninda tutulur; uygulamayi yeniden baslatmaya gerek yok.
 /// </summary>
+/// <summary>Ayarlar yalnizca yoneticiye acik: API anahtarlari, SMTP, Salesforce, arama varsayilanlari.</summary>
+[Microsoft.AspNetCore.Authorization.Authorize(Roles = nameof(EgebisLeadFinder.Models.UserRole.Admin))]
 public class SettingsController : Controller
 {
     private readonly ISettingsService _settings;
@@ -106,8 +108,17 @@ public class SettingsController : Controller
                 values.Remove(key);
         }
 
+        // Audit: yalnizca hangi ayarlarin degistigi yazilir, degerler (anahtar/sifre) asla.
+        var changed = new List<string>();
+        foreach (var (key, value) in values)
+            if ((await _settings.GetAsync(key, ct) ?? "") != (value ?? ""))
+                changed.Add(key);
+
         await _settings.SetManyAsync(values, ct);
 
+        EgebisLeadFinder.Services.Auth.AuditActionFilter.SetAuditSummary(HttpContext, changed.Count == 0
+            ? "Ayarlar kaydedildi (değişiklik yok)"
+            : $"Ayarlar değişti: {string.Join(", ", changed)}");
         TempData["SettingsSaved"] = "Ayarlar kaydedildi.";
         return RedirectToAction(nameof(Index));
 

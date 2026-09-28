@@ -19,6 +19,10 @@ public class SentEmail
     public int LeadId { get; set; }
     public Lead? Lead { get; set; }
 
+    /// <summary>Maili gonderen kullanici; mail dizisinin otomatik gonderiminde bos (Sistem).</summary>
+    public int? SentByUserId { get; set; }
+    public AppUser? SentBy { get; set; }
+
     [MaxLength(255)]
     public string? FromAddress { get; set; }
 

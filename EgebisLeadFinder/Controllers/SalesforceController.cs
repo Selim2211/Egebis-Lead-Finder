@@ -11,6 +11,7 @@ namespace EgebisLeadFinder.Controllers;
 /// dönen "code" access/refresh token ile değiştirilir (bkz. ISalesforceConnector).
 /// Şifre bizim sistemimize hiç girilmez.
 /// </summary>
+[Microsoft.AspNetCore.Authorization.Authorize(Roles = nameof(EgebisLeadFinder.Models.UserRole.Admin))]
 public class SalesforceController : Controller
 {
     private const string StateSessionKey = "SalesforceOAuthState";
@@ -88,6 +89,8 @@ public class SalesforceController : Controller
 
         // Tek tus kurulum: baglanti kurulur kurulmaz gerekli ozel alanlar olusturulur
         // ve kayit sayfalarina eklenir.
+        await HttpContext.RequestServices.GetRequiredService<EgebisLeadFinder.Services.Auth.IAuditLogger>()
+            .LogAsync("salesforce.connect", "Salesforce bağlantısı kuruldu", ct: ct);
         ReportSchema(await _salesforce.EnsureSchemaAsync(ct), "Salesforce bağlantısı kuruldu.");
         return RedirectToAction("Index", "Settings");
     }

@@ -1,0 +1,42 @@
+@model LoginViewModel
+@{
+    ViewData["Title"] = "Giriş";
+}
+<div class="auth-wrap">
+    <div class="card auth-card">
+        <div class="card-body">
+            <div class="auth-brand">
+                <img src="~/img/logo.png" asp-append-version="true" width="44" height="44" alt="" />
+                <div>
+                    <div class="auth-title">Egebis Lead Finder</div>
+                    <div class="auth-sub">Devam etmek için giriş yapın</div>
+                </div>
+            </div>
+
+            @if (Model.Error is not null)
+            {
+                <div class="alert alert-danger py-2 small" role="alert">@Model.Error</div>
+            }
+
+            <form method="post" asp-action="Login">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+                <div class="mb-3">
+                    <label class="form-label" for="userName">Kullanıcı adı</label>
+                    <input class="form-control" id="userName" name="UserName" value="@Model.UserName"
+                           autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="password">Şifre</label>
+                    <input class="form-control" id="password" name="Password" type="password" autocomplete="current-password" required />
+                </div>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="rememberMe" name="RememberMe" value="true" checked="@Model.RememberMe" />
+                    <label class="form-check-label" for="rememberMe">Beni 7 gün hatırla</label>
+                </div>
+                <button class="btn btn-primary w-100" type="submit">Giriş yap</button>
+            </form>
+            <p class="small text-muted-2 mt-3 mb-0">Şifrenizi unuttuysanız yöneticinizden sıfırlamasını isteyin.</p>
+        </div>
+    </div>
+</div>

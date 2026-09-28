@@ -40,6 +40,9 @@ docker compose up -d --build
 
 Ardından `http://SUNUCU_IP:8091` adresini açın.
 
+**İlk açılışta** uygulama yönetici hesabı oluşturma ekranını gösterir (varsayılan şifre yoktur). Yönetici, diğer
+kullanıcıları **Kullanıcılar** ekranından ekler; tüm giriş/çıkış ve işlemler **Audit log** ekranında görünür.
+
 `.env` dosyası gerekmez; yoksa geliştirme varsayılanları kullanılır (veritabanı şifresi `egebis_dev`).
 Canlıya çıkarken `cp .env.example .env` yapıp `POSTGRES_PASSWORD`'u değiştirin.
 

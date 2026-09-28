@@ -1,0 +1,183 @@
+@model UsersViewModel
+@using EgebisLeadFinder.Controllers
+@{
+    ViewData["Title"] = "Kullanıcılar";
+    var min = EgebisLeadFinder.Services.Auth.UserService.MinPasswordLength;
+}
+
+<div class="page-head">
+    <div>
+        <h1>Kullanıcılar</h1>
+        <div class="page-sub">Kimler giriş yapabilir ve ne yetkisi var. Veriler tüm kullanıcılar için ortaktır.</div>
+    </div>
+    <a class="btn btn-outline-secondary" asp-controller="Audit" asp-action="Index">Audit log →</a>
+</div>
+
+@if (TempData["SettingsSaved"] is string ok)
+{
+    <div class="alert alert-success" data-flash="success">@ok</div>
+}
+@if (TempData["SettingsError"] is string err)
+{
+    <div class="alert alert-danger" data-flash="error">@err</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">Yeni kullanıcı</div>
+            <div class="card-body">
+                <form method="post" asp-action="Create" autocomplete="off">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-2">
+                        <label class="form-label" for="newUserName">Kullanıcı adı</label>
+                        <input class="form-control" id="newUserName" name="userName" required autocapitalize="none" spellcheck="false" placeholder="ör. ahmet.yilmaz" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label" for="newFullName">Ad soyad</label>
+                        <input class="form-control" id="newFullName" name="fullName" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label" for="newEmail">E-posta</label>
+                        <input class="form-control" id="newEmail" name="email" type="email" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label" for="newPassword">Geçici şifre</label>
+                        <input class="form-control" id="newPassword" name="password" type="password" autocomplete="new-password" minlength="@min" required />
+                        <div class="form-text">En az @min karakter. Kullanıcı ilk girişte kendi şifresini belirler.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="newRole">Rol</label>
+                        <select class="form-select" id="newRole" name="role">
+                            <option value="@UserRole.User">Kullanıcı — arama, firmalar, lead, mail</option>
+                            <option value="@UserRole.Admin">Yönetici — ayrıca ayarlar, kullanıcılar, audit</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary w-100" type="submit">Kullanıcı oluştur</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body small text-muted-2">
+                <div class="fw-semibold text-body mb-1">Yetkiler</div>
+                <div><strong>Kullanıcı:</strong> firma arama, firmalar, lead'ler, mail yazma/gönderme, taslaklar, mail dizilerine ekleme, dışa aktarma, API kullanım ekranı.</div>
+                <div class="mt-1"><strong>Yönetici:</strong> bunlara ek olarak Ayarlar (API anahtarları, SMTP, Salesforce), ICP, IMAP ve günlük gönderim sınırı, kullanıcı yönetimi, audit log, tüm firmaları silme.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">@Model.Users.Count kullanıcı</div>
+            <div class="user-list">
+                @foreach (var u in Model.Users)
+                {
+                    var self = u.Id == Model.CurrentUserId;
+                    var locked = u.LockedUntil is { } lu && lu > DateTime.UtcNow;
+                    <details class="user-row">
+                        <summary>
+                            <span class="avatar avatar-sm avatar-hue-@PersonDisplay.Hue(u.UserName)">@PersonDisplay.Initials(u.DisplayName)</span>
+                            <span class="user-row-main">
+                                <span class="user-row-name">@u.DisplayName <span class="text-muted-2 fw-normal">@@@u.UserName</span></span>
+                                <span class="user-row-meta">
+                                    Son giriş: @(u.LastLoginAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "hiç")
+                                    @if (!string.IsNullOrWhiteSpace(u.Email)) { <span>· @u.Email</span> }
+                                </span>
+                            </span>
+                            <span class="d-flex gap-1 flex-wrap justify-content-end">
+                                @if (self) { <span class="tag tag-muted">siz</span> }
+                                <span class="tag @(u.Role == UserRole.Admin ? "tag-navy" : "tag-muted")">@UsersController.RoleLabel(u.Role)</span>
+                                @if (!u.IsActive) { <span class="tag tag-danger">pasif</span> }
+                                @if (locked) { <span class="tag tag-amber">kilitli</span> }
+                                @if (u.MustChangePassword) { <span class="tag tag-muted">şifre değiştirmeli</span> }
+                            </span>
+                        </summary>
+
+                        <div class="user-row-body">
+                            <form method="post" asp-action="Update" asp-route-id="@u.Id" class="row g-2 align-items-end">
+                                @Html.AntiForgeryToken()
+                                <div class="col-md-4">
+                                    <label class="form-label small">Ad soyad</label>
+                                    <input class="form-control form-control-sm" name="fullName" value="@u.FullName" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small">E-posta</label>
+                                    <input class="form-control form-control-sm" name="email" type="email" value="@u.Email" />
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small">Rol</label>
+                                    <select class="form-select form-select-sm" name="role">
+                                        <option value="@UserRole.User" selected="@(u.Role == UserRole.User)">Kullanıcı</option>
+                                        <option value="@UserRole.Admin" selected="@(u.Role == UserRole.Admin)">Yönetici</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="form-check mb-1">
+                                        @if (self)
+                                        {
+                                            @* Kendi hesabinizi pasiflestiremezsiniz. *@
+                                            <input class="form-check-input" type="checkbox" id="active-@u.Id" checked disabled />
+                                            <input type="hidden" name="isActive" value="true" />
+                                        }
+                                        else
+                                        {
+                                            <input class="form-check-input" type="checkbox" id="active-@u.Id" name="isActive" value="true" checked="@u.IsActive" />
+                                            <input type="hidden" name="isActive" value="false" />
+                                        }
+                                        <label class="form-check-label small" for="active-@u.Id">Aktif</label>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <button class="btn btn-sm btn-primary" type="submit">Kaydet</button>
+                                </div>
+                            </form>
+
+                            <div class="d-flex flex-wrap gap-2 align-items-end mt-3">
+                                <form method="post" asp-action="ResetPassword" asp-route-id="@u.Id" class="d-flex gap-2 align-items-end m-0"
+                                      data-confirm="Kullanıcının açık oturumları kapanır ve ilk girişte yeni şifre belirlemesi istenir."
+                                      data-confirm-title="Şifre sıfırlansın mı?" data-confirm-subject="@u.UserName" data-confirm-ok="Sıfırla">
+                                    @Html.AntiForgeryToken()
+                                    <div>
+                                        <label class="form-label small">Yeni geçici şifre</label>
+                                        <input class="form-control form-control-sm" name="newPassword" type="password" autocomplete="new-password" minlength="@min" required />
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-secondary" type="submit">Şifreyi sıfırla</button>
+                                </form>
+
+                                @if (!self)
+                                {
+                                    <form method="post" asp-action="Delete" asp-route-id="@u.Id" class="ms-auto m-0"
+                                          data-confirm="Kullanıcı kalıcı olarak silinir. Eklediği firmalar, lead'ler ve gönderdiği mailler kalır; audit kayıtlarında adı görünmeye devam eder."
+                                          data-confirm-title="Kullanıcı silinsin mi?" data-confirm-subject="@u.UserName"
+                                          data-confirm-ok="Evet, sil" data-confirm-tone="danger">
+                                        @Html.AntiForgeryToken()
+                                        <button class="btn btn-sm btn-outline-danger" type="submit">Kullanıcıyı sil</button>
+                                    </form>
+                                }
+                            </div>
+
+                            <div class="small text-muted-2 mt-3">
+                                <div class="fw-semibold text-body">Son girişler</div>
+                                @if (Model.RecentLogins.TryGetValue(u.Id, out var logins) && logins.Count > 0)
+                                {
+                                    <ul class="list-unstyled mb-0">
+                                        @foreach (var l in logins)
+                                        {
+                                            <li>@l.At.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @(l.Ip ?? "—")</li>
+                                        }
+                                    </ul>
+                                }
+                                else
+                                {
+                                    <span>Kayıt yok.</span>
+                                }
+                                <a class="d-inline-block mt-1" asp-controller="Audit" asp-action="Index" asp-route-userId="@u.Id">Tüm hareketleri →</a>
+                            </div>
+                        </div>
+                    </details>
+                }
+            </div>
+        </div>
+    </div>
+</div>

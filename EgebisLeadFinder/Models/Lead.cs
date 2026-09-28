@@ -34,6 +34,11 @@ public class Lead
     public string? Notes { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Lead'i olusturan kullanici (veri ortak havuz; kim ekledi bilgisi icin).</summary>
+    public int? CreatedByUserId { get; set; }
+    public AppUser? CreatedBy { get; set; }
+
     public DateTime? SentAt { get; set; }
 
     /// <summary>Kisiyle (telefon, LinkedIn, yuz yuze vb.) iletisim kuruldugu an.</summary>

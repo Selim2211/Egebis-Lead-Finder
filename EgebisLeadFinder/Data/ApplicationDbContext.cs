@@ -1,11 +1,18 @@
 using EgebisLeadFinder.Models;
+using EgebisLeadFinder.Services.Auth;
 using Microsoft.EntityFrameworkCore;
 
 namespace EgebisLeadFinder.Data;
 
 public class ApplicationDbContext : DbContext
 {
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
+    private readonly IHttpContextAccessor? _http;
+
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, IHttpContextAccessor? http = null)
+        : base(options)
+    {
+        _http = http;
+    }
 
     public DbSet<Company> Companies => Set<Company>();
     public DbSet<Contact> Contacts => Set<Contact>();
@@ -21,9 +28,12 @@ public class ApplicationDbContext : DbContext
     public DbSet<EmailSequence> EmailSequences => Set<EmailSequence>();
     public DbSet<SequenceStep> SequenceSteps => Set<SequenceStep>();
     public DbSet<LeadSequence> LeadSequences => Set<LeadSequence>();
+    public DbSet<AppUser> Users => Set<AppUser>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
+        StampCreatedBy();
         ResetChangedEmailVerification();
         var pending = SalesforceChangeTracker.Collect(ChangeTracker);
         var result = base.SaveChanges(acceptAllChangesOnSuccess);
@@ -35,11 +45,24 @@ public class ApplicationDbContext : DbContext
     {
         // Firma/kisi/lead degisince Salesforce'taki kopyasi eskir; kaydedilen her degisiklik
         // "senkron bekliyor" olarak isaretlenir (bkz. SalesforceAutoSyncService).
+        StampCreatedBy();
         ResetChangedEmailVerification();
         var pending = SalesforceChangeTracker.Collect(ChangeTracker);
         var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
         if (!pending.IsEmpty) await SalesforceChangeTracker.MarkDirtyAsync(this, pending, cancellationToken);
         return result;
+    }
+
+    /// <summary>Yeni lead ve gonderilen maile, istegi yapan kullanici yazilir (arka plan islerinde bos kalir).</summary>
+    private void StampCreatedBy()
+    {
+        var userId = _http?.HttpContext?.User.UserId();
+        if (userId is null) return;
+
+        foreach (var entry in ChangeTracker.Entries<Lead>().Where(e => e.State == EntityState.Added))
+            entry.Entity.CreatedByUserId ??= userId;
+        foreach (var entry in ChangeTracker.Entries<SentEmail>().Where(e => e.State == EntityState.Added))
+            entry.Entity.SentByUserId ??= userId;
     }
 
     /// <summary>
@@ -150,6 +173,23 @@ public class ApplicationDbContext : DbContext
              .HasForeignKey(x => x.SearchProfileId)
              .OnDelete(DeleteBehavior.Cascade);
         });
+
+        b.Entity<AppUser>(e =>
+        {
+            e.ToTable("Users");
+            e.HasIndex(x => x.UserName).IsUnique();
+        });
+
+        b.Entity<AuditLog>(e =>
+        {
+            e.HasIndex(x => x.At);
+            e.HasIndex(x => new { x.UserId, x.At });
+            e.HasIndex(x => x.Action);
+        });
+
+        // Kullanici silinirse eklediği lead ve gonderdigi mailler kalir, sadece "kim" bilgisi bosalir.
+        b.Entity<Lead>().HasOne(x => x.CreatedBy).WithMany().HasForeignKey(x => x.CreatedByUserId).OnDelete(DeleteBehavior.SetNull);
+        b.Entity<SentEmail>().HasOne(x => x.SentBy).WithMany().HasForeignKey(x => x.SentByUserId).OnDelete(DeleteBehavior.SetNull);
 
         b.Entity<EmailTemplate>().HasData(EmailTemplateSeed.All);
     }

@@ -183,6 +183,7 @@ public class SequenceController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Microsoft.AspNetCore.Authorization.Authorize(Roles = nameof(UserRole.Admin))]
     public async Task<IActionResult> SaveSettings(int dailyCap, string? imapHost, int? imapPort, string? imapUsername,
         string? imapPassword, CancellationToken ct)
     {
@@ -203,6 +204,7 @@ public class SequenceController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Microsoft.AspNetCore.Authorization.Authorize(Roles = nameof(UserRole.Admin))]
     public async Task<IActionResult> TestImap(CancellationToken ct)
     {
         var (ok, message) = await _replies.TestAsync(ct);

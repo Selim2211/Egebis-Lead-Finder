@@ -264,7 +264,8 @@ public class LeadController : Controller
             .AsNoTracking()
             .Include(l => l.Company)
             .Include(l => l.Contact)
-            .Include(l => l.SentEmails)
+            .Include(l => l.SentEmails).ThenInclude(e => e.SentBy)
+            .Include(l => l.CreatedBy)
             .FirstOrDefaultAsync(l => l.Id == id, ct);
 
         if (lead is null) return NotFound();

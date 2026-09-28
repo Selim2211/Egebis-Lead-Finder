@@ -4373,3 +4373,36 @@ a.pager-btn:hover { border-color: var(--eg-mailed-border); background: var(--eg-
 .eg-dialog-type input { border: 1px solid var(--eg-border-strong); border-radius: 8px; padding: .5rem .65rem; font-size: .95rem; background: var(--eg-surface); color: var(--eg-text); letter-spacing: .04em; }
 .eg-dialog-type input:focus { outline: 2px solid var(--eg-danger, #dc2626); outline-offset: 1px; }
 .eg-dialog-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Giris / ilk kurulum / sifre ekranlari */
+.auth-wrap { min-height: 60vh; display: flex; align-items: center; justify-content: center; padding: 1rem 0; }
+.auth-card { width: 100%; max-width: 420px; }
+.auth-card .card-body { padding: 1.75rem; }
+.auth-brand { display: flex; align-items: center; gap: .8rem; margin-bottom: 1.25rem; }
+.auth-title { font-weight: 700; font-size: 1.15rem; }
+.auth-sub { color: var(--eg-text-muted); font-size: .88rem; }
+
+/* Kullanicilar listesi */
+.user-list { display: flex; flex-direction: column; }
+.user-row { border-top: 1px solid var(--eg-border); }
+.user-row:first-child { border-top: 0; }
+.user-row > summary { list-style: none; display: flex; align-items: center; gap: .75rem; padding: .8rem 1rem; cursor: pointer; }
+.user-row > summary::-webkit-details-marker { display: none; }
+.user-row > summary:hover { background: var(--eg-surface-alt); }
+.user-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.user-row-name { font-weight: 600; }
+.user-row-meta { font-size: .8rem; color: var(--eg-text-muted); }
+.user-row-body { padding: .25rem 1rem 1rem 3.4rem; }
+
+/* Audit log */
+.audit-table td { vertical-align: top; }
+.audit-failed td { background: var(--eg-danger-bg, rgba(220, 38, 38, .06)); }
+
+/* Ust menu: kullanici */
+.nav-user { display: inline-flex; align-items: center; gap: .45rem; }
+.nav-user .avatar { width: 1.7rem; height: 1.7rem; font-size: .7rem; }
+.nav-user-menu { min-width: 14rem; }
+.nav-user-menu .dropdown-item-text { font-size: .8rem; color: var(--eg-text-muted); }
+
+/* Menu ogeleri tek satirda kalsin (kullanici menusu eklenince dar ekranda kiriliyordu). */
+.eg-navbar .navbar-nav .nav-link { white-space: nowrap; }
