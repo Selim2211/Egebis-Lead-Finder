@@ -143,6 +143,7 @@ public class CompanyController : Controller
 
             c.CompanyName = c.CompanyName.Trim();
             c.Industry = string.Empty;
+            c.SegmentId = null;
             c.City = null;
             c.ProfileName = null;
             c.MaxCompanies = CompanySearchViewModel.NameSearchMaxResults;
@@ -328,6 +329,7 @@ public class CompanyController : Controller
                 await audit.LogAsync(result.Cancelled ? "search.cancelled" : "search.finished",
                     $"{(result.Cancelled ? "Arama iptal edildi" : "Arama tamamlandı")}: {describe} — {result.FoundBySearch} bulundu, " +
                     $"{result.Processed} yeni, {result.AlreadyKnown} zaten kayıtlı" +
+                    (result.PreFiltered.Count > 0 ? $", {result.PreFiltered.Count} ön elemede elendi" : "") +
                     (result.AbortReason is null ? "" : $" — yarıda kaldı: {result.AbortReason}"),
                     success: result.AbortReason is null, actor: actor);
             }
@@ -472,15 +474,16 @@ public class CompanyController : Controller
         int? profileId = null, string? stage = null, string? signal = null, string? sort = null,
         [FromQuery(Name = "region")] string[]? regions = null, [FromQuery(Name = "city")] string[]? cities = null,
         [FromQuery(Name = "country")] string[]? countries = null, string? nace = null, bool icp = false,
-        int page = 1, string? run = null, bool notEvaluated = false, CancellationToken ct = default)
+        int page = 1, string? run = null, bool notEvaluated = false, string? segment = null, CancellationToken ct = default)
     {
         var geo = GeoFilter.From(regions, cities, countries);
         if (signal is not ("guclu" or "incelenmeli" or "riskli" or "none")) signal = null;
         sort = CompanySort.Options.Any(o => o.Key == sort) ? sort! : CompanySort.Default;
         nace = NaceCatalog.DivisionCode(nace);
+        segment = string.IsNullOrWhiteSpace(segment) ? null : segment.Trim();
         var runId = await ResolveRunAsync(run, profileId, ct);
         var query = await FilterCompaniesAsync(search, minScore, onlyWithoutLead, profileId, stage, signal, geo, nace, icp, ct,
-            runId, notEvaluated);
+            runId, notEvaluated, segment);
         var ordered = OrderCompanies(query, sort);
 
         var total = await query.CountAsync(ct);
@@ -509,6 +512,12 @@ public class CompanyController : Controller
             NotEvaluated = notEvaluated,
             NotEvaluatedCount = await ScopeToRun(_db.Companies.AsNoTracking(), runId)
                 .CountAsync(c => c.EvaluationStatus == EvaluationStatus.NotEvaluated, ct),
+            Segment = segment,
+            SegmentCounts = await ScopeToRun(_db.Companies.AsNoTracking(), runId)
+                .Where(c => c.FitSegment != null)
+                .GroupBy(c => c.FitSegment!)
+                .Select(g => new { g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Key, x => x.Count, ct),
             Pool = await PoolCountsAsync(ct),
             Search = search,
             MinScore = minScore,
@@ -581,15 +590,16 @@ public class CompanyController : Controller
         int? profileId = null, string? stage = null, string? signal = null, string? sort = null,
         [FromQuery(Name = "region")] string[]? regions = null, [FromQuery(Name = "city")] string[]? cities = null,
         [FromQuery(Name = "country")] string[]? countries = null, string? nace = null, bool icp = false,
-        string? run = null, bool notEvaluated = false, CancellationToken ct = default)
+        string? run = null, bool notEvaluated = false, string? segment = null, CancellationToken ct = default)
     {
         var geo = GeoFilter.From(regions, cities, countries);
         var runId = await ResolveRunAsync(run, profileId, ct);
+        segment = string.IsNullOrWhiteSpace(segment) ? null : segment.Trim();
         if (signal is not ("guclu" or "incelenmeli" or "riskli" or "none")) signal = null;
         sort = CompanySort.Options.Any(o => o.Key == sort) ? sort! : CompanySort.Default;
 
         var query = await FilterCompaniesAsync(search, minScore, onlyWithoutLead, profileId, stage, signal, geo,
-            NaceCatalog.DivisionCode(nace), icp, ct, runId, notEvaluated);
+            NaceCatalog.DivisionCode(nace), icp, ct, runId, notEvaluated, segment);
         var companies = await OrderCompanies(query, sort).ThenBy(c => c.Id)
             .Take(ExportService.MaxRows)
             .Include(c => c.Contacts)
@@ -624,9 +634,11 @@ public class CompanyController : Controller
     /// <summary>Firmalar listesi ve disa aktarim ayni suzgeci kullanir: ekranda ne varsa o iner.</summary>
     private async Task<IQueryable<Company>> FilterCompaniesAsync(string? search, int minScore, bool onlyWithoutLead,
         int? profileId, string? stage, string? signal, GeoFilter geo, string? nace, bool icp, CancellationToken ct,
-        int? runId = null, bool notEvaluated = false)
+        int? runId = null, bool notEvaluated = false, string? segment = null)
     {
         var query = ScopeToRun(_db.Companies.AsNoTracking(), runId).Where(c => c.Score >= minScore);
+
+        if (segment is not null) query = query.Where(c => c.FitSegment == segment);
 
         if (notEvaluated) query = query.Where(c => c.EvaluationStatus == EvaluationStatus.NotEvaluated);
 
@@ -738,6 +750,25 @@ public class CompanyController : Controller
             return Json(new { active = at is not null, at = at?.ToLocalTime().ToString("dd.MM.yyyy") });
 
         return RedirectToLocal(returnUrl);
+    }
+
+    /// <summary>Firma detayindaki harita karti: acik adresi elle duzeltir (bos = adres silinir, harita ad + sehirle arar).</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateAddress(int id, string? address, CancellationToken ct)
+    {
+        var company = await _db.Companies.FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (company is null) return NotFound();
+
+        var value = address?.Trim();
+        company.Address = string.IsNullOrEmpty(value) ? null : value.Length > 300 ? value[..300].TrimEnd() : value;
+        await _db.SaveChangesAsync(ct);
+
+        AuditActionFilter.SetAuditSummary(HttpContext, company.Address is null
+            ? $"Firma adresi silindi: {company.Name}"
+            : $"Firma adresi güncellendi: {company.Name}");
+        TempData["LocationSaved"] = company.Address is null ? "Adres kaldırıldı; harita firma adı ve şehirle arıyor." : "Adres kaydedildi.";
+        return RedirectToAction(nameof(Details), new { id });
     }
 
     /// <summary>Firmayi kisileri, lead'leri ve profil baglantilariyla birlikte kalici olarak siler.</summary>
@@ -909,7 +940,7 @@ public class CompanyController : Controller
         if (company is null) return null;
 
         var analysis = ParseAnalysis(company.AiAnalysis);
-        var breakdown = _scoring.ScoreCompany(analysis, site: null, company.Contacts, await _icp.GetAsync(ct), company);
+        var breakdown = await _icp.BreakdownAsync(company, analysis, ct);
 
         var model = new CompanyDetailViewModel
         {

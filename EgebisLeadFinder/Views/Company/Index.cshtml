@@ -225,6 +225,14 @@
             İncelenemedi <span class="stage-chip-count">@Model.NotEvaluatedCount</span>
         </a>
     }
+    @foreach (var seg in Model.SegmentCounts.OrderByDescending(kv => kv.Value))
+    {
+        <a class="stage-chip chip-segment @(Model.Segment == seg.Key ? "is-active" : "")"
+           href="@(Model.Segment == seg.Key ? QueryUrl.Without(req, "segment") : QueryUrl.With(req, "segment", seg.Key))"
+           title="Bu segmente uyan firmalar (Biz ne arıyoruz?)">
+            🎯 @seg.Key <span class="stage-chip-count">@seg.Value</span>
+        </a>
+    }
     <a class="stage-chip" asp-controller="Icp" asp-action="Index" title="İdeal müşteri profilini düzenle">ICP ayarla</a>
 </nav>
 
@@ -440,7 +448,19 @@ else
                                 @RatingSignalDisplay.Label(company.RatingSignal)
                             </span>
                         }
+                        @if (company.FitSegment is not null)
+                        {
+                            <span class="meta-chip meta-chip-segment" title="Uyduğu hedef segment">🎯 @company.FitSegment</span>
+                        }
+                        @if (company.FitScore is int fit)
+                        {
+                            <span class="meta-chip fit-chip @FitDisplay.Css(fit)" title="Şirket profilimize uygunluk (yapay zekâ)">Uygunluk %@fit</span>
+                        }
                     </div>
+                    @if (company.FitReason is not null && company.EvaluationStatus == EvaluationStatus.Evaluated)
+                    {
+                        <div class="company-card-reason" title="@company.FitReason">@company.FitReason</div>
+                    }
                 </a>
 
                 <div class="company-card-actions">

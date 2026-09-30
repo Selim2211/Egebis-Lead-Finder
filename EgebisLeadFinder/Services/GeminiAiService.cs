@@ -11,7 +11,7 @@ namespace EgebisLeadFinder.Services;
 /// AI #1: firma analizi. Gemini'ye responseSchema verilerek JSON ciktisi sema ile zorlanir,
 /// boylece serbest metin ayristirma riski ortadan kalkar.
 /// </summary>
-public class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INaceClassifierAi
+public class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INaceClassifierAi, IBusinessProfileAi, ISearchPlannerAi
 {
     private readonly HttpClient _http;
     private readonly AiOptions _options;
@@ -48,6 +48,10 @@ public class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INa
         return GeminiModelCatalog.IsValidModelId(stored) ? stored! : _options.GeminiModel;
     }
 
+    /// <summary>"Biz ne arıyoruz?" sirket profili; bossa talimatlar eski Egebis tanimini kullanir.</summary>
+    private async Task<BusinessProfile> ProfileAsync(CancellationToken ct) =>
+        BusinessProfileService.Parse(await _settings.GetAsync(SettingKeys.BusinessProfile, ct));
+
     public async Task<AiAnalysisResult> AnalyzeCompanyAsync(string siteText, CancellationToken ct = default)
     {
         // Anahtar yalnizca Ayarlar ekranindan okunur (bkz. SettingKeys.IsSettingsOnly).
@@ -68,7 +72,7 @@ public class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INa
         {
             system_instruction = new
             {
-                parts = new[] { new { text = SystemPrompt } }
+                parts = new[] { new { text = AnalysisPrompt(await ProfileAsync(ct)) } }
             },
             contents = new[]
             {
@@ -208,13 +212,15 @@ public class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INa
     private static string Truncate(string value, int max) =>
         value.Length <= max ? value : value[..max];
 
-    private const string SystemPrompt = """
+    private const string LegacyAnalysisHeader = """
         Egebis Bilişim için potansiyel müşteri analizi yapıyorsun.
 
         Egebis, üretim yapan firmalara SAP danışmanlığı, SAP entegrasyonu,
         MES/üretim takip ve özel yazılım hizmeti veriyor.
         Bu nedenle EN DEĞERLİ hedef: SAP kullanan üretici firmalar/fabrikalar.
+        """;
 
+    private const string AnalysisIntro = """
         Sana bir firmanın web sitesinden alınan düz metin verilecek.
         Metne dayanarak firmayı değerlendir ve verilen şemaya uygun JSON döndür.
 
@@ -233,7 +239,9 @@ public class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INa
         sapEvidence alanına, "yes" veya "likely" dediysen metinden bunu
         destekleyen kısa alıntıyı yaz. Kanıt yoksa boş bırak.
         Metinde olmayan bilgiyi asla uydurma.
+        """;
 
+    private const string LegacyAnalysisTarget = """
         sapVendor alanı: firma SAP danışmanlığı, SAP entegrasyonu veya SAP
         eklentisi SATIYOR mu? Bunlar Egebis'in rakibidir, müşterisi değil.
         Yazılım evi, ERP danışmanlık şirketi, SAP iş ortağı ise true.
@@ -248,7 +256,39 @@ public class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INa
         - bayi, perakendeci, e-ticaret sitesi
         - dernek, oda, vakıf, kamu kurumu, üniversite
         - firma rehberi, blog, forum
+        """;
 
+    private const string ProfileAnalysisTarget = """
+        sapVendor alanı (RAKİP): firma, bizim sattığımız ürün/hizmetle aynı veya
+        benzer bir şeyi başkalarına SATIYOR mu? Yukarıdaki rakip tanımına uyuyorsa
+        true. Bizim ürün/hizmetimizi kendi işi için KULLANABİLECEK firma ise false.
+
+        potential alanı: firma bizim için gerçek bir satış hedefi mi?
+        Yukarıdaki İDEAL MÜŞTERİMİZ veya HEDEF SEGMENTLER tanımına uyan ve sattığımız
+        ürün/hizmete ihtiyaç duyabilecek firmalar için true.
+        "Müşterimiz olmayanlar" tanımına uyan firmalar ve rakipler için false.
+        Şirket tanımında açıkça hedef olarak yazmıyorsa şunlar için de false ver:
+        - haber sitesi, gazete, haber ajansı
+        - iş ilanı / kariyer platformu (bir firmanın kendi kariyer sayfası hariç)
+        - dernek, oda, vakıf, kamu kurumu, üniversite
+        - firma rehberi, blog, forum, pazaryeri
+
+        reason alanı: 1-2 cümle; firma neden hedefimize uyuyor ya da uymuyor. Uyuyorsa
+        sattığımız hangi ürün/hizmetle ilgili olabileceğini yaz.
+
+        fitScore alanı: firmanın bizim için ne kadar iyi bir müşteri adayı olduğu, 0-100.
+        - 80-100: ideal müşteri tanımına ve bir hedef segmente net uyuyor, ürünümüze
+          açık ihtiyacı var.
+        - 50-79: büyük ölçüde uyuyor ama bir eksik var (büyüklük, sektör kenarı, belirsiz ihtiyaç).
+        - 20-49: zayıf uyum; ancak dolaylı bir fırsat olabilir.
+        - 0-19: hedef değil (potential=false olan firmalar bu aralıkta olmalı).
+        Metinde olmayan bilgiyi varsayma; bilgi azsa puanı düşük tut.
+
+        segment alanı: firma yukarıdaki HEDEF SEGMENTLER'den birine uyuyorsa o segmentin
+        adını aynen yaz; hiçbirine uymuyorsa boş bırak.
+        """;
+
+    private const string AnalysisTail = """
         Dikkat: metin bir firma HAKKINDA haber veya o firma için verilmiş bir
         iş ilanı olabilir. Bu durumda sitenin sahibi haber/ilan sitesidir;
         haberde adı geçen firma değil. Sitenin sahibini değerlendir.
@@ -269,6 +309,15 @@ public class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INa
 
         Tüm metin alanlarını Türkçe yaz.
         """;
+
+    /// <summary>
+    /// Firma analizi talimati. Sirket profili ("Biz ne arıyoruz?") doluysa hedef ve rakip tanimi
+    /// profilden gelir; bossa eski Egebis tanimi aynen kullanilir.
+    /// </summary>
+    public static string AnalysisPrompt(BusinessProfile? profile) =>
+        profile is { IsConfigured: true }
+            ? string.Join("\n\n", profile.ToPromptBlock(), AnalysisIntro, ProfileAnalysisTarget, AnalysisTail)
+            : string.Join("\n\n", LegacyAnalysisHeader, AnalysisIntro, LegacyAnalysisTarget, AnalysisTail);
 
     /// <summary>
     /// Gemini responseSchema'si. CompanyAnalysis sinifiyla birebir eslesmelidir.
@@ -294,15 +343,17 @@ public class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INa
                 @enum = new[] { "yes", "likely", "no", "unknown" }
             },
             sapEvidence = new { type = "string", description = "SAP kullanımına dair metinden alıntı" },
-            sapVendor = new { type = "boolean", description = "SAP hizmeti satan firma mı (rakip)" },
+            sapVendor = new { type = "boolean", description = "Rakip mi (bizim sattığımızı satan firma)" },
             employeeSizeHint = new { type = "string", description = "Çalışan sayısı ipucu, yoksa boş" },
-            potential = new { type = "boolean", description = "Egebis için gerçek satış hedefi mi" },
+            potential = new { type = "boolean", description = "Bizim için gerçek satış hedefi mi" },
             reason = new { type = "string", description = "Kısa gerekçe" },
             recommendedTemplate = new
             {
                 type = "string",
                 @enum = new[] { "SAP_ENTEGRASYON", "SAP", "MES", "URETIM_YAZILIMI", "GENEL" }
-            }
+            },
+            fitScore = new { type = "integer", description = "Bizim için müşteri adayı olarak uygunluk, 0-100" },
+            segment = new { type = "string", description = "Uyduğu hedef segmentin adı veya boş" }
         },
         required = new[]
         {
@@ -344,7 +395,7 @@ public class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INa
 
         var payload = new
         {
-            system_instruction = new { parts = new[] { new { text = RatingSystemPrompt } } },
+            system_instruction = new { parts = new[] { new { text = RatingPrompt(await ProfileAsync(ct)) } } },
             contents = new[]
             {
                 new { role = "user", parts = new[] { new { text = userText } } }
@@ -430,11 +481,12 @@ public class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INa
         if (string.IsNullOrWhiteSpace(apiKey))
             return EmailDraftAiResult.Failed(new MissingApiKeyException("Gemini").Message);
 
+        var profile = await ProfileAsync(ct);
         var url = $"{_options.GeminiEndpoint}/{await ModelAsync(ct)}:generateContent";
         var payload = new
         {
-            system_instruction = new { parts = new[] { new { text = EmailSystemPrompt } } },
-            contents = new[] { new { role = "user", parts = new[] { new { text = BuildEmailBrief(input) } } } },
+            system_instruction = new { parts = new[] { new { text = EmailPrompt(profile) } } },
+            contents = new[] { new { role = "user", parts = new[] { new { text = BuildEmailBrief(input, profile) } } } },
             generationConfig = new
             {
                 temperature = 0.6,
@@ -479,7 +531,7 @@ public class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INa
     }
 
     /// <summary>AI'a verilen bilgi notu: yalnizca dogrulanmis bilgiler, kaynak listesiyle.</summary>
-    public static string BuildEmailBrief(EmailDraftInput input)
+    public static string BuildEmailBrief(EmailDraftInput input, BusinessProfile? profile = null)
     {
         var sb = new System.Text.StringBuilder();
         var c = input.Company;
@@ -488,7 +540,8 @@ public class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INa
 
         sb.AppendLine($"DİL: {input.Language}");
         sb.AppendLine($"MAİL TÜRÜ: {(input.IsFollowUp ? "takip (daha önce mail atıldı, cevap gelmedi)" : "ilk temas")}");
-        sb.AppendLine($"GÖNDEREN: {input.SenderName} (Egebis Bilişim)");
+        var senderCompany = profile is { IsConfigured: true } ? profile.DisplayName : "Egebis Bilişim";
+        sb.AppendLine($"GÖNDEREN: {input.SenderName} ({senderCompany})");
         sb.AppendLine();
         sb.AppendLine($"ALICI: {input.Contact?.Name ?? "(isim bilinmiyor — 'Sayın Yetkili' kullan)"}");
         if (!string.IsNullOrWhiteSpace(input.Contact?.Title)) sb.AppendLine($"Ünvan: {input.Contact.Title}");
@@ -530,27 +583,342 @@ public class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INa
         return sb.ToString();
     }
 
-    private const string EmailSystemPrompt = """
+    private const string LegacyEmailHeader = """
         Egebis Bilişim adına B2B satış e-postası yazıyorsun. Egebis; üretici firmalara SAP
         danışmanlığı, SAP entegrasyonu, MES/üretim takip ve özel yazılım hizmeti veren bir
         SAP iş ortağıdır.
+        """;
 
-        Kurallar:
-        - Yalnızca verilen bilgi notundaki olguları kullan. Firma hakkında notta olmayan
-          hiçbir şey iddia etme, rakam uydurma.
-        - İlk cümlede firmaya özgü, somut bir gözlemle başla (bir haber, yatırım, ürün,
-          teknoloji kanıtı). Genel iltifat ("sektörün lideri") yazma.
+    private const string LegacyEmailRoleRule = """
         - Alıcının rolüne göre açı seç: IT/bilgi işlem → entegrasyon, SAP, MES, veri;
           genel müdür/yönetim → verimlilik, maliyet, büyümeye hazırlık; üretim/fabrika →
           üretim takibi, izlenebilirlik; finans → raporlama, kapanış süresi.
-        - 120-180 kelime, kısa paragraflar, tek net çağrı (ör. 15-20 dakikalık görüşme).
-        - Takip mailinde önceki maile kısaca atıf yap, yeni bir değer/açı ekle, 80-120 kelime.
-        - Hitap: isim biliniyorsa "Sayın Ad Soyad" (Türkçe) ya da dile uygun resmi hitap;
-          bilinmiyorsa "Sayın Yetkili".
-        - Sonda gönderen adıyla kapanış yap. Şablonda imza/iletişim bilgisi varsa onu kullan.
-        - DİL alanındaki dilde yaz (tr = Türkçe, en = İngilizce, de = Almanca...).
-        - Konu satırı kısa (en fazla 70 karakter), kişisel ve tıklama tuzağı olmayan.
-        - body alanı düz metindir: HTML, markdown veya köşeli parantezli yer tutucu kullanma.
+        """;
+
+    private const string ProfileEmailRoleRule = """
+        - Alıcının rolüne göre açı seç: sattığımız ürün/hizmetin o kişinin işine (IT,
+          yönetim, üretim, finans, satın alma...) somut faydasını anlat. Yalnızca yukarıdaki
+          şirket tanımında geçen ürün/hizmetleri öner; tanımda olmayan hizmet vaat etme.
+        """;
+
+    /// <summary>E-posta yazim talimati: sirket profili doluysa gonderen sirket profilden gelir.</summary>
+    public static string EmailPrompt(BusinessProfile? profile)
+    {
+        var configured = profile is { IsConfigured: true };
+        var header = configured
+            ? profile!.ToPromptBlock() + $"\n\n{profile.DisplayName} adına B2B satış e-postası yazıyorsun."
+            : LegacyEmailHeader;
+        var roleRule = configured ? ProfileEmailRoleRule : LegacyEmailRoleRule;
+
+        return header + "\n\n" + """
+            Kurallar:
+            - Yalnızca verilen bilgi notundaki olguları kullan. Firma hakkında notta olmayan
+              hiçbir şey iddia etme, rakam uydurma.
+            - İlk cümlede firmaya özgü, somut bir gözlemle başla (bir haber, yatırım, ürün,
+              teknoloji kanıtı). Genel iltifat ("sektörün lideri") yazma.
+            """ + "\n" + roleRule + "\n" + """
+            - 120-180 kelime, kısa paragraflar, tek net çağrı (ör. 15-20 dakikalık görüşme).
+            - Takip mailinde önceki maile kısaca atıf yap, yeni bir değer/açı ekle, 80-120 kelime.
+            - Hitap: isim biliniyorsa "Sayın Ad Soyad" (Türkçe) ya da dile uygun resmi hitap;
+              bilinmiyorsa "Sayın Yetkili".
+            - Sonda gönderen adıyla kapanış yap. Şablonda imza/iletişim bilgisi varsa onu kullan.
+            - DİL alanındaki dilde yaz (tr = Türkçe, en = İngilizce, de = Almanca...).
+            - Konu satırı kısa (en fazla 70 karakter), kişisel ve tıklama tuzağı olmayan.
+            - body alanı düz metindir: HTML, markdown veya köşeli parantezli yer tutucu kullanma.
+            """;
+    }
+
+    // ================= AI #6: "Biz ne arıyoruz?" taslagi =================
+
+    /// <summary>
+    /// Sirketin kendi sitesinden sirket profili taslagi cikarir: ne satiyor, ideal musteri,
+    /// musteri olmayanlar, rakipler, hedef segmentler ve ulasilacak unvanlar.
+    /// </summary>
+    public async Task<BusinessProfileDraft> DraftBusinessProfileAsync(string siteUrl, string siteText, CancellationToken ct = default)
+    {
+        var apiKey = await _settings.GetAsync(SettingKeys.GeminiApiKey, ct);
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return new BusinessProfileDraft { Error = new MissingApiKeyException("Gemini").Message };
+
+        var input = siteText.Length > _options.MaxInputChars ? siteText[.._options.MaxInputChars] : siteText;
+        var regions = string.Join(", ", EgebisLeadFinder.Data.SearchRegions.All.Select(r => $"{r.Key}={r.Name}"));
+        var userText = $"Şirketimizin sitesi: {siteUrl}\nGeçerli bölge anahtarları: {regions}\n\nSite metni:\n\n{input}";
+
+        var segment = new
+        {
+            type = "object",
+            properties = new
+            {
+                name = new { type = "string", description = "Kısa segment adı, ör. Otomotiv yan sanayi" },
+                description = new { type = "string", description = "Bu segmentte kime, neyi, neden satıyoruz" },
+                searchTerm = new { type = "string", description = "Firma aramasında sektör kutusuna yazılacak kısa terim" },
+                region = new { type = "string", description = "Bölge anahtarı (listeden) veya boş" },
+                keywords = StringArray,
+                nace = StringArray,
+                exclude = StringArray,
+                titles = StringArray
+            },
+            required = new[] { "name", "description", "searchTerm" }
+        };
+
+        var payload = new
+        {
+            system_instruction = new { parts = new[] { new { text = BusinessProfileSystemPrompt } } },
+            contents = new[] { new { role = "user", parts = new[] { new { text = userText } } } },
+            generationConfig = new
+            {
+                temperature = 0.3,
+                responseMimeType = "application/json",
+                responseSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        companyName = new { type = "string" },
+                        offering = new { type = "string", description = "Ne satıyoruz" },
+                        problems = new { type = "string", description = "Müşteride hangi sorunları çözüyoruz" },
+                        idealCustomer = new { type = "string", description = "İdeal müşteri tanımı" },
+                        notCustomers = new { type = "string", description = "Müşterimiz olmayan firma türleri" },
+                        competitors = new { type = "string", description = "Rakip tanımı" },
+                        exampleCustomers = StringArray,
+                        segments = new { type = "array", items = segment },
+                        targetTitles = StringArray
+                    },
+                    required = new[] { "companyName", "offering", "idealCustomer", "segments", "targetTitles" }
+                }
+            }
+        };
+
+        try
+        {
+            var url = $"{_options.GeminiEndpoint}/{await ModelAsync(ct)}:generateContent";
+            var response = await SendWithRetryAsync(url, JsonSerializer.Serialize(payload), apiKey, ct);
+            if (response.Error is not null) return new BusinessProfileDraft { Error = response.Error };
+
+            var json = ExtractText(response.Content!);
+            return json is null
+                ? new BusinessProfileDraft { Error = "Gemini yanıtında metin bulunamadı." }
+                : ParseBusinessProfileDraft(json);
+        }
+        catch (QuotaExceededException)
+        {
+            return new BusinessProfileDraft { Error = "Gemini kotası doldu; bir süre sonra tekrar deneyin." };
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Şirket profili taslağı başarısız.");
+            return new BusinessProfileDraft { Error = ex.Message };
+        }
+    }
+
+    /// <summary>Taslak JSON'unu cozer (profil alanlari + targetTitles).</summary>
+    public static BusinessProfileDraft ParseBusinessProfileDraft(string json)
+    {
+        try
+        {
+            var profile = JsonSerializer.Deserialize<BusinessProfile>(json, JsonOptions) ?? new BusinessProfile();
+            using var doc = JsonDocument.Parse(json);
+            var titles = doc.RootElement.TryGetProperty("targetTitles", out var t) && t.ValueKind == JsonValueKind.Array
+                ? t.EnumerateArray().Select(x => x.GetString() ?? string.Empty).ToList()
+                : new List<string>();
+            return new BusinessProfileDraft { Profile = profile, TargetTitles = BusinessProfileService.CleanList(titles) };
+        }
+        catch (JsonException)
+        {
+            return new BusinessProfileDraft { Error = "Yapay zekâ yanıtı çözümlenemedi." };
+        }
+    }
+
+    private const string BusinessProfileSystemPrompt = """
+        Bir B2B şirketinin kendi web sitesi metni verilecek. Bu şirket, potansiyel müşteri
+        bulma uygulamasına kendini tanıtacak. Sitedeki bilgilere dayanarak şirket profilini
+        çıkar ve verilen şemaya uygun JSON döndür.
+
+        - companyName: şirketin ticari adı.
+        - offering: ne satıyor (ürün/hizmetler), 1-3 cümle.
+        - problems: müşterilerinde hangi sorunları çözüyor / hangi faydayı sağlıyor.
+        - idealCustomer: bu ürünü/hizmeti kimler satın alır: sektör, firma büyüklüğü,
+          özellikler. Somut yaz ("50-1000 çalışanlı üretici firmalar" gibi).
+        - notCustomers: müşterisi OLMAYAN firma türleri (ör. bayi, distribütör, dernek,
+          haber sitesi, çok küçük işletmeler) — şirketin işine göre düşün.
+        - competitors: rakip tanımı: aynı ürün/hizmeti satan firma türleri.
+        - exampleCustomers: sitede referans/müşteri olarak adı geçen firmalar; yoksa boş dizi.
+        - segments: 2-5 hedef segment. Her biri farklı bir müşteri sektörü veya ürün grubu.
+          name kısa ad; description bu segmentte neyi neden sattığımız; searchTerm firma
+          aramasında kullanılacak kısa sektör terimi (Türkçe, ör. "Otomotiv yan sanayi");
+          region verilen bölge anahtarlarından biri (şirket belirli bir pazarı hedefliyorsa),
+          değilse boş; keywords sektörü tanıyan 3-8 kelime; nace NACE Rev.2 kodları
+          ("29" veya "29.32"); exclude bu segmentte elenecek kelimeler; titles bu
+          segmentteki firmalarda ulaşılacak 2-5 karar verici unvanı.
+        - targetTitles: satış için ulaşılacak karar verici unvanları, 5-12 adet; Türkçe ve
+          İngilizce karışık olabilir (ör. "Genel Müdür", "IT Müdürü", "CIO", "Plant Manager").
+
+        Sitede olmayan referans müşteri uydurma. Diğer alanlarda sitedeki işten makul
+        çıkarım yapabilirsin. Tüm metin alanlarını Türkçe yaz.
+        """;
+
+    // ================= AI #7-8: Akilli arama (terim onerisi + on eleme) =================
+
+    /// <summary>Sirket tanimi: profil doluysa profilden, bossa eski Egebis tanimi.</summary>
+    public static string SellerBlock(BusinessProfile? profile) =>
+        profile is { IsConfigured: true } ? profile.ToPromptBlock() : LegacyAnalysisHeader;
+
+    public async Task<List<string>> SuggestSearchTermsAsync(SearchTermRequest request, CancellationToken ct = default)
+    {
+        var apiKey = await _settings.GetAsync(SettingKeys.GeminiApiKey, ct);
+        if (string.IsNullOrWhiteSpace(apiKey)) throw new MissingApiKeyException("Gemini");
+
+        var payload = new
+        {
+            system_instruction = new { parts = new[] { new { text = SellerBlock(request.Profile) + "\n\n" + SearchTermsSystemPrompt } } },
+            contents = new[] { new { role = "user", parts = new[] { new { text = BuildSearchTermBrief(request) } } } },
+            generationConfig = new
+            {
+                temperature = 0.3,
+                responseMimeType = "application/json",
+                responseSchema = new
+                {
+                    type = "object",
+                    properties = new { terms = StringArray },
+                    required = new[] { "terms" }
+                }
+            }
+        };
+
+        var url = $"{_options.GeminiEndpoint}/{await ModelAsync(ct)}:generateContent";
+        var response = await SendWithRetryAsync(url, JsonSerializer.Serialize(payload), apiKey, ct);
+        if (response.Error is not null) throw new InvalidOperationException(response.Error);
+
+        var json = ExtractText(response.Content!);
+        if (json is null) return new List<string>();
+
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.TryGetProperty("terms", out var terms) && terms.ValueKind == JsonValueKind.Array
+            ? terms.EnumerateArray().Select(t => t.GetString() ?? string.Empty).Where(t => t.Length > 0).ToList()
+            : new List<string>();
+    }
+
+    public static string BuildSearchTermBrief(SearchTermRequest r)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"KULLANICININ YAZDIĞI SEKTÖR: {r.Industry}");
+        if (r.Segment is not null)
+        {
+            sb.AppendLine($"HEDEF SEGMENT: {r.Segment.Name}");
+            if (!string.IsNullOrWhiteSpace(r.Segment.Description)) sb.AppendLine($"Segment açıklaması: {r.Segment.Description}");
+            if (r.Segment.Keywords.Count > 0) sb.AppendLine($"Segment kelimeleri: {string.Join(", ", r.Segment.Keywords)}");
+        }
+        sb.AppendLine($"ARAMA ÜLKESİ: {r.CountryName}");
+        sb.AppendLine($"TERİMLERİN DİLİ: {r.LanguageName}");
+        sb.AppendLine($"İSTENEN TERİM SAYISI: en fazla {r.MaxTerms}");
+        return sb.ToString();
+    }
+
+    private const string SearchTermsSystemPrompt = """
+        Google ve Google Haritalar'da potansiyel müşteri firmaları bulmak için kısa arama
+        terimleri üretiyorsun. Terimler hazır sorgu kalıplarına yerleştirilecek; kalıplar
+        zaten "üretici", "fabrika", "firma" ve şehir/ülke ekliyor.
+
+        Kurallar:
+        - Her terim 1-4 kelime; bir sektör, ürün grubu veya firma türü adı olsun.
+        - Kullanıcının yazdığı sektörün eş anlamlılarını, alt dallarını ve bu sektörde
+          bizim ideal müşterimize uyan firma türlerini bul (ör. "Otomotiv" için
+          "otomotiv yan sanayi", "metal pres parça", "plastik enjeksiyon").
+        - Terimleri istenen dilde yaz (Almanca için ör. "Kunststoffspritzguss",
+          "Automobilzulieferer"). Kullanıcının yazdığı terimi aynen tekrar etme.
+        - Şehir, ülke, "üretici", "fabrika", "firma", "şirket" gibi kelimeleri ekleme.
+        - Müşterimiz olmayan firma türlerini (bayi, servis, perakende, rakip) getirecek
+          terim üretme.
+        - En alakalı olan en başta olsun.
+        """;
+
+    public async Task<Dictionary<int, CandidateVerdict>> ScreenCandidatesAsync(CandidateScreenRequest request, CancellationToken ct = default)
+    {
+        var result = new Dictionary<int, CandidateVerdict>();
+        if (request.Candidates.Count == 0) return result;
+
+        var apiKey = await _settings.GetAsync(SettingKeys.GeminiApiKey, ct);
+        if (string.IsNullOrWhiteSpace(apiKey)) throw new MissingApiKeyException("Gemini");
+
+        var payload = new
+        {
+            system_instruction = new { parts = new[] { new { text = SellerBlock(request.Profile) + "\n\n" + ScreenSystemPrompt } } },
+            contents = new[] { new { role = "user", parts = new[] { new { text = BuildScreenBrief(request) } } } },
+            generationConfig = new
+            {
+                temperature = 0.0,
+                responseMimeType = "application/json",
+                responseSchema = new
+                {
+                    type = "array",
+                    items = new
+                    {
+                        type = "object",
+                        properties = new
+                        {
+                            id = new { type = "integer" },
+                            keep = new { type = "boolean" },
+                            reason = new { type = "string", description = "Elendiyse kısa neden" }
+                        },
+                        required = new[] { "id", "keep" }
+                    }
+                }
+            }
+        };
+
+        var url = $"{_options.GeminiEndpoint}/{await ModelAsync(ct)}:generateContent";
+        var response = await SendWithRetryAsync(url, JsonSerializer.Serialize(payload), apiKey, ct);
+        if (response.Error is not null) throw new InvalidOperationException(response.Error);
+
+        var json = ExtractText(response.Content!);
+        return json is null ? result : ParseScreenVerdicts(json);
+    }
+
+    public static Dictionary<int, CandidateVerdict> ParseScreenVerdicts(string json)
+    {
+        var result = new Dictionary<int, CandidateVerdict>();
+        using var doc = JsonDocument.Parse(json);
+        if (doc.RootElement.ValueKind != JsonValueKind.Array) return result;
+
+        foreach (var item in doc.RootElement.EnumerateArray())
+        {
+            if (!item.TryGetProperty("id", out var idEl) || idEl.ValueKind != JsonValueKind.Number || !idEl.TryGetInt32(out var id)) continue;
+            var keep = !item.TryGetProperty("keep", out var k) || k.ValueKind != JsonValueKind.False;
+            var reason = item.TryGetProperty("reason", out var r) ? r.GetString() : null;
+            result[id] = new CandidateVerdict(keep, string.IsNullOrWhiteSpace(reason) ? null : reason.Trim());
+        }
+        return result;
+    }
+
+    public static string BuildScreenBrief(CandidateScreenRequest r)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"ARANAN SEKTÖR: {r.Industry}");
+        if (r.Segment is not null)
+            sb.AppendLine($"HEDEF SEGMENT: {r.Segment.Name}{(string.IsNullOrWhiteSpace(r.Segment.Description) ? "" : " — " + r.Segment.Description)}");
+        sb.AppendLine();
+        sb.AppendLine("ADAYLAR:");
+        foreach (var (id, text) in r.Candidates)
+            sb.AppendLine($"[{id}] {text.Replace('\n', ' ')}");
+        return sb.ToString();
+    }
+
+    private const string ScreenSystemPrompt = """
+        Google aramasından gelen firma adayları verilecek: her satırda [numara], başlık,
+        site adresi ve varsa Google Haritalar kategorisi, adres ve arama özeti var.
+        Siteler henüz okunmadı; her birini okumak zaman ve para demek. Görevin, AÇIKÇA
+        hedef dışı olan adayları şimdiden elemek.
+
+        Her aday için keep alanını doldur:
+        - keep=false yalnızca şu durumlarda: haber/gazete/blog sitesi; firma rehberi,
+          dizin veya pazaryeri; iş ilanı sitesi; dernek, oda, vakıf, kamu kurumu, okul;
+          bayi, perakende mağaza, servis/tamirci; bizim rakibimiz; ya da aranan sektör
+          ve hedef müşteri tanımımızla hiç ilgisi olmayan bir iş.
+        - Emin değilsen keep=true. Bilgi azsa keep=true. Gerçek bir hedef firmayı yanlışlıkla
+          elemek, fazladan bir siteyi okumaktan çok daha kötüdür.
+        - keep=false ise reason alanına 2-6 kelimelik Türkçe neden yaz ("haber sitesi",
+          "firma rehberi", "oto servis", "rakip yazılım firması").
+        - Her aday için verilen numarayı id alanına aynen yaz.
         """;
 
     // ================= AI #5: Toplu NACE siniflandirma =================
@@ -618,53 +986,71 @@ public class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INa
         Her firma için verilen numarayı id alanına aynen yaz.
         """;
 
-    private const string RatingSystemPrompt = """
+    private const string LegacyRatingHeader = """
         Egebis Bilişim için bir potansiyel müşteri (firma) hakkında DERİN bir ön araştırma
         raporu hazırlıyorsun. Egebis; üretici firmalara SAP danışmanlığı, SAP entegrasyonu,
         MES/üretim takip ve özel yazılım hizmeti veren bir SAP iş ortağıdır.
-
-        Sana firma hakkında internetten toplanmış kaynaklar verilecek: firmanın kendi web
-        sitesinden sayfalar (Site), haber makaleleri ve arama sonucu özetleri, KAP
-        bildirimleri. Her kaynağın başında [numara] (tür) [tarih] link yazar.
-        SADECE bu kaynaklardan yararlanarak verilen şemaya uygun JSON döndür.
-
-        Kesin kurallar:
-        - Kaynaklarda olmayan hiçbir bilgiyi uydurma. Bilgi yoksa alanı boş bırak veya
-          boş dizi döndür. Tahmin yürütüyorsan bunu açıkça "tahmini" diye belirt.
-        - Başka bir firmaya ait bilgiyi (benzer isimli firma, haberde adı geçen başka
-          şirket) bu firmaya yazma.
-        - Link isteyen her alana (sourceUrl, url) o bilgiyi veren kaynağın linkini koy.
-        - summary: 5-8 cümlelik yönetici özeti. Firma ne yapar, ne büyüklükte, finansal
-          ve ticari durumu, öne çıkan gelişmeler, riskler ve Egebis açısından önemi.
-        - riskSignals.severity: konkordato, iflas, haciz, tasfiye, el koyma =>
-          "yuksek". Dava, icra takibi, ödeme gecikmesi haberi => "orta".
-          Belirsiz/söylenti => "dusuk". Kaynağı olmayan risk iddiası yazma.
-        - financialSource: rakam KAP bildiriminden geliyorsa "KAP", haber veya firma
-          sitesinden geliyorsa "haber", hiç rakam yoksa "yok".
-        - financialPeriods: kaynakta açıkça geçen dönemsel ciro/kâr rakamları; tutarı
-          birimiyle yaz ("1,2 milyar TL", "45 milyon USD"). Her satıra sourceUrl.
-        - sizeInfo: çalışan sayısı, ihracat (ülke sayısı/oranı), üretim kapasitesi,
-          fabrika/şube lokasyonları.
-        - management: yönetim kurulu, genel müdür, CFO, IT/bilgi işlem yöneticisi gibi
-          karar vericiler; isim + rol + sourceUrl. İsmi kaynakta geçmeyen kişi yazma.
-        - groupCompanies: bağlı olduğu holding/grup ve iştirakler.
-        - technology: kullandığı ERP (SAP, Logo, Netsis, Microsoft Dynamics, Oracle...)
-          ve dayanağı (erpEvidence), diğer yazılımlar, dijital dönüşüm projeleri,
-          IT/yazılım iş ilanları. Kanıt yoksa erp = "bilinmiyor".
-        - newsTimeline: önemli haberler, en yeni önce, en fazla 12; tarih kaynakta
-          varsa yaz. kind: risk | buyume | finansal | yonetim | teknoloji | genel.
-        - opportunities: Egebis için somut satış fırsatları (ör. SAP'ye geçiş, yeni
-          fabrika = yeni sistem ihtiyacı, IT ilanı, entegrasyon ihtiyacı) ve nedeni.
-        - salesApproach: 2-4 cümle; kime (rol/isim), hangi açıdan, hangi zamanlamayla
-          yaklaşılmalı.
-        - signal alanı senin ÖNERİN: net risk yoksa ve firma köklü/aktif görünüyorsa
-          "guclu"; veri az veya karışıksa "incelenmeli"; doğrulanmış ciddi risk
-          varsa "riskli". Nihai kararı sistem verecek.
-        - customers/suppliers/projects/growthSignals: kaynaklarda açıkça geçen
-          isimleri/olayları kısa madde olarak yaz. Yoksa boş dizi.
-
-        Tüm metin alanlarını Türkçe yaz.
         """;
+
+    private const string LegacyRatingOpportunities =
+        "Egebis için somut satış fırsatları (ör. SAP'ye geçiş, yeni fabrika = yeni sistem ihtiyacı, IT ilanı, entegrasyon ihtiyacı) ve nedeni.";
+
+    private const string ProfileRatingOpportunities =
+        "bizim sattığımız ürün/hizmet için somut satış fırsatları (ör. yeni yatırım, büyüme, ilgili iş ilanı, teknoloji değişikliği) ve nedeni.";
+
+    /// <summary>Arastirma raporu talimati: sirket profili doluysa "biz kimiz" profilden gelir.</summary>
+    public static string RatingPrompt(BusinessProfile? profile)
+    {
+        var configured = profile is { IsConfigured: true };
+        var header = configured
+            ? profile!.ToPromptBlock() + "\n\nBu firma hakkında DERİN bir ön araştırma raporu hazırlıyorsun."
+            : LegacyRatingHeader;
+        var who = configured ? "bizim" : "Egebis";
+        var opportunities = configured ? ProfileRatingOpportunities : LegacyRatingOpportunities;
+
+        return header + "\n\n" + $"""
+            Sana firma hakkında internetten toplanmış kaynaklar verilecek: firmanın kendi web
+            sitesinden sayfalar (Site), haber makaleleri ve arama sonucu özetleri, KAP
+            bildirimleri. Her kaynağın başında [numara] (tür) [tarih] link yazar.
+            SADECE bu kaynaklardan yararlanarak verilen şemaya uygun JSON döndür.
+
+            Kesin kurallar:
+            - Kaynaklarda olmayan hiçbir bilgiyi uydurma. Bilgi yoksa alanı boş bırak veya
+              boş dizi döndür. Tahmin yürütüyorsan bunu açıkça "tahmini" diye belirt.
+            - Başka bir firmaya ait bilgiyi (benzer isimli firma, haberde adı geçen başka
+              şirket) bu firmaya yazma.
+            - Link isteyen her alana (sourceUrl, url) o bilgiyi veren kaynağın linkini koy.
+            - summary: 5-8 cümlelik yönetici özeti. Firma ne yapar, ne büyüklükte, finansal
+              ve ticari durumu, öne çıkan gelişmeler, riskler ve {who} açısından önemi.
+            - riskSignals.severity: konkordato, iflas, haciz, tasfiye, el koyma =>
+              "yuksek". Dava, icra takibi, ödeme gecikmesi haberi => "orta".
+              Belirsiz/söylenti => "dusuk". Kaynağı olmayan risk iddiası yazma.
+            - financialSource: rakam KAP bildiriminden geliyorsa "KAP", haber veya firma
+              sitesinden geliyorsa "haber", hiç rakam yoksa "yok".
+            - financialPeriods: kaynakta açıkça geçen dönemsel ciro/kâr rakamları; tutarı
+              birimiyle yaz ("1,2 milyar TL", "45 milyon USD"). Her satıra sourceUrl.
+            - sizeInfo: çalışan sayısı, ihracat (ülke sayısı/oranı), üretim kapasitesi,
+              fabrika/şube lokasyonları.
+            - management: yönetim kurulu, genel müdür, CFO, IT/bilgi işlem yöneticisi gibi
+              karar vericiler; isim + rol + sourceUrl. İsmi kaynakta geçmeyen kişi yazma.
+            - groupCompanies: bağlı olduğu holding/grup ve iştirakler.
+            - technology: kullandığı ERP (SAP, Logo, Netsis, Microsoft Dynamics, Oracle...)
+              ve dayanağı (erpEvidence), diğer yazılımlar, dijital dönüşüm projeleri,
+              IT/yazılım iş ilanları. Kanıt yoksa erp = "bilinmiyor".
+            - newsTimeline: önemli haberler, en yeni önce, en fazla 12; tarih kaynakta
+              varsa yaz. kind: risk | buyume | finansal | yonetim | teknoloji | genel.
+            - opportunities: {opportunities}
+            - salesApproach: 2-4 cümle; kime (rol/isim), hangi açıdan, hangi zamanlamayla
+              yaklaşılmalı.
+            - signal alanı senin ÖNERİN: net risk yoksa ve firma köklü/aktif görünüyorsa
+              "guclu"; veri az veya karışıksa "incelenmeli"; doğrulanmış ciddi risk
+              varsa "riskli". Nihai kararı sistem verecek.
+            - customers/suppliers/projects/growthSignals: kaynaklarda açıkça geçen
+              isimleri/olayları kısa madde olarak yaz. Yoksa boş dizi.
+
+            Tüm metin alanlarını Türkçe yaz.
+            """;
+    }
 
     private static readonly object StringArray = new { type = "array", items = new { type = "string" } };
 

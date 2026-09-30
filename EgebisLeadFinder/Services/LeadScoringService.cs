@@ -24,8 +24,11 @@ public class LeadScoringService
     /// ICP'ye uyup uymadigi (IcpMatch) hesaplanir. ICP bossa sabit agirliklarla eski davranis.
     /// </summary>
     public ScoreBreakdown ScoreCompany(CompanyAnalysis? analysis, ScrapedSite? site, IEnumerable<Contact>? contacts,
-        IcpProfile? icp, Company? company)
+        IcpProfile? icp, Company? company, FitContext? fit = null)
     {
+        // "Biz ne arıyoruz?" profili tanimliysa ve analiz uygunluk puani verdiyse, Egebis'e ozel
+        // SAP/uretici puanlari yerine yapay zekanin uygunluk puani kullanilir.
+        var useFit = fit is { Active: true } && analysis?.FitScore is not null;
         var breakdown = new ScoreBreakdown();
         var useIcp = icp is { IsActive: true };
         bool industryOk = true, locationOk = true, sizeOk = true, manufacturerOk = true;
@@ -49,20 +52,25 @@ public class LeadScoringService
             // bolca getirdigi icin bu eleme kritik.
             if (!analysis.Potential)
             {
-                breakdown.Disqualify(analysis.Reason ?? "Egebis için hedef müşteri değil");
+                breakdown.Disqualify(analysis.Reason ?? (fit is { Active: true } ? "Hedef müşteri tanımımıza uymuyor" : "Egebis için hedef müşteri değil"));
                 return breakdown;
             }
 
             // SAP hizmeti satan firmalar Egebis'in rakibi, musterisi degil.
             if (analysis.SapVendor)
             {
-                breakdown.Disqualify("SAP hizmeti satan firma (rakip)");
+                breakdown.Disqualify(fit is { Active: true } ? "Rakip firma (bizimle aynı işi yapıyor)" : "SAP hizmeti satan firma (rakip)");
                 return breakdown;
             }
 
+            if (useFit)
+            {
+                var fitScore = Math.Clamp(analysis.FitScore!.Value, 0, 100);
+                breakdown.Add($"Uygunluk (yapay zekâ): %{fitScore}", FitPoints(fitScore));
+            }
             // SAP puani yalnizca ureticilere verilir: SAP'tan soz eden bir yazilim
             // veya danismanlik sitesi bu puani almamali.
-            if (analysis.Manufacturer)
+            else if (analysis.Manufacturer)
             {
                 if (analysis.UsesSap)
                     breakdown.Add("SAP kullanımı doğrulandı", _options.SapFound);
@@ -124,8 +132,14 @@ public class LeadScoringService
 
         var contactList = contacts?.ToList() ?? new List<Contact>();
 
+        if (fit is { Active: true, TargetTitles.Count: > 0 })
+        {
+            // Profil modunda "dogru kisi": Ayarlar/segment hedef unvanlarindan birini tasiyan kisi.
+            if (contactList.Any(c => fit.TargetTitles.Any(t => TurkishText.ContainsWord(c.Title, t))))
+                breakdown.Add("Hedef unvanda kişi bulundu", _options.ItManagerFound);
+        }
         // IT/SAP tarafinda muhatap bulmak dogrudan satis avantajidir.
-        if (contactList.Any(c => c.TitleScore >= 80))
+        else if (contactList.Any(c => c.TitleScore >= 80))
             breakdown.Add("IT/SAP yöneticisi bulundu", _options.ItManagerFound);
 
         var hasEmail = contactList.Any(c => !string.IsNullOrWhiteSpace(c.Email))
@@ -135,6 +149,10 @@ public class LeadScoringService
 
         return breakdown;
     }
+
+    /// <summary>Uygunluk puaninin karsiligi: eski SAP + uretici puanlarinin toplami kadar agirlik.</summary>
+    public int FitPoints(int fitScore) =>
+        (int)Math.Round((_options.SapFound + _options.Manufacturer) * Math.Clamp(fitScore, 0, 100) / 100.0);
 
     /// <summary>
     /// Unvana gore kisi onceligi. AI #2 yerine kod (dokuman bolum 25).
@@ -224,4 +242,13 @@ public class ScoreBreakdown
 
     /// <summary>AI analizi yapilamadigini isaretler ve puani tavanla sinirlar.</summary>
     public void MarkUnverified() => Unverified = true;
+}
+
+/// <summary>
+/// "Biz ne arıyoruz?" puanlama baglami: profil tanimliysa (Active) uygunluk puani ve hedef unvanlar
+/// kullanilir. Bos/pasifse puanlama eski (Egebis) kurallariyla yapilir.
+/// </summary>
+public record FitContext(bool Active, IReadOnlyList<string> TargetTitles)
+{
+    public static readonly FitContext Inactive = new(false, Array.Empty<string>());
 }

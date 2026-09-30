@@ -75,6 +75,9 @@ public static class SettingKeys
     /// <summary>Ideal musteri profili (IcpProfile) JSON olarak.</summary>
     public const string IcpProfile = "Icp:Profile";
 
+    /// <summary>"Biz ne arıyoruz?" sirket profili (BusinessProfile) JSON olarak.</summary>
+    public const string BusinessProfile = "Business:Profile";
+
     // --- E-posta gonderimi (SMTP). Anahtarlar appsettings "Smtp" bolumuyle ayni:
     // ekranda bos birakilirsa yapilandirmadaki degere dusulur. ---
     public const string SmtpFromAddress = "Smtp:FromAddress";
@@ -145,7 +148,7 @@ public static class SettingKeys
     public static readonly string[] All =
     {
         LeadTitleKeywords, SerperApiKey, GeminiApiKey, GeminiModel, ApolloApiKey, SerperCreditLimit,
-        GeminiCostPerCallTry, LastKnownUsdTryRate, SearchMaxCompanies, SearchDefaultCountry, SearchRegion, FollowUpAfterDays, IcpProfile, ExtraBlockedDomains,
+        GeminiCostPerCallTry, LastKnownUsdTryRate, SearchMaxCompanies, SearchDefaultCountry, SearchRegion, FollowUpAfterDays, IcpProfile, BusinessProfile, ExtraBlockedDomains,
         SmtpFromAddress, SmtpFromName, SmtpHost, SmtpPort, SmtpUsername, SmtpPassword, SmtpSecurity,
         SalesforceConsumerKey, SalesforceConsumerSecret, SalesforceUsername, SalesforcePassword,
         SalesforceSecurityToken, SalesforceLoginUrl, SalesforceRefreshToken, SalesforceInstanceUrl,

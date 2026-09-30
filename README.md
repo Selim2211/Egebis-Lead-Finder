@@ -50,6 +50,9 @@ Canlıya çıkarken `cp .env.example .env` yapıp `POSTGRES_PASSWORD`'u değişt
 - Tablolar uygulama açılırken otomatik kurulur/güncellenir (elle migration gerekmez).
 - API anahtarları (Serper, Gemini, Apollo), SMTP, IMAP ve Salesforce bilgileri uygulamadaki
   **Ayarlar** ekranından girilir ve veritabanında saklanır.
+- Kurulumdan sonra üst menüdeki **🎯 Biz ne arıyoruz?** ekranında şirketin ne sattığı, ideal müşterisi ve
+  hedef segmentleri tanımlanır (site adresi yazılınca yapay zekâ taslak doldurur). Yapay zekâ analizi, akıllı arama,
+  uygunluk puanı ve mail yazımı bu tanıma göre çalışır; boş bırakılırsa eski Egebis (SAP/MES) tanımı geçerlidir.
 - Sağlık kontrolü: `http://SUNUCU_IP:8091/health`
 - Güncelleme: `git pull && docker compose up -d --build`
 - Loglar: `docker compose logs -f app`

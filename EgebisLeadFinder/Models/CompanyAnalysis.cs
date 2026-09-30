@@ -50,6 +50,14 @@ public class CompanyAnalysis
     [JsonPropertyName("reason")]
     public string? Reason { get; set; }
 
+    /// <summary>"Biz ne arıyoruz?" profiline uygunluk, 0-100 (profil bossa gelmez).</summary>
+    [JsonPropertyName("fitScore")]
+    public int? FitScore { get; set; }
+
+    /// <summary>Firmanin uydugu hedef segmentin adi (profildeki segmentlerden biri) veya bos.</summary>
+    [JsonPropertyName("segment")]
+    public string? Segment { get; set; }
+
     /// <summary>EmailTemplate.Key ile eslesir.</summary>
     [JsonPropertyName("recommendedTemplate")]
     public string? RecommendedTemplate { get; set; }

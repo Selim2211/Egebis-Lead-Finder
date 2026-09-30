@@ -1,0 +1,388 @@
+@model BusinessProfileForm
+@using EgebisLeadFinder.Data
+@{
+    ViewData["Title"] = "Biz ne arıyoruz?";
+    var isAdmin = User.IsInRole(nameof(UserRole.Admin));
+}
+
+@functions {
+    // Tek segment karti: kayitli segmentler ve "Segment ekle" sablonu ayni isaretlemeyi kullanir.
+    private async Task RenderRegionOptions(string? selected)
+    {
+        <option value="" selected="@string.IsNullOrEmpty(selected)">Ayarlar'daki bölge</option>
+        foreach (var g in SearchRegions.Grouped())
+        {
+            <optgroup label="@g.Key">
+                @foreach (var r in g)
+                {
+                    <option value="@r.Key" selected="@(r.Key == selected)">@r.Name</option>
+                }
+            </optgroup>
+        }
+    }
+}
+
+<div class="page-head">
+    <div>
+        <h1>🎯 Biz ne arıyoruz?</h1>
+        <div class="page-sub">Şirketinizi ve hedef müşterinizi tanıtın; yapay zekâ bulduğu firmaları bu tanıma göre değerlendirir, mailleri buna göre yazar</div>
+    </div>
+    @if (Model.UpdatedAt is DateTime updated)
+    {
+        <div class="small text-muted-2 text-end">
+            Son güncelleme: @updated.ToLocalTime().ToString("dd.MM.yyyy HH:mm")@(Model.UpdatedBy is null ? "" : " · " + Model.UpdatedBy)
+        </div>
+    }
+</div>
+
+@if (TempData["ProfileSaved"] is string saved)
+{
+    <div class="alert alert-success" data-flash="success">@saved</div>
+}
+
+@if (!Model.IsConfigured)
+{
+    <div class="alert alert-warning">
+        <strong>Şirket profili henüz tanımlı değil.</strong>
+        Şu an yapay zekâ varsayılan (Egebis — SAP/MES) tanımıyla çalışıyor.
+        @if (isAdmin)
+        {
+            <span>Aşağıya sitenizin adresini yazıp <strong>Sitemizden doldur</strong> deyin, taslağı düzeltip kaydedin.</span>
+        }
+        else
+        {
+            <span>Tanımı yönetici yapabilir.</span>
+        }
+    </div>
+}
+
+<div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+
+@if (isAdmin)
+{
+    <div class="card bp-autofill mb-4">
+        <div class="card-body">
+            <div class="bp-autofill-row">
+                <div class="bp-autofill-text">
+                    <div class="fw-semibold">✨ Sitemizden otomatik doldur</div>
+                    <div class="small text-muted-2">Yapay zekâ sitenizi okur; ne sattığınızı, ideal müşterinizi, segmentleri ve hedef unvanları taslak olarak doldurur. Kaydetmeden önce düzeltebilirsiniz.</div>
+                </div>
+                <form class="bp-autofill-form" id="draftForm" asp-action="Draft" method="post">
+                    @Html.AntiForgeryToken()
+                    <input class="form-control" name="website" id="draftWebsite" value="@Model.Website"
+                           placeholder="ornek.com" autocomplete="off" maxlength="300" required />
+                    <button type="submit" class="btn btn-accent text-nowrap" id="draftButton">Sitemizden doldur</button>
+                </form>
+            </div>
+            <div class="small mt-2" id="draftStatus" role="status"></div>
+        </div>
+    </div>
+}
+
+<form method="post" asp-action="Index" id="profileForm">
+    @Html.AntiForgeryToken()
+    <fieldset disabled="@(!isAdmin)">
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <div class="card mb-4">
+                    <div class="card-header">Şirketimiz</div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="CompanyName">Şirket adı</label>
+                                <input class="form-control" asp-for="CompanyName" maxlength="150" placeholder="Egebis Bilişim" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="Website">Web sitesi</label>
+                                <input class="form-control" asp-for="Website" maxlength="300" placeholder="egebis.com" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="Offering">Ne satıyoruz? *</label>
+                                <textarea class="form-control" asp-for="Offering" rows="3" maxlength="2000"
+                                          placeholder="Üretici firmalara SAP danışmanlığı, SAP entegrasyonu, MES/üretim takip yazılımı"></textarea>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="ProblemsWeSolve">Hangi sorunu çözüyoruz?</label>
+                                <textarea class="form-control" asp-for="ProblemsWeSolve" rows="2" maxlength="2000"
+                                          placeholder="Üretim planlama, stok ve maliyet takibi, sistemler arası entegrasyon"></textarea>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="IdealCustomer">İdeal müşterimiz *</label>
+                                <textarea class="form-control" asp-for="IdealCustomer" rows="3" maxlength="2000"
+                                          placeholder="50-1000 çalışanlı, kendi üretimini yapan fabrikalar; SAP kullanan veya ERP'ye geçecek firmalar"></textarea>
+                                <div class="form-text">Ne kadar somut olursa (sektör, büyüklük, özellik) firmalar o kadar isabetli elenir.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="NotCustomers">Kimler müşterimiz DEĞİL</label>
+                                <textarea class="form-control" asp-for="NotCustomers" rows="3" maxlength="2000"
+                                          placeholder="Bayi, distribütör, perakende, dernek, haber sitesi"></textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="Competitors">Rakiplerimiz</label>
+                                <textarea class="form-control" asp-for="Competitors" rows="3" maxlength="2000"
+                                          placeholder="SAP danışmanlık firmaları, ERP yazılım evleri"></textarea>
+                                <div class="form-text">Rakip çıkan firmalar "Elendi" olur.</div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="ExampleCustomers">Örnek mevcut müşteriler</label>
+                                <input class="form-control" asp-for="ExampleCustomers" placeholder="Firma adı veya sitesi, virgülle ayırın" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="card mb-4">
+                    <div class="card-header">Kime ulaşalım?</div>
+                    <div class="card-body">
+                        <label class="form-label" for="TargetTitles">Hedef unvanlar</label>
+                        <textarea class="form-control" asp-for="TargetTitles" rows="4"
+                                  placeholder="Genel Müdür, IT Müdürü, CIO, Üretim Müdürü"></textarea>
+                        <div class="form-text">Apollo ve site taramasında bu unvanlardaki kişiler aranır (Ayarlar'daki "lead unvanları" ile aynı liste). Virgülle ayırın.</div>
+                    </div>
+                </div>
+
+                <div class="card bp-help mb-4">
+                    <div class="card-body small">
+                        <div class="fw-semibold mb-1">Bu tanım nerede kullanılır?</div>
+                        <ul class="mb-0 ps-3">
+                            <li>Firma analizinde: firma <em>ideal müşterimize</em> uyuyor mu, rakip mi, neden uygun?</li>
+                            <li>Detaylı araştırma raporunda: bizim için satış fırsatları.</li>
+                            <li>Yapay zekâ ile yazılan maillerde: gönderen şirket ve anlatılan hizmet.</li>
+                            <li>Firma Ara ekranında: segment düğmeleriyle tek tıkla arama.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                <span>Hedef segmentler <span class="text-muted-2 small fw-normal" id="segmentCount">@Model.Segments.Count / @BusinessProfile.MaxSegments</span></span>
+                @if (isAdmin)
+                {
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="addSegment">+ Segment ekle</button>
+                }
+            </div>
+            <div class="card-body">
+                <div class="small text-muted-2 mb-3">
+                    Farklı ürün grupları veya müşteri kitleleri için ayrı segment tanımlayın (ör. "Otomotiv yan sanayi", "Gıda üreticileri").
+                    Her segment Firma Ara ekranında bir düğme olarak çıkar.
+                </div>
+                <div class="bp-segments" id="segmentList">
+                    @for (var i = 0; i < Model.Segments.Count; i++)
+                    {
+                        var s = Model.Segments[i];
+                        <div class="bp-segment">
+                            <input type="hidden" data-field="Id" value="@s.Id" />
+                            <div class="bp-segment-head">
+                                <input class="form-control fw-semibold" data-field="Name" value="@s.Name" placeholder="Segment adı" maxlength="100" required />
+                                @if (isAdmin)
+                                {
+                                    <button type="button" class="btn btn-sm btn-link text-danger bp-remove" title="Segmenti kaldır" aria-label="Segmenti kaldır">✕</button>
+                                }
+                            </div>
+                            <textarea class="form-control form-control-sm mt-2" data-field="Description" rows="2" maxlength="1000"
+                                      placeholder="Bu segmentte kime, neyi, neden satıyoruz?">@s.Description</textarea>
+                            <div class="row g-2 mt-1">
+                                <div class="col-md-6">
+                                    <label class="form-label small mb-0">Arama terimi</label>
+                                    <input class="form-control form-control-sm" data-field="SearchTerm" value="@s.SearchTerm" maxlength="150" placeholder="Otomotiv yan sanayi" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small mb-0">Bölge</label>
+                                    <select class="form-select form-select-sm" data-field="RegionKey">@{ await RenderRegionOptions(s.RegionKey); }</select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small mb-0">Sektör kelimeleri</label>
+                                    <input class="form-control form-control-sm" data-field="Keywords" value="@s.Keywords" placeholder="otomotiv, yedek parça" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small mb-0">NACE kodları</label>
+                                    <input class="form-control form-control-sm" data-field="NaceCodes" value="@s.NaceCodes" placeholder="29, 22.29" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small mb-0">Elenecek kelimeler</label>
+                                    <input class="form-control form-control-sm" data-field="ExcludeKeywords" value="@s.ExcludeKeywords" placeholder="bayi, servis" />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small mb-0">Bu segmentte ulaşılacak unvanlar</label>
+                                    <input class="form-control form-control-sm" data-field="TargetTitles" value="@s.TargetTitles" placeholder="Kalite Müdürü, Üretim Müdürü (boşsa genel unvanlar)" />
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="text-muted-2 small" id="segmentEmpty" hidden="@(Model.Segments.Count > 0 ? "hidden" : null)">Henüz segment yok.</div>
+            </div>
+        </div>
+
+        @if (isAdmin)
+        {
+            <div class="bp-actions">
+                <label class="form-check">
+                    <input class="form-check-input" type="checkbox" asp-for="ApplyToIcp" />
+                    <span class="form-check-label">Segmentlerdeki NACE kodlarını, sektör ve eleme kelimelerini <a asp-controller="Icp" asp-action="Index">ICP'ye</a> de ekle</span>
+                </label>
+                <button type="submit" class="btn btn-accent px-4">Kaydet</button>
+            </div>
+        }
+    </fieldset>
+</form>
+
+@if (isAdmin)
+{
+    <template id="segmentTemplate">
+        <div class="bp-segment">
+            <input type="hidden" data-field="Id" value="" />
+            <div class="bp-segment-head">
+                <input class="form-control fw-semibold" data-field="Name" placeholder="Segment adı" maxlength="100" required />
+                <button type="button" class="btn btn-sm btn-link text-danger bp-remove" title="Segmenti kaldır" aria-label="Segmenti kaldır">✕</button>
+            </div>
+            <textarea class="form-control form-control-sm mt-2" data-field="Description" rows="2" maxlength="1000"
+                      placeholder="Bu segmentte kime, neyi, neden satıyoruz?"></textarea>
+            <div class="row g-2 mt-1">
+                <div class="col-md-6">
+                    <label class="form-label small mb-0">Arama terimi</label>
+                    <input class="form-control form-control-sm" data-field="SearchTerm" maxlength="150" placeholder="Otomotiv yan sanayi" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small mb-0">Bölge</label>
+                    <select class="form-select form-select-sm" data-field="RegionKey">@{ await RenderRegionOptions(null); }</select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small mb-0">Sektör kelimeleri</label>
+                    <input class="form-control form-control-sm" data-field="Keywords" placeholder="otomotiv, yedek parça" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small mb-0">NACE kodları</label>
+                    <input class="form-control form-control-sm" data-field="NaceCodes" placeholder="29, 22.29" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small mb-0">Elenecek kelimeler</label>
+                    <input class="form-control form-control-sm" data-field="ExcludeKeywords" placeholder="bayi, servis" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label small mb-0">Bu segmentte ulaşılacak unvanlar</label>
+                    <input class="form-control form-control-sm" data-field="TargetTitles" placeholder="Kalite Müdürü, Üretim Müdürü (boşsa genel unvanlar)" />
+                </div>
+            </div>
+        </div>
+    </template>
+}
+
+@section Scripts {
+@if (isAdmin)
+{
+    <script>
+        (function () {
+            var max = @BusinessProfile.MaxSegments;
+            var list = document.getElementById('segmentList');
+            var tpl = document.getElementById('segmentTemplate');
+            var addBtn = document.getElementById('addSegment');
+            var countLabel = document.getElementById('segmentCount');
+            var empty = document.getElementById('segmentEmpty');
+            var form = document.getElementById('profileForm');
+
+            function segments() { return list.querySelectorAll('.bp-segment'); }
+
+            function refresh() {
+                var n = segments().length;
+                countLabel.textContent = n + ' / ' + max;
+                addBtn.disabled = n >= max;
+                empty.hidden = n > 0;
+            }
+
+            function bindRemove(seg) {
+                seg.querySelector('.bp-remove').addEventListener('click', function () { seg.remove(); refresh(); });
+            }
+
+            function addSegment(data) {
+                if (segments().length >= max) return null;
+                var seg = tpl.content.firstElementChild.cloneNode(true);
+                if (data) {
+                    seg.querySelectorAll('[data-field]').forEach(function (el) {
+                        var key = el.getAttribute('data-field');
+                        var map = { Id: 'id', Name: 'name', Description: 'description', SearchTerm: 'searchTerm', RegionKey: 'region', Keywords: 'keywords', NaceCodes: 'nace', ExcludeKeywords: 'exclude', TargetTitles: 'titles' };
+                        var v = data[map[key]];
+                        if (v !== undefined && v !== null) el.value = v;
+                    });
+                }
+                list.appendChild(seg);
+                bindRemove(seg);
+                refresh();
+                return seg;
+            }
+
+            segments().forEach(bindRemove);
+            addBtn.addEventListener('click', function () {
+                var seg = addSegment(null);
+                if (seg) seg.querySelector('[data-field="Name"]').focus();
+            });
+            refresh();
+
+            // Gonderirken segment alanlarina sirali model adlari verilir (Segments[0].Name ...).
+            form.addEventListener('submit', function () {
+                segments().forEach(function (seg, i) {
+                    seg.querySelectorAll('[data-field]').forEach(function (el) {
+                        el.name = 'Segments[' + i + '].' + el.getAttribute('data-field');
+                    });
+                });
+            });
+
+            // Sitemizden doldur: taslak formu doldurur, kaydetmez.
+            var draftForm = document.getElementById('draftForm');
+            var draftBtn = document.getElementById('draftButton');
+            var status = document.getElementById('draftStatus');
+
+            function setField(id, value) {
+                var el = document.getElementById(id);
+                if (el && value) el.value = value;
+            }
+
+            draftForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var hasContent = document.getElementById('Offering').value.trim() || segments().length;
+                if (hasContent && !confirm('Formdaki mevcut bilgiler yapay zekâ taslağıyla değiştirilecek (kaydetmeden önce düzeltebilirsiniz). Devam edilsin mi?')) return;
+
+                draftBtn.disabled = true;
+                var label = draftBtn.textContent;
+                draftBtn.textContent = 'Site okunuyor…';
+                status.className = 'small mt-2 text-muted-2';
+                status.textContent = 'Siteniz okunup yapay zekâ ile özetleniyor; 15-40 saniye sürebilir.';
+
+                fetch(draftForm.action, { method: 'POST', body: new FormData(draftForm), headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(function (r) { if (!r.ok) throw new Error('Sunucu hatası (' + r.status + ')'); return r.json(); })
+                    .then(function (res) {
+                        if (!res.ok) throw new Error(res.error || 'Taslak çıkarılamadı.');
+                        var p = res.profile;
+                        setField('CompanyName', p.companyName);
+                        setField('Website', p.website);
+                        setField('Offering', p.offering);
+                        setField('ProblemsWeSolve', p.problems);
+                        setField('IdealCustomer', p.idealCustomer);
+                        setField('NotCustomers', p.notCustomers);
+                        setField('Competitors', p.competitors);
+                        setField('ExampleCustomers', p.exampleCustomers);
+                        setField('TargetTitles', res.titles);
+                        if (p.segments && p.segments.length) {
+                            segments().forEach(function (s) { s.remove(); });
+                            p.segments.forEach(function (s) { addSegment(s); });
+                        }
+                        status.className = 'small mt-2 text-success';
+                        status.textContent = 'Taslak dolduruldu (' + (p.segments ? p.segments.length : 0) + ' segment). Kontrol edip düzeltin, ardından Kaydet\'e basın.';
+                    })
+                    .catch(function (err) {
+                        status.className = 'small mt-2 text-danger';
+                        status.textContent = err.message;
+                    })
+                    .finally(function () {
+                        draftBtn.disabled = false;
+                        draftBtn.textContent = label;
+                    });
+            });
+        })();
+    </script>
+}
+}

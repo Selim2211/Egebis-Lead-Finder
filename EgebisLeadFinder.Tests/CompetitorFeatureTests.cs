@@ -45,7 +45,7 @@ public class CompetitorFeatureTests
 
         using var wb = new XLWorkbook(new MemoryStream(bytes));
         Assert.Equal("Haksan", wb.Worksheet("Firmalar").Cell(2, 1).GetString());
-        Assert.Equal("22.19", wb.Worksheet("Firmalar").Cell(2, 6).GetString());
+        Assert.Equal("22.19", wb.Worksheet("Firmalar").Cell(2, 7).GetString());
         Assert.Equal("Geçerli", wb.Worksheet("Kişiler").Cell(2, 5).GetString());
     }
 

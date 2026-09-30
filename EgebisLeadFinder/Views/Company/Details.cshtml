@@ -98,6 +98,22 @@
                 }
                 else
                 {
+                    @if (Model.Company.FitScore is int fitScore)
+                    {
+                        <div class="fit-box mb-3 @FitDisplay.Css(fitScore)">
+                            <div class="fit-box-head">
+                                <span class="fit-box-label">Bize uygunluk</span>
+                                <span class="fit-box-value">%@fitScore</span>
+                                <span class="fit-box-level">@FitDisplay.Label(fitScore)</span>
+                            </div>
+                            <div class="fit-bar" role="img" aria-label="Uygunluk yüzde @fitScore"><span style="width:@(fitScore)%"></span></div>
+                            @if (Model.Company.FitSegment is not null)
+                            {
+                                <div class="fit-box-segment">🎯 Segment: <strong>@Model.Company.FitSegment</strong></div>
+                            }
+                        </div>
+                    }
+
                     <div class="d-flex flex-wrap gap-2 mb-3">
                         <span class="tag @sapCss">@sapLabel</span>
                         @if (analysis.Manufacturer)
@@ -259,7 +275,7 @@
                             {
                                 <form method="post" asp-action="RevealContactEmail" asp-route-id="@Model.Company.Id"
                                       asp-route-contactId="@contact.Id" class="m-0 reveal-email-form"
-                                      data-confirm="Kişinin e-postası Apollo'dan açılacak; bunun için 1 kredi harcanır."
+                                      data-confirm="@(Model.Company.FitScore is int lowFit && lowFit < FitDisplay.LowThreshold ? $"Dikkat: bu firmanın bize uygunluğu düşük (%{lowFit}). " : "")Kişinin e-postası Apollo'dan açılacak; bunun için 1 kredi harcanır."
                                       data-confirm-title="E-posta getirilsin mi?" data-confirm-subject="@PersonDisplay.DisplayName(contact)"
                                       data-confirm-ok="1 kredi harca ve getir" data-confirm-tone="credit">
                                     @Html.AntiForgeryToken()
@@ -277,6 +293,8 @@
     </div>
 
     <div class="col-lg-5">
+        <partial name="_LocationCard" model="Model.Company" />
+
         <div class="card mb-4" data-tab="ozet">
             <div class="card-header">Puan Dökümü</div>
             <div class="card-body">
@@ -417,6 +435,26 @@
 </div>
 
 @section Scripts {
+<script>
+    (function () {
+        // Konum karti: adres duzenleme ve kopyalama.
+        var form = document.getElementById('locEditForm');
+        document.querySelectorAll('.loc-edit-toggle').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                form.hidden = !form.hidden;
+                btn.setAttribute('aria-expanded', form.hidden ? 'false' : 'true');
+                if (!form.hidden) document.getElementById('locAddressInput').focus();
+            });
+        });
+        var copy = document.getElementById('locCopy');
+        if (copy) copy.addEventListener('click', function () {
+            var label = copy.querySelector('span');
+            var done = function (text) { label.textContent = text; setTimeout(function () { label.textContent = 'Adresi kopyala'; }, 1800); };
+            if (!navigator.clipboard) { done('Kopyalanamadı'); return; }
+            navigator.clipboard.writeText(copy.getAttribute('data-copy')).then(function () { done('Kopyalandı ✓'); }, function () { done('Kopyalanamadı'); });
+        });
+    })();
+</script>
 <script>
     // Sekmeler: kartlar data-tab ile isaretli, secim adres cubugunda (#) tutulur.
     (function () {

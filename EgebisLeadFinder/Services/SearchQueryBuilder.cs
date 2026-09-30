@@ -40,6 +40,15 @@ public static class SearchQueryBuilder
         var country = string.IsNullOrWhiteSpace(c.Country) ? region.Country : c.Country.Trim();
         var queries = new List<string>();
 
+        // Akilli aramada yapay zekanin onerdigi ek terimler de denenir. Her kalip once tum
+        // terimlerle kurulur: kayit hedefi erken dolarsa bile aday cesitliligi korunur.
+        var terms = c.SearchTerms
+            .Select(t => t.Trim())
+            .Where(t => t.Length > 0)
+            .Prepend(industry)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         foreach (var city in cities)
         {
             // Haritalar'da sehir tek basina yeterli; web aramasinda ulke de eklenir.
@@ -48,7 +57,8 @@ public static class SearchQueryBuilder
                 : places ? city : $"{city} {country}";
 
             foreach (var template in templates)
-                queries.Add(string.Format(template, industry, location));
+                foreach (var term in terms)
+                    queries.Add(string.Format(template, term, location));
 
             if (!places && !string.IsNullOrWhiteSpace(c.TargetPosition))
                 queries.Add($"\"{c.TargetPosition}\" \"{industry}\" {location}");

@@ -35,6 +35,21 @@ public class Company
     [MaxLength(100)]
     public string? Country { get; set; }
 
+    /// <summary>Acik adres (Google Haritalar kaydindan veya elle). Firma detayindaki harita bunu kullanir.</summary>
+    [MaxLength(300)]
+    public string? Address { get; set; }
+
+    /// <summary>Sirket profiline uygunluk (0-100, yapay zeka). Profil tanimli degilken bos.</summary>
+    public int? FitScore { get; set; }
+
+    /// <summary>Firmanin uydugu "Biz ne arıyoruz?" segmenti.</summary>
+    [MaxLength(100)]
+    public string? FitSegment { get; set; }
+
+    /// <summary>Yapay zekanin kisa gerekcesi: neden uygun / neden uygun degil.</summary>
+    [MaxLength(500)]
+    public string? FitReason { get; set; }
+
     public string? Description { get; set; }
 
     /// <summary>AI analizinin ham JSON ciktisi (jsonb).</summary>

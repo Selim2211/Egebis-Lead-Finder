@@ -1,0 +1,101 @@
+@model Company
+@{
+    var location = CompanyLocation.For(Model);
+}
+
+@* Firma konumu: Google Haritalar onizlemesi; haritaya tiklayinca Google Haritalar yeni sekmede acilir. *@
+<div class="card loc-card mb-4" data-tab="ozet">
+    <div class="card-header d-flex justify-content-between align-items-center gap-2">
+        <span class="d-inline-flex align-items-center gap-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" />
+            </svg>
+            Konum
+        </span>
+        @if (location is not null)
+        {
+            <a class="loc-open-link" href="@location.OpenUrl" target="_blank" rel="noopener noreferrer">
+                Google Haritalar'da aç
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7" /><path d="M8 7h9v9" /></svg>
+            </a>
+        }
+    </div>
+
+    @if (TempData["LocationSaved"] is string saved)
+    {
+        <div class="alert alert-success small m-3 mb-0 py-2">@saved</div>
+    }
+
+    @if (location is not null)
+    {
+        <a class="loc-map" href="@location.OpenUrl" target="_blank" rel="noopener noreferrer"
+           aria-label="@Model.Name konumunu Google Haritalar'da aç">
+            <iframe src="@location.EmbedUrl" loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+                    title="@Model.Name harita önizlemesi" tabindex="-1" aria-hidden="true"></iframe>
+            <span class="loc-map-shade" aria-hidden="true"></span>
+            <span class="loc-map-cta">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" /><path d="M15 5.764v15" /><path d="M9 3.236v15" />
+                </svg>
+                Haritada aç
+            </span>
+        </a>
+    }
+
+    <div class="card-body loc-body">
+        @if (location is not null)
+        {
+            <div class="loc-address">
+                <span class="loc-pin" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" /></svg>
+                </span>
+                <div class="min-w-0">
+                    <div class="loc-address-text" id="locAddressText">@location.Label</div>
+                    @if (!location.IsExact)
+                    {
+                        <div class="loc-approx">Yaklaşık konum · açık adres yok, firma adı ve şehirle aranıyor</div>
+                    }
+                </div>
+            </div>
+
+            <div class="loc-actions">
+                <a class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1" href="@location.DirectionsUrl" target="_blank" rel="noopener noreferrer">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 11 19-9-9 19-2-8-8-2z" /></svg>
+                    Yol tarifi
+                </a>
+                <button type="button" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" id="locCopy"
+                        data-copy="@(location.IsExact ? location.Label : location.Query)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                    <span>Adresi kopyala</span>
+                </button>
+                <button type="button" class="btn btn-sm btn-link loc-edit-toggle" aria-expanded="false" aria-controls="locEditForm">
+                    @(location.IsExact ? "Düzenle" : "Adres ekle")
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="loc-empty">
+                <div class="loc-empty-icon" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>
+                </div>
+                <div>
+                    <div class="fw-semibold">Konum bilgisi yok</div>
+                    <div class="small text-muted-2">Adres ekleyin; harita ve yol tarifi burada görünsün.</div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary ms-auto loc-edit-toggle" aria-expanded="false" aria-controls="locEditForm">Adres ekle</button>
+            </div>
+        }
+
+        <form method="post" asp-action="UpdateAddress" asp-route-id="@Model.Id" class="loc-edit" id="locEditForm" hidden>
+            @Html.AntiForgeryToken()
+            <label class="form-label small mb-1" for="locAddressInput">Açık adres</label>
+            <div class="d-flex gap-2">
+                <input class="form-control form-control-sm" id="locAddressInput" name="address" value="@Model.Address" maxlength="300"
+                       placeholder="Mahalle, cadde, no, ilçe / şehir" autocomplete="off" />
+                <button type="submit" class="btn btn-sm btn-accent">Kaydet</button>
+            </div>
+            <div class="form-text">Boş bırakıp kaydederseniz harita firma adı ve şehirle arar.</div>
+        </form>
+    </div>
+</div>

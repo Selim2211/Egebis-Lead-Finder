@@ -100,6 +100,10 @@ public class CompanyListViewModel
     public bool NotEvaluated { get; set; }
     public int NotEvaluatedCount { get; set; }
 
+    /// <summary>Secili "Biz ne arıyoruz?" segmenti (Company.FitSegment) ve segment basina firma sayisi.</summary>
+    public string? Segment { get; set; }
+    public Dictionary<string, int> SegmentCounts { get; set; } = new();
+
     public List<Company> Companies { get; set; } = new();
     public string? Search { get; set; }
     public int MinScore { get; set; }

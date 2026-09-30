@@ -179,6 +179,10 @@ builder.Services.AddScoped<IEmailWriterAi>(sp => (IEmailWriterAi)sp.GetRequiredS
 builder.Services.AddScoped<EmailDraftService>();
 builder.Services.AddScoped<INaceClassifierAi>(sp => (INaceClassifierAi)sp.GetRequiredService<IAiService>());
 builder.Services.AddScoped<IcpService>();
+builder.Services.AddScoped<IBusinessProfileAi>(sp => (IBusinessProfileAi)sp.GetRequiredService<IAiService>());
+builder.Services.AddScoped<BusinessProfileService>();
+builder.Services.AddScoped<ISearchPlannerAi>(sp => (ISearchPlannerAi)sp.GetRequiredService<IAiService>());
+builder.Services.AddScoped<SearchPlanService>();
 builder.Services.AddScoped<EgebisLeadFinder.Services.Sequences.SequenceService>();
 builder.Services.AddScoped<EgebisLeadFinder.Services.Sequences.ReplyDetectionService>();
 builder.Services.AddHostedService<EgebisLeadFinder.Services.Sequences.SequenceSenderWorker>();

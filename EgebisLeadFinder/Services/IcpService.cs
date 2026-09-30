@@ -25,6 +25,7 @@ public class IcpService
     private readonly ApplicationDbContext _db;
     private readonly INaceClassifierAi _naceAi;
     private IcpProfile? _cached;
+    private (BusinessProfile Profile, FitContext Fit)? _fitCached;
 
     public IcpService(ISettingsService settings, LeadScoringService scoring, ApplicationDbContext db, INaceClassifierAi naceAi)
     {
@@ -123,11 +124,34 @@ public class IcpService
         _cached = profile;
     }
 
+    /// <summary>"Biz ne arıyoruz?" profili ve puanlama baglami (profil + hedef unvanlar), ornek basina bir kez okunur.</summary>
+    public async Task<(BusinessProfile Profile, FitContext Fit)> GetFitAsync(CancellationToken ct = default)
+    {
+        if (_fitCached is { } cached) return cached;
+        var profile = BusinessProfileService.Parse(await _settings.GetAsync(SettingKeys.BusinessProfile, ct));
+        var fit = profile.IsConfigured
+            ? new FitContext(true, (await _settings.GetTitleKeywordsAsync(ct))
+                .Concat(profile.Segments.SelectMany(s => s.TargetTitles))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList())
+            : FitContext.Inactive;
+        _fitCached = (profile, fit);
+        return _fitCached.Value;
+    }
+
+    /// <summary>Kaydetmeden puan dokumu (firma detayi icin).</summary>
+    public async Task<ScoreBreakdown> BreakdownAsync(Company company, CompanyAnalysis? analysis, CancellationToken ct = default)
+    {
+        var (_, fit) = await GetFitAsync(ct);
+        return _scoring.ScoreCompany(analysis, site: null, company.Contacts, await GetAsync(ct), company, fit);
+    }
+
     /// <summary>Firmanin puanini, ICP uyumunu ve NACE kodunu gunceller (kaydetmez).</summary>
     public async Task<ScoreBreakdown> ScoreAsync(Company company, CompanyAnalysis? analysis, ScrapedSite? site, CancellationToken ct = default)
     {
         var icp = await GetAsync(ct);
-        var breakdown = _scoring.ScoreCompany(analysis, site, company.Contacts, icp, company);
+        var (profile, fit) = await GetFitAsync(ct);
+        var breakdown = _scoring.ScoreCompany(analysis, site, company.Contacts, icp, company, fit);
+        ApplyFit(company, analysis, profile);
 
         company.Score = breakdown.Total;
         company.IcpMatch = breakdown.IcpMatch;
@@ -155,6 +179,26 @@ public class IcpService
         return breakdown;
     }
 
+    /// <summary>Analizden uygunluk puani, segment ve gerekceyi firmaya yazar.</summary>
+    public static void ApplyFit(Company company, CompanyAnalysis? analysis, BusinessProfile profile)
+    {
+        if (analysis is null) return;
+
+        var reason = analysis.Reason?.Trim();
+        company.FitReason = string.IsNullOrEmpty(reason) ? null : reason.Length > 500 ? reason[..500] : reason;
+
+        if (profile.IsConfigured && analysis.FitScore is int score)
+        {
+            company.FitScore = analysis.Potential && !analysis.SapVendor ? Math.Clamp(score, 0, 100) : Math.Min(Math.Clamp(score, 0, 100), 19);
+            company.FitSegment = analysis.Potential ? profile.FindSegment(analysis.Segment)?.Name : null;
+        }
+        else
+        {
+            company.FitScore = null;
+            company.FitSegment = null;
+        }
+    }
+
     /// <summary>Tum firmalari kayitli AI analizi ve kisilerle yeniden puanlar (API/kredi harcamaz).</summary>
     public async Task<int> RescoreAllAsync(CancellationToken ct = default)
     {
@@ -168,9 +212,9 @@ public class IcpService
 
             foreach (var company in companies)
             {
-                var before = (company.Score, company.IcpMatch, company.NaceCode);
+                var before = (company.Score, company.IcpMatch, company.NaceCode, company.FitSegment);
                 await ScoreAsync(company, CompanyController.ParseAnalysis(company.AiAnalysis), site: null, ct);
-                if (before != (company.Score, company.IcpMatch, company.NaceCode)) changed++;
+                if (before != (company.Score, company.IcpMatch, company.NaceCode, company.FitSegment)) changed++;
             }
 
             await _db.SaveChangesAsync(ct);

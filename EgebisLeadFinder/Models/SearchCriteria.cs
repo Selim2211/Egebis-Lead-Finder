@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+
 namespace EgebisLeadFinder.Models;
 
 /// <summary>Firma Arama ekranindan gelen kriterler.</summary>
@@ -35,6 +37,32 @@ public class SearchCriteria
     public string? CompanyName { get; set; }
 
     public bool IsNameSearch => !string.IsNullOrWhiteSpace(CompanyName);
+
+    /// <summary>Firma Ara'da tiklanan "Biz ne arıyoruz?" segmenti (BusinessProfile.Segments[].Id).</summary>
+    public string? SegmentId { get; set; }
+
+    /// <summary>
+    /// Akilli arama: yapay zeka sektore/segmente gore ek arama terimleri onerir ve
+    /// siteler okunmadan once hedef disi adaylari eler (bkz. SearchPlanService).
+    /// </summary>
+    public bool SmartSearch { get; set; } = true;
+
+    /// <summary>
+    /// Sorgu kaliplarinda sektor yerine kullanilacak terimler. Formdan gelmez; SearchPlanService
+    /// doldurur. Bossa yalnizca Industry kullanilir.
+    /// </summary>
+    [BindNever]
+    public List<string> SearchTerms { get; set; } = new();
+
+    /// <summary>
+    /// Aramada toplanacak aday sayisi. On eleme yapilacaksa MaxCompanies'den biraz fazla
+    /// toplanir ki elenenlerin yerine aday kalsin. Bossa MaxCompanies.
+    /// </summary>
+    [BindNever]
+    public int? CollectTarget { get; set; }
+
+    [BindNever]
+    public int EffectiveCollectTarget => Math.Max(CollectTarget ?? MaxCompanies, MaxCompanies);
 }
 
 /// <summary>Search API'den donen tek bir sonuc.</summary>

@@ -1,5 +1,6 @@
 @inject EgebisLeadFinder.Data.ApplicationDbContext LayoutDb
 @inject EgebisLeadFinder.Services.UsageService LayoutUsage
+@inject EgebisLeadFinder.Services.ISettingsService LayoutSettings
 @{
     var controller = ViewContext.RouteData.Values["controller"]?.ToString();
     var action = ViewContext.RouteData.Values["action"]?.ToString();
@@ -26,6 +27,19 @@
     catch
     {
         // Rozet kozmetik; veritabani sorunu sayfayi dusurmemeli.
+    }
+
+    // "Biz ne arıyoruz?" tanimlanmadiysa menudeki dugmede uyari noktasi.
+    var profileConfigured = true;
+    try
+    {
+        if (signedIn)
+            profileConfigured = EgebisLeadFinder.Services.BusinessProfileService
+                .Parse(await LayoutSettings.GetAsync(SettingKeys.BusinessProfile)).IsConfigured;
+    }
+    catch
+    {
+        // Kozmetik.
     }
 
     // API kotasi %80'i gecen saglayici varsa menude uyari noktasi.
@@ -113,6 +127,18 @@
                     </li>
                 </ul>
                 <ul class="navbar-nav mt-2 mt-lg-0 align-items-lg-center gap-lg-2">
+                    <li class="nav-item">
+                        <a class="nav-target @(controller == "BusinessProfile" ? "active" : "")"
+                           asp-controller="BusinessProfile" asp-action="Index"
+                           title="@(profileConfigured ? "Biz ne arıyoruz? — şirket profili ve hedef segmentler" : "Şirket profili tanımlı değil — yapay zekâ varsayılan tanımla çalışıyor")">
+                            <span class="nav-target-icon" aria-hidden="true">🎯</span>
+                            <span class="nav-target-label">Biz ne arıyoruz?</span>
+                            @if (!profileConfigured)
+                            {
+                                <span class="nav-alert-dot is-warning" aria-label="Tanımlı değil"></span>
+                            }
+                        </a>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link nav-link-icon nav-usage @(controller == "Usage" ? "active" : "")"
                            asp-controller="Usage" asp-action="Index"

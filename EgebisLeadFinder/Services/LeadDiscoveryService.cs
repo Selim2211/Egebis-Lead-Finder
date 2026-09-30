@@ -18,6 +18,7 @@ public class LeadDiscoveryService
     private readonly IAiService _ai;
     private readonly LeadScoringService _scoring;
     private readonly IcpService _icp;
+    private readonly SearchPlanService? _plans;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly PipelineOptions _options;
     private readonly ILogger<LeadDiscoveryService> _logger;
@@ -30,9 +31,11 @@ public class LeadDiscoveryService
         IServiceScopeFactory scopeFactory,
         IOptions<PipelineOptions> options,
         ILogger<LeadDiscoveryService> logger,
-        IcpService icp)
+        IcpService icp,
+        SearchPlanService? plans = null)
     {
         _icp = icp;
+        _plans = plans;
         _search = search;
         _scraper = scraper;
         _ai = ai;
@@ -54,6 +57,21 @@ public class LeadDiscoveryService
 
         progress?.Report(new JobStep(3, "Arama sorguları hazırlanıyor"));
 
+        // Akilli arama: yapay zeka ek terimler onerir (bolgenin dilinde), toplama hedefi on eleme payi kadar artar.
+        SearchPlan plan;
+        try
+        {
+            plan = _plans is null ? new SearchPlan { Terms = { criteria.Industry } } : await _plans.PrepareAsync(criteria, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            result.Cancelled = true;
+            return result;
+        }
+        if (plan.Terms.Count > 1) result.SearchTerms = plan.Terms;
+        result.SegmentName = plan.Segment?.Name;
+        if (plan.Note is not null) result.Warning = plan.Note;
+
         List<SearchResult> searchResults;
         try
         {
@@ -62,7 +80,7 @@ public class LeadDiscoveryService
         catch (SearchProviderException ex) when (ex.Partial.Count > 0)
         {
             searchResults = ex.Partial;
-            result.Warning = $"{ex.Message} Bulunabilen {ex.Partial.Count} firma ile devam edildi.";
+            result.Warning = Join(result.Warning, $"{ex.Message} Bulunabilen {ex.Partial.Count} firma ile devam edildi.");
         }
         catch (Exception ex) when (ex is SearchProviderException or QuotaExceededException)
         {
@@ -88,6 +106,37 @@ public class LeadDiscoveryService
 
         var toProcess = searchResults.Where(r => !knownDomains.Contains(r.Domain)).ToList();
         result.AlreadyKnown = searchResults.Count - toProcess.Count;
+
+        // On eleme: siteleri okumadan once hedef disi adaylar (bayi, rehber, haber, rakip...) ayiklanir.
+        // Kayitli firmalar zaten degerlendirilmis oldugundan yalnizca yeni adaylar elenir.
+        if (_plans is not null && toProcess.Count > 0)
+        {
+            progress?.Report(new JobStep(9, "Ön eleme yapılıyor", $"{toProcess.Count} aday arama bilgisiyle değerlendiriliyor"));
+            try
+            {
+                var screen = await _plans.ScreenAsync(toProcess, criteria, plan, ct);
+                toProcess = screen.Kept;
+                result.PreFiltered = screen.Dropped;
+                if (screen.Warning is not null) result.Warning = Join(result.Warning, screen.Warning);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                result.Cancelled = true;
+                return result;
+            }
+        }
+
+        // Fazladan toplanan (on eleme payi) adaylar: kalan en iyi adaylarla asil limite inilir.
+        // Kayitli firma sayisi yalnizca ilk MaxCompanies sonuc icinden sayilir; fazladan toplama yeni firma kotasini daraltmasin.
+        var knownInLimit = searchResults.Take(criteria.MaxCompanies).Count(r => knownDomains.Contains(r.Domain));
+        var room = Math.Max(0, criteria.MaxCompanies - knownInLimit);
+        if (toProcess.Count > room)
+        {
+            result.OverLimit = toProcess.Count - room;
+            toProcess = toProcess.Take(room).ToList();
+        }
+        if (result.PreFiltered.Count > 0 || result.OverLimit > 0)
+            result.FoundBySearch = result.AlreadyKnown + result.PreFiltered.Count + toProcess.Count;
 
         // Hedef siteleri de kendimizi de yormamak icin es zamanli istek sayisi sinirli.
         using var throttle = new SemaphoreSlim(_options.MaxParallelism);
@@ -189,6 +238,20 @@ public class LeadDiscoveryService
                 .ToListAsync(ct)
             : new List<Company>();
 
+        // Kayitli firmanin adresi yoksa bu aramada Haritalar'dan gelen adresle tamamlanir (firma detayindaki harita icin).
+        var addresses = searchResults
+            .Where(r => !string.IsNullOrWhiteSpace(r.Address))
+            .GroupBy(r => r.Domain, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Address!.Trim(), StringComparer.OrdinalIgnoreCase);
+        var filled = 0;
+        foreach (var known in previouslyKnown.Where(c => c.Address is null && c.Domain is not null))
+        {
+            if (!addresses.TryGetValue(known.Domain!, out var address)) continue;
+            known.Address = address.Length > 300 ? address[..300].TrimEnd() : address;
+            filled++;
+        }
+        if (filled > 0) await db.SaveChangesAsync(ct);
+
         // Kaydedilenler + zaten kayitli olanlar. Cakisma nedeniyle eklenmeyen
         // kayitlar listeye girmez; onlarin veritabanindaki hali previouslyKnown
         // icinde zaten var. Ayni domain iki kez listelenmemeli.
@@ -206,6 +269,9 @@ public class LeadDiscoveryService
         return result;
     }
 
+    private static string Join(string? first, string second) =>
+        string.IsNullOrWhiteSpace(first) ? second : $"{first} {second}";
+
     private async Task<Company> ProcessCompanyAsync(SearchResult searchResult, SearchCriteria criteria, CancellationToken ct)
     {
         var company = new Company
@@ -216,7 +282,8 @@ public class LeadDiscoveryService
             Description = searchResult.Snippet,
             Industry = criteria.Industry,
             City = CompanyCityResolver.Resolve(searchResult, criteria.City),
-            Country = criteria.Country
+            Country = criteria.Country,
+            Address = string.IsNullOrWhiteSpace(searchResult.Address) ? null : searchResult.Address.Trim()
         };
 
         try
@@ -365,4 +432,16 @@ public class DiscoveryResult
 
     /// <summary>Arama durmadi ama kismen etkilendi (ör. kota bir kisim sorgudan sonra doldu).</summary>
     public string? Warning { get; set; }
+
+    /// <summary>Akilli aramada kullanilan terimler (ilk: kullanicinin yazdigi).</summary>
+    public List<string> SearchTerms { get; set; } = new();
+
+    /// <summary>Firma Ara'da secilen "Biz ne arıyoruz?" segmenti.</summary>
+    public string? SegmentName { get; set; }
+
+    /// <summary>Siteleri okunmadan elenen adaylar ve nedenleri.</summary>
+    public List<ScreenedOut> PreFiltered { get; set; } = new();
+
+    /// <summary>On eleme payi icin fazladan toplanip limit nedeniyle islenmeyen aday sayisi.</summary>
+    public int OverLimit { get; set; }
 }

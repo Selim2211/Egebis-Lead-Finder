@@ -53,6 +53,10 @@ public class HybridContactEnrichmentService : IContactEnrichmentService
             // Ayarlardaki unvanlar hem Apollo sorgusunu hem LinkedIn aday elemesini belirler.
             var keywords = await _settings.GetTitleKeywordsAsync(ct);
 
+            // Firma bir "Biz ne arıyoruz?" segmentine uyuyorsa o segmentin unvanlari one alinir.
+            keywords = SegmentTitlesFirst(company,
+                BusinessProfileService.Parse(await _settings.GetAsync(SettingKeys.BusinessProfile, ct)), keywords);
+
             var fromApollo = await SearchWithApolloAsync(company, keywords, ct);
             if (fromApollo.Count > 0)
                 return new EnrichmentResult { Contacts = fromApollo };
@@ -72,6 +76,13 @@ public class HybridContactEnrichmentService : IContactEnrichmentService
             _logger.LogWarning(ex, "Zenginleştirme başarısız: {Company}", company.Name);
             return EnrichmentResult.Failed(ex.Message);
         }
+    }
+
+    public static List<string> SegmentTitlesFirst(Company company, BusinessProfile profile, List<string> general)
+    {
+        var segment = profile.IsConfigured ? profile.FindSegment(company.FitSegment) : null;
+        if (segment is null || segment.TargetTitles.Count == 0) return general;
+        return segment.TargetTitles.Concat(general).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     /// <summary>

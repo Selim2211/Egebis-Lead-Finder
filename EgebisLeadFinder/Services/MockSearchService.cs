@@ -19,7 +19,7 @@ public class MockSearchService : ISearchService
     public Task<List<SearchResult>> SearchCompaniesAsync(SearchCriteria criteria, CancellationToken ct = default)
     {
         var results = SampleDomains
-            .Take(criteria.MaxCompanies)
+            .Take(criteria.EffectiveCollectTarget)
             .Select(d => new SearchResult
             {
                 Domain = d,

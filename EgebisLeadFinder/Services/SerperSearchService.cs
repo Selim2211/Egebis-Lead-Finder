@@ -106,7 +106,7 @@ public class SerperSearchService : ISearchService
                 await CollectFromPlacesAsync(criteria, found, apiKey, ct);
 
             // Haritalar hedefi dolduramadiysa organik arama ile tamamla.
-            if (found.Count < criteria.MaxCompanies)
+            if (found.Count < criteria.EffectiveCollectTarget)
                 await CollectFromOrganicAsync(criteria, found, apiKey, ct);
         }
         catch (Exception ex) when (ex is SearchProviderException or QuotaExceededException && found.Count > 0)
@@ -229,7 +229,7 @@ public class SerperSearchService : ISearchService
         {
             for (var page = 1; page <= _options.PlacesPagesPerQuery; page++)
             {
-                if (found.Count >= criteria.MaxCompanies) return;
+                if (found.Count >= criteria.EffectiveCollectTarget) return;
                 ct.ThrowIfCancellationRequested();
 
                 try
@@ -268,7 +268,7 @@ public class SerperSearchService : ISearchService
                             Category = place.Category
                         };
 
-                        if (found.Count >= criteria.MaxCompanies) return;
+                        if (found.Count >= criteria.EffectiveCollectTarget) return;
                     }
                 }
                 catch (Exception ex) when (IsQueryLocal(ex))
@@ -289,7 +289,7 @@ public class SerperSearchService : ISearchService
 
         foreach (var query in queries)
         {
-            if (found.Count >= criteria.MaxCompanies) return;
+            if (found.Count >= criteria.EffectiveCollectTarget) return;
             ct.ThrowIfCancellationRequested();
 
             try
@@ -311,7 +311,7 @@ public class SerperSearchService : ISearchService
                         Snippet = organic.Snippet
                     };
 
-                    if (found.Count >= criteria.MaxCompanies) return;
+                    if (found.Count >= criteria.EffectiveCollectTarget) return;
                 }
             }
             catch (Exception ex) when (IsQueryLocal(ex))

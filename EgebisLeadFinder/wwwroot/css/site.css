@@ -4449,3 +4449,112 @@ a.pager-btn:hover { border-color: var(--eg-mailed-border); background: var(--eg-
 .run-picker-empty { padding: .6rem; font-size: .85rem; color: var(--eg-text-muted); }
 .run-tag { font-size: .68rem; margin-left: .3rem; vertical-align: middle; }
 .stage-chip.chip-unknown.is-active { background: var(--eg-warning-bg); border-color: #fcd34d; color: #92400e; }
+
+/* "Biz ne arıyoruz?" — ust menudeki renkli dugme */
+.nav-target { position: relative; display: inline-flex; align-items: center; gap: .4rem; padding: .38rem .85rem; border-radius: 999px;
+    font-size: .88rem; font-weight: 600; color: #fff; text-decoration: none; white-space: nowrap;
+    background: linear-gradient(135deg, #f59e0b 0%, #ec4899 55%, #8b5cf6 100%); box-shadow: 0 2px 10px rgba(236, 72, 153, .35);
+    transition: transform .15s ease, box-shadow .15s ease; }
+.nav-target:hover, .nav-target:focus-visible { color: #fff; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(236, 72, 153, .5); }
+.nav-target.active { box-shadow: 0 0 0 2px rgba(255, 255, 255, .85), 0 2px 10px rgba(236, 72, 153, .35); }
+.nav-target-icon { font-size: 1rem; line-height: 1; }
+.nav-target .nav-alert-dot { position: absolute; top: -2px; right: -2px; margin: 0; width: .6rem; height: .6rem; box-shadow: 0 0 0 2px var(--eg-navy-900); }
+@media (max-width: 991.98px) { .nav-target { margin: .35rem 0; align-self: flex-start; } }
+@media (min-width: 992px) and (max-width: 1199.98px) { .nav-target-label { display: none; } .nav-target { padding: .38rem .6rem; } }
+
+/* Sirket profili ekrani */
+.bp-autofill { border: 1px solid transparent; background:
+    linear-gradient(var(--eg-surface), var(--eg-surface)) padding-box,
+    linear-gradient(135deg, #f59e0b, #ec4899, #8b5cf6) border-box; }
+.bp-autofill-row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.bp-autofill-text { flex: 1 1 18rem; }
+.bp-autofill-form { display: flex; gap: .5rem; flex: 1 1 22rem; }
+.bp-segments { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr)); gap: 1rem; }
+.bp-segment { border: 1px solid var(--eg-border); border-radius: var(--eg-radius-sm); padding: .85rem; background: var(--eg-surface-alt); }
+.bp-segment-head { display: flex; gap: .4rem; align-items: center; }
+.bp-actions { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem; }
+.bp-help ul li + li { margin-top: .2rem; }
+
+/* Firma Ara: segment dugmeleri */
+.segment-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+.segment-chip { border: 1px solid var(--eg-border-strong); background: var(--eg-surface); color: var(--eg-text); border-radius: 999px;
+    padding: .25rem .7rem; font-size: .82rem; cursor: pointer; }
+.segment-chip:hover { border-color: #ec4899; }
+.segment-chip.is-active { border-color: #ec4899; background: rgba(236, 72, 153, .1); color: var(--eg-text); }
+
+/* Firma Ara: akilli arama */
+.smart-toggle { display: flex; gap: .6rem; align-items: flex-start; padding: .6rem .75rem; border-radius: var(--eg-radius-sm);
+    border: 1px solid transparent; cursor: pointer; background:
+    linear-gradient(var(--eg-surface-alt), var(--eg-surface-alt)) padding-box,
+    linear-gradient(135deg, #f59e0b, #ec4899, #8b5cf6) border-box; }
+.smart-toggle .form-check-input { margin-top: .2rem; flex-shrink: 0; }
+.search-terms { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+.search-terms-label { font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--eg-text-muted); margin-right: .15rem; }
+.search-terms-label:not(:first-child) { margin-left: .6rem; }
+.prefilter-list { border-top: 1px solid var(--eg-border); padding: .75rem 1rem; font-size: .9rem; }
+.prefilter-list > summary { cursor: pointer; font-weight: 600; color: var(--eg-text-muted); margin-bottom: .25rem; }
+.prefilter-list li { padding: .2rem 0; }
+
+/* Firma detayi: konum karti (Google Haritalar onizlemesi) */
+.loc-card { overflow: hidden; }
+.loc-open-link { display: inline-flex; align-items: center; gap: .25rem; font-size: .8rem; font-weight: 600; text-decoration: none; }
+.loc-open-link:hover { text-decoration: underline; }
+.loc-map { position: relative; display: block; height: 220px; overflow: hidden; background: var(--eg-surface-alt);
+    border-bottom: 1px solid var(--eg-border); isolation: isolate; }
+.loc-map iframe { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); border: 0; pointer-events: none;
+    transform: scale(1.02); transition: transform .5s cubic-bezier(.2, .7, .2, 1), filter .3s ease; }
+.loc-map:hover iframe, .loc-map:focus-visible iframe { transform: scale(1.07); }
+.loc-map-shade { position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: linear-gradient(180deg, rgba(11, 28, 51, 0) 55%, rgba(11, 28, 51, .45) 100%);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .04); }
+.loc-map-cta { position: absolute; z-index: 2; right: .75rem; bottom: .75rem; display: inline-flex; align-items: center; gap: .4rem;
+    padding: .38rem .75rem; border-radius: 999px; font-size: .8rem; font-weight: 600; color: var(--eg-navy-800);
+    background: rgba(255, 255, 255, .92); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 4px 14px rgba(11, 28, 51, .25); transition: transform .2s ease, box-shadow .2s ease; }
+.loc-map:hover .loc-map-cta, .loc-map:focus-visible .loc-map-cta { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(11, 28, 51, .35); }
+.loc-map:focus-visible { outline: 3px solid var(--eg-amber-500); outline-offset: -3px; }
+.loc-body { display: flex; flex-direction: column; gap: .85rem; }
+.loc-address { display: flex; gap: .65rem; align-items: flex-start; }
+.loc-pin { flex-shrink: 0; display: inline-grid; place-items: center; width: 2rem; height: 2rem; border-radius: 10px; color: #fff;
+    background: linear-gradient(135deg, #ef4444, #f97316); box-shadow: 0 3px 10px rgba(239, 68, 68, .35); }
+.loc-address .min-w-0 { min-width: 0; }
+.loc-address-text { font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.loc-approx { font-size: .78rem; color: var(--eg-warning); margin-top: .15rem; }
+.loc-actions { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; }
+.loc-actions .loc-edit-toggle { margin-left: auto; padding-left: .25rem; padding-right: .25rem; }
+.loc-empty { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+.loc-empty-icon { display: inline-grid; place-items: center; width: 2.6rem; height: 2.6rem; border-radius: 12px;
+    background: var(--eg-surface-alt); color: var(--eg-text-muted); border: 1px dashed var(--eg-border-strong); }
+.loc-edit { border-top: 1px dashed var(--eg-border); padding-top: .75rem; }
+[data-theme="dark"] .loc-map iframe { filter: invert(.9) hue-rotate(180deg) saturate(.85) brightness(.95); }
+[data-theme="dark"] .loc-map-cta { background: rgba(22, 32, 58, .9); color: var(--eg-text); }
+@media (max-width: 575.98px) { .loc-map { height: 180px; } .loc-actions .loc-edit-toggle { margin-left: 0; } }
+
+
+/* 3. asama: uygunluk puani, segment, neden */
+.fit-chip { font-weight: 600; }
+.fit-chip.fit-high { background: var(--eg-success-bg); color: var(--eg-success); border-color: transparent; }
+.fit-chip.fit-good { background: rgba(8, 145, 178, .1); color: var(--eg-info); border-color: transparent; }
+.fit-chip.fit-mid { background: var(--eg-warning-bg); color: var(--eg-warning); border-color: transparent; }
+.fit-chip.fit-low { background: var(--eg-danger-bg); color: var(--eg-danger); border-color: transparent; }
+.meta-chip-segment { background: rgba(236, 72, 153, .1); color: #be185d; border-color: transparent; }
+[data-theme="dark"] .meta-chip-segment { color: #f9a8d4; }
+.company-card-reason { margin-top: .55rem; font-size: .8rem; line-height: 1.4; color: var(--eg-text-muted);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.stage-chip.chip-segment.is-active { background: rgba(236, 72, 153, .12); border-color: #f9a8d4; color: #be185d; }
+.fit-box { border: 1px solid var(--eg-border); border-radius: var(--eg-radius-sm); padding: .75rem .9rem; background: var(--eg-surface-alt); }
+.fit-box-head { display: flex; align-items: baseline; gap: .6rem; }
+.fit-box-label { font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--eg-text-muted); }
+.fit-box-value { font-size: 1.5rem; font-weight: 800; line-height: 1; }
+.fit-box-level { margin-left: auto; font-size: .82rem; font-weight: 600; }
+.fit-bar { height: 8px; border-radius: 999px; background: var(--eg-border); overflow: hidden; margin-top: .55rem; }
+.fit-bar > span { display: block; height: 100%; border-radius: inherit; transition: width .6s ease; }
+.fit-box.fit-high .fit-bar > span { background: linear-gradient(90deg, #10b981, #059669); }
+.fit-box.fit-good .fit-bar > span { background: linear-gradient(90deg, #22d3ee, #0891b2); }
+.fit-box.fit-mid .fit-bar > span { background: linear-gradient(90deg, #fbbf24, #d97706); }
+.fit-box.fit-low .fit-bar > span { background: linear-gradient(90deg, #f87171, #dc2626); }
+.fit-box.fit-high .fit-box-level { color: var(--eg-success); }
+.fit-box.fit-good .fit-box-level { color: var(--eg-info); }
+.fit-box.fit-mid .fit-box-level { color: var(--eg-warning); }
+.fit-box.fit-low .fit-box-level { color: var(--eg-danger); }
+.fit-box-segment { margin-top: .5rem; font-size: .85rem; }

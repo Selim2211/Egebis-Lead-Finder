@@ -23,7 +23,7 @@ public static class ExportService
         var firms = new ExportTable("Firmalar",
             new[]
             {
-                "Firma", "Web sitesi", "Şehir", "Ülke", "Sektör", "NACE", "Puan", "Sinyal", "Aşama",
+                "Firma", "Web sitesi", "Adres", "Şehir", "Ülke", "Sektör", "NACE", "Puan", "Uygunluk (%)", "Segment", "Neden", "Sinyal", "Aşama",
                 "Kişi sayısı", "Lead sayısı", "AI özeti", "Satış önerisi", "Eklenme"
             },
             list.Select(c =>
@@ -32,7 +32,8 @@ public static class ExportService
                 var analysis = Parse<CompanyAnalysis>(c.AiAnalysis);
                 return new object?[]
                 {
-                    c.Name, c.Website, c.City, c.Country, analysis?.Industry ?? c.Industry, c.NaceCode, c.Score,
+                    c.Name, c.Website, c.Address, c.City, c.Country, analysis?.Industry ?? c.Industry, c.NaceCode, c.Score,
+                    c.FitScore, c.FitSegment, c.FitReason,
                     RatingSignalDisplay.HasSignal(c.RatingSignal) ? RatingSignalDisplay.Label(c.RatingSignal) : null,
                     SalesforceRecordMapper.StageLabel(c), c.Contacts.Count, c.Leads.Count,
                     rating?.Summary ?? analysis?.Reason, rating?.SalesApproach, c.CreatedAt.ToLocalTime()

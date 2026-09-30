@@ -7,7 +7,9 @@
 # (veritabani sifresi: egebis_dev). Canliya cikarken .env.example'i .env olarak
 # kopyalayip sifreyi degistirin. Veritabani portu disari acik degildir.
 #
-# Veritabani tablolari uygulama acilirken otomatik kurulur/guncellenir.
+# Veritabani tablolari uygulama acilirken otomatik kurulur/guncellenir (yeni surumlerde
+# de: git pull && docker compose up -d --build yeterli, elle migration gerekmez).
+# Ilk acilista yonetici hesabi kurulum ekraninda olusturulur.
 # API anahtarlari (Serper, Gemini, Apollo), SMTP ve Salesforce ayarlari uygulamadaki
 # Ayarlar ekranindan girilir ve veritabaninda saklanir.
 

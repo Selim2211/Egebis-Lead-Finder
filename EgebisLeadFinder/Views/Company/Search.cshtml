@@ -1,5 +1,6 @@
 @model CompanySearchViewModel
 @using EgebisLeadFinder.Data
+@inject EgebisLeadFinder.Services.ISettingsService SearchSettings
 @{
     ViewData["Title"] = "Firma Ara";
 
@@ -15,6 +16,10 @@
     var selRegion = SearchRegions.IsKnown(Model.Criteria.RegionKey)
         ? SearchRegions.Get(Model.Criteria.RegionKey)
         : Model.Region;
+
+    // "Biz ne arıyoruz?" segmentleri: tek tikla sektor + bolge doldurur.
+    var segments = EgebisLeadFinder.Services.BusinessProfileService
+        .Parse(await SearchSettings.GetAsync(SettingKeys.BusinessProfile)).Segments;
 }
 
 <div class="page-head">
@@ -91,6 +96,27 @@
                     <input type="hidden" name="Criteria.RegionKey" class="region-sync" value="@selRegion.Key" />
 
                     <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-baseline gap-2 mb-1">
+                            <span class="form-label mb-0">Hedef segmentlerimiz</span>
+                            <a class="small" asp-controller="BusinessProfile" asp-action="Index">@(segments.Count == 0 ? "🎯 Segment tanımla" : "Düzenle")</a>
+                        </div>
+                        @if (segments.Count > 0)
+                        {
+                            <div class="segment-chips" id="segmentChips">
+                                @foreach (var seg in segments)
+                                {
+                                    <button type="button" class="segment-chip @(seg.Id == Model.Criteria.SegmentId ? "is-active" : "")" data-id="@seg.Id" data-term="@seg.EffectiveSearchTerm" data-region="@seg.RegionKey"
+                                            title="@(seg.Description ?? seg.Name)">@seg.Name</button>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="small text-muted-2">Şirket profilinde segment tanımlarsanız burada tek tıkla arama düğmeleri çıkar.</div>
+                        }
+                    </div>
+
+                    <div class="mb-3">
                         <label class="form-label" for="basicIndustry">Sektör *</label>
                         <input class="form-control" id="basicIndustry" name="Criteria.Industry" list="industryOptions"
                                value="@Model.Criteria.Industry" placeholder="Otomotiv" required />
@@ -120,6 +146,16 @@
                         <div><span class="search-scope-label">Sonuç</span> en fazla @Model.MaxCompanies firma, skoru en yüksekten sıralı</div>
                         <a class="small" asp-controller="Settings" asp-action="Index">Varsayılanı Ayarlar'dan değiştir</a>
                     </div>
+
+                    <input type="hidden" name="Criteria.SegmentId" class="segment-sync" value="@Model.Criteria.SegmentId" />
+                    <input type="hidden" name="Criteria.SmartSearch" class="smart-sync" value="@(Model.Criteria.SmartSearch ? "true" : "false")" />
+                    <label class="smart-toggle mb-3" title="Yapay zekâ, sektöre ve şirket profilinize göre ek arama terimleri üretir; siteleri okumadan önce bayi, rehber, haber sitesi, rakip gibi hedef dışı adayları eler.">
+                        <input class="form-check-input" type="checkbox" id="smartSearchToggle" checked="@Model.Criteria.SmartSearch" />
+                        <span>
+                            <strong>Akıllı arama</strong>
+                            <span class="d-block small text-muted-2">Ek arama terimleri + siteye girmeden ön eleme (1-2 Gemini çağrısı)</span>
+                        </span>
+                    </label>
 
                     <button type="submit" class="btn btn-accent w-100 mb-2" id="searchButton">
                         FİRMA ARA
@@ -198,7 +234,33 @@
                                  style="font-size:1.7rem">@result.Failed</div>
                             <div class="stat-label">hatalı</div>
                         </div>
+                        @if (result.PreFiltered.Count > 0)
+                        {
+                            <div class="col">
+                                <div class="stat-value" style="font-size:1.7rem">@result.PreFiltered.Count</div>
+                                <div class="stat-label">ön elemede elendi</div>
+                            </div>
+                        }
                     </div>
+
+                    @if (result.SearchTerms.Count > 1 || result.SegmentName is not null)
+                    {
+                        <div class="search-terms mb-3">
+                            @if (result.SegmentName is not null)
+                            {
+                                <span class="search-terms-label">Segment</span>
+                                <span class="segment-chip is-active">@result.SegmentName</span>
+                            }
+                            @if (result.SearchTerms.Count > 1)
+                            {
+                                <span class="search-terms-label">Arama terimleri</span>
+                                @foreach (var term in result.SearchTerms)
+                                {
+                                    <span class="tag tag-muted">@term</span>
+                                }
+                            }
+                        </div>
+                    }
 
                     @if (result.Companies.Count == 0 && result.AbortReason is null && !result.Cancelled)
                     {
@@ -249,6 +311,27 @@
                             </tbody>
                         </table>
                     </div>
+                }
+
+                @if (result.PreFiltered.Count > 0)
+                {
+                    <details class="prefilter-list">
+                        <summary>Siteye girmeden elenen @result.PreFiltered.Count aday — neden elendiklerini gör</summary>
+                        <div class="small text-muted-2 mb-2">
+                            Bu adayların siteleri okunmadı, kayıt açılmadı. Yanlışlıkla elenen bir firma varsa üstteki "Belirli bir firmayı bul" ile adıyla arayabilirsiniz.
+                        </div>
+                        <ul class="list-unstyled mb-0">
+                            @foreach (var d in result.PreFiltered)
+                            {
+                                <li>
+                                    <span class="fw-semibold">@d.Title</span>
+                                    <a class="small" href="https://@d.Domain" target="_blank" rel="noopener noreferrer">@d.Domain</a>
+                                    <span class="text-muted-2 small">— @d.Reason</span>
+                                    <span class="tag tag-muted run-tag">@d.Stage</span>
+                                </li>
+                            }
+                        </ul>
+                    </details>
                 }
 
                 @if (result.RunId is not null && result.Companies.Count > 0)
@@ -321,6 +404,8 @@
                         </div>
 
                         <input type="hidden" name="Criteria.ProfileId" id="advProfileId" value="" />
+                        <input type="hidden" name="Criteria.SegmentId" class="segment-sync" value="@Model.Criteria.SegmentId" />
+                        <input type="hidden" name="Criteria.SmartSearch" class="smart-sync" value="@(Model.Criteria.SmartSearch ? "true" : "false")" />
 
                         <div class="mb-4">
                             <label class="form-label" for="advProfileName">Arama profili adı</label>
@@ -490,6 +575,33 @@
             if (!basicRegion.hidden) basicRegion.focus();
         });
         basicRegion.addEventListener('change', function () { setRegion(basicRegion.value); });
+
+        // Segment dugmesi: sektoru ve (tanimliysa) bolgeyi doldurur.
+        // Sektor elle degistirilirse segment secimi kalkar (segment tanimi baska terimle aranmasin).
+        [document.getElementById('basicIndustry'), advIndustry].forEach(function (input) {
+            input.addEventListener('input', function () {
+                document.querySelectorAll('.segment-sync').forEach(function (i) { i.value = ''; });
+                document.querySelectorAll('#segmentChips .segment-chip').forEach(function (c) { c.classList.remove('is-active'); });
+            });
+        });
+
+        var smartToggle = document.getElementById('smartSearchToggle');
+        smartToggle.addEventListener('change', function () {
+            document.querySelectorAll('.smart-sync').forEach(function (i) { i.value = smartToggle.checked ? 'true' : 'false'; });
+        });
+
+        document.querySelectorAll('#segmentChips .segment-chip').forEach(function (chip) {
+            chip.addEventListener('click', function () {
+                var term = chip.getAttribute('data-term') || '';
+                document.getElementById('basicIndustry').value = term;
+                advIndustry.value = term;
+                var region = chip.getAttribute('data-region');
+                if (region) setRegion(region);
+                document.querySelectorAll('#segmentChips .segment-chip').forEach(function (c) { c.classList.toggle('is-active', c === chip); });
+                document.querySelectorAll('.segment-sync').forEach(function (i) { i.value = chip.getAttribute('data-id') || ''; });
+                basicButton.focus();
+            });
+        });
         advRegion.addEventListener('change', function () { setRegion(advRegion.value); });
 
         function selectedCities() {
