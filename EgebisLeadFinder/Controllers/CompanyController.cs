@@ -539,10 +539,28 @@ public class CompanyController : Controller
         sort = CompanySort.Options.Any(o => o.Key == sort) ? sort! : CompanySort.Default;
         nace = NaceCatalog.DivisionCode(nace);
         segment = string.IsNullOrWhiteSpace(segment) ? null : segment.Trim();
-        var runId = await ResolveRunAsync(fav ? run ?? "all" : run, profileId, ct);
+        // Favoriler suzgeci tum (gorunen) firmalar uzerinde calisir: cipteki sayi = listedeki firma.
+        var runId = await ResolveRunAsync(fav ? "all" : run, profileId, ct);
         var query = await FilterCompaniesAsync(search, minScore, onlyWithoutLead, profileId, stage, signal, geo, nace, icp, ct,
             runId, notEvaluated, segment, fav);
         var ordered = OrderCompanies(query, sort);
+
+        // Asama, ICP ve "incelenemedi" sayilari tek sorguda: secili aramanin icinden (secili degilse gorunen tum firmalar).
+        var counts = await ScopeToRun(_db.Companies.AsNoTracking(), runId)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                All = g.Count(),
+                Contacted = g.Count(c => c.ContactedAt != null),
+                Mailed = g.Count(c => c.EmailSentAt != null),
+                Project = g.Count(c => c.ProjectStartedAt != null),
+                Untouched = g.Count(c => c.ContactedAt == null && c.EmailSentAt == null && c.ProjectStartedAt == null),
+                Icp = g.Count(c => c.IcpMatch),
+                NotEvaluated = g.Count(c => c.EvaluationStatus == EvaluationStatus.NotEvaluated)
+            })
+            .FirstOrDefaultAsync(ct);
+        var me = User.UserId();
+        var isAdmin = User.IsAdmin();
 
         var total = await query.CountAsync(ct);
         page = PagerModel.Clamp(page, total);
@@ -565,19 +583,19 @@ public class CompanyController : Controller
         var runs = HttpContext.RequestServices.GetRequiredService<SearchRunService>();
         var model = new CompanyListViewModel
         {
-            Runs = await runs.RecentAsync(User.UserId(), User.IsAdmin(), 30, ct),
-            AllCount = await VisibleCompanies().CountAsync(ct),
+            Runs = await runs.RecentAsync(me, isAdmin, 30, ct),
+            AllCount = runId is null ? counts?.All ?? 0 : await VisibleCompanies().CountAsync(ct),
             RunId = runId,
             NotEvaluated = notEvaluated,
-            NotEvaluatedCount = await ScopeToRun(_db.Companies.AsNoTracking(), runId)
-                .CountAsync(c => c.EvaluationStatus == EvaluationStatus.NotEvaluated, ct),
+            NotEvaluatedCount = counts?.NotEvaluated ?? 0,
             Segment = segment,
             SegmentCounts = await ScopeToRun(_db.Companies.AsNoTracking(), runId)
                 .Where(c => c.FitSegment != null)
                 .GroupBy(c => c.FitSegment!)
                 .Select(g => new { g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.Key, x => x.Count, ct),
-            Pool = await PoolCountsAsync(ct),
+            // Havuz sayilari yalnizca yoneticinin "Tumunu sil" onayinda kullanilir.
+            Pool = isAdmin ? await PoolCountsAsync(ct) : null,
             Search = search,
             MinScore = minScore,
             OnlyWithoutLead = onlyWithoutLead,
@@ -591,7 +609,7 @@ public class CompanyController : Controller
                 .GroupBy(c => c.NaceCode!.Substring(0, 2))
                 .Select(g => new { g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.Key, x => x.Count, ct),
-            IcpCount = await ScopeToRun(_db.Companies.AsNoTracking(), runId).CountAsync(c => c.IcpMatch, ct),
+            IcpCount = counts?.Icp ?? 0,
             Sort = sort,
             Geo = geo,
             Pager = new PagerModel { Page = page, TotalItems = total },
@@ -608,10 +626,9 @@ public class CompanyController : Controller
 
         var favorites = HttpContext.RequestServices.GetRequiredService<FavoriteService>();
         model.Favorites = fav;
-        model.FavoriteIds = await favorites.FavoriteIdsAsync(User.UserId(), model.Companies.Select(c => c.Id), ct);
-        var me = User.UserId();
-        model.FavoriteCount = await ScopeToRun(_db.Companies.AsNoTracking(), runId)
-            .CountAsync(c => _db.FavoriteCompanies.Any(f => f.UserId == me && f.CompanyId == c.Id), ct);
+        model.FavoriteIds = await favorites.FavoriteIdsAsync(me, model.Companies.Select(c => c.Id), ct);
+        // Kendi favorileri her zaman gorunur firmalardandir (bkz. CompanyVisibility).
+        model.FavoriteCount = await _db.FavoriteCompanies.CountAsync(f => f.UserId == me, ct);
 
         if (runId is int rid)
         {
@@ -622,19 +639,6 @@ public class CompanyController : Controller
                 .Where(x => x.SearchRunId == rid && x.IsNew && pageIds.Contains(x.CompanyId))
                 .Select(x => x.CompanyId).ToListAsync(ct)).ToHashSet();
         }
-
-        // Asama sayilari secili aramanin icinden (arama secili degilse tum firmalar).
-        var counts = await ScopeToRun(_db.Companies.AsNoTracking(), runId)
-            .GroupBy(_ => 1)
-            .Select(g => new
-            {
-                All = g.Count(),
-                Contacted = g.Count(c => c.ContactedAt != null),
-                Mailed = g.Count(c => c.EmailSentAt != null),
-                Project = g.Count(c => c.ProjectStartedAt != null),
-                Untouched = g.Count(c => c.ContactedAt == null && c.EmailSentAt == null && c.ProjectStartedAt == null)
-            })
-            .FirstOrDefaultAsync(ct);
 
         if (counts is not null)
         {
@@ -657,7 +661,7 @@ public class CompanyController : Controller
         string? run = null, bool notEvaluated = false, string? segment = null, bool fav = false, CancellationToken ct = default)
     {
         var geo = GeoFilter.From(regions, cities, countries);
-        var runId = await ResolveRunAsync(fav ? run ?? "all" : run, profileId, ct);
+        var runId = await ResolveRunAsync(fav ? "all" : run, profileId, ct);
         segment = string.IsNullOrWhiteSpace(segment) ? null : segment.Trim();
         if (signal is not ("guclu" or "incelenmeli" or "riskli" or "none")) signal = null;
         sort = CompanySort.Options.Any(o => o.Key == sort) ? sort! : CompanySort.Default;
@@ -694,10 +698,7 @@ public class CompanyController : Controller
         return await runs.DefaultRunIdAsync(User.UserId(), ct);
     }
 
-    /// <summary>
-    /// "Tum firmalar": yonetici tum havuzu gorur; kullanici kendi aramalarinda bulunan firmalari ve
-    /// hicbir aramaya bagli olmayan eski kayitlari gorur (baskalarinin arama sonuclari gizli).
-    /// </summary>
+    /// <summary>"Tum firmalar": kullanicinin gorebildigi firmalar (bkz. CompanyVisibility).</summary>
     private IQueryable<Company> VisibleCompanies() => ScopeToRun(_db.Companies.AsNoTracking(), null);
 
     /// <summary>Secili aramanin firmalari; arama secili degilse kullanicinin gorebildigi tum firmalar.</summary>
@@ -705,11 +706,7 @@ public class CompanyController : Controller
     {
         if (runId is int id)
             return query.Where(c => _db.SearchRunCompanies.Any(x => x.SearchRunId == id && x.CompanyId == c.Id));
-        if (User.IsAdmin()) return query;
-        var me = User.UserId();
-        return query.Where(c =>
-            _db.SearchRunCompanies.Any(x => x.CompanyId == c.Id && x.SearchRun.UserId == me)
-            || !_db.SearchRunCompanies.Any(x => x.CompanyId == c.Id));
+        return query.VisibleTo(_db, User.UserId(), User.IsAdmin());
     }
 
     /// <summary>Firmalar listesi ve disa aktarim ayni suzgeci kullanir: ekranda ne varsa o iner.</summary>
@@ -1084,7 +1081,7 @@ public class CompanyController : Controller
                 ViewBag.CompareError = "Karşılaştırmak için iki farklı firma seçin.";
             else
             {
-                model.Result = await comparer.BuildAsync(ia, ib, ct);
+                model.Result = await comparer.BuildAsync(ia, ib, User.UserId(), User.IsAdmin(), ct);
                 if (model.Result is null) return NotFound();
                 AddMissingOption(model, model.Result.A);
                 AddMissingOption(model, model.Result.B);
@@ -1104,7 +1101,7 @@ public class CompanyController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CompareAi(int a, int b, [FromServices] CompanyComparisonService comparer, CancellationToken ct)
     {
-        var comparison = await comparer.BuildAsync(a, b, ct);
+        var comparison = await comparer.BuildAsync(a, b, User.UserId(), User.IsAdmin(), ct);
         if (comparison is null) return NotFound();
 
         var ai = await comparer.GenerateAiAsync(comparison, ct);
@@ -1113,11 +1110,51 @@ public class CompanyController : Controller
         return RedirectToAction(nameof(Compare), new { a, b });
     }
 
+    /// <summary>Yapay zeka yorumunu arka planda uretir (ilerleme cubugu + iptal); bitince karsilastirmaya doner.</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> StartCompareAi(int a, int b, [FromServices] CompanyComparisonService comparer, CancellationToken ct)
+    {
+        var userId = User.UserId();
+        var isAdmin = User.IsAdmin();
+        var comparison = await comparer.BuildAsync(a, b, userId, isAdmin, ct);
+        if (comparison is null) return NotFound(new { error = "Firmalar bulunamadı." });
+
+        var job = _progress.Create();
+        var resultUrl = Url.Action(nameof(Compare), new { a, b })!;
+        AuditActionFilter.SetAuditSummary(HttpContext, $"Firma karşılaştırma yorumu: {comparison.A.Name} / {comparison.B.Name}");
+
+        _ = Task.Run(async () =>
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var service = scope.ServiceProvider.GetRequiredService<CompanyComparisonService>();
+            try
+            {
+                _progress.Report(job.Id, 30, "Yapay zekâ iki firmayı karşılaştırıyor");
+                var fresh = await service.BuildAsync(a, b, userId, isAdmin, job.Token);
+                var ai = fresh is null ? new CompareAiResult { Error = "Firmalar bulunamadı." } : await service.GenerateAiAsync(fresh, job.Token);
+                if (ai.Success) _progress.Complete(job.Id, resultUrl);
+                else _progress.Fail(job.Id, $"Yapay zekâ yorumu alınamadı: {ai.Error}");
+            }
+            catch (OperationCanceledException) when (job.CancelRequested)
+            {
+                _progress.MarkCancelled(job.Id, null, detail: "Yorum iptal edildi.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Karşılaştırma yorumu başarısız (arka plan).");
+                _progress.Fail(job.Id, ex.Message);
+            }
+        });
+
+        return Json(new { jobId = job.Id, progressUrl = Url.Action(nameof(JobStatus), new { jobId = job.Id }) });
+    }
+
     /// <summary>Karsilastirma raporunu Excel olarak indirir (yapay zeka yorumu varsa o da eklenir).</summary>
     [HttpGet]
     public async Task<IActionResult> CompareExport(int a, int b, [FromServices] CompanyComparisonService comparer, CancellationToken ct)
     {
-        var comparison = await comparer.BuildAsync(a, b, ct);
+        var comparison = await comparer.BuildAsync(a, b, User.UserId(), User.IsAdmin(), ct);
         if (comparison is null) return NotFound();
 
         var bytes = ExportService.ToXlsx(CompanyComparisonService.ToExport(comparison));

@@ -49,7 +49,7 @@ public class FavoritesController : Controller
         var me = User.UserId();
         if (me is null) return Challenge();
 
-        var state = await _favorites.ToggleAsync(me.Value, id, ct);
+        var state = await _favorites.ToggleAsync(me.Value, id, User.IsAdmin(), ct);
         if (state is null) return NotFound();
 
         if (Request.Headers.Accept.Any(a => a?.Contains("application/json", StringComparison.OrdinalIgnoreCase) == true))

@@ -1,6 +1,7 @@
 using EgebisLeadFinder.Models;
 using EgebisLeadFinder.Services;
 using EgebisLeadFinder.Services.Auth;
+using EgebisLeadFinder.Services.Progress;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -48,6 +49,50 @@ public class SectorController : Controller
 
         AuditActionFilter.SetAuditSummary(HttpContext, $"Sektör analizi: {keyword} ({report.Codes})");
         return RedirectToAction(nameof(Report), new { id = report.Id });
+    }
+
+    /// <summary>
+    /// Analizi arka planda baslatir (ilerleme cubugu + iptal). Yapay zeka cagrisi uzun surebildigi icin
+    /// istek icinde beklenmez; JavaScript kapaliysa form yukaridaki Analyze'a duser.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult StartAnalyze(string keyword, List<string>? codes, [FromServices] JobProgressStore progress,
+        [FromServices] IServiceScopeFactory scopes, [FromServices] ILogger<SectorController> logger)
+    {
+        keyword = (keyword ?? string.Empty).Trim();
+        var selection = SectorAnalysisService.ParseSelection(codes);
+        if (SectorAnalysisService.ValidateSelection(selection) is { } invalid) return BadRequest(new { error = invalid });
+
+        var job = progress.Create();
+        var userId = User.UserId();
+        var userName = User.DisplayName();
+        var reportBase = Url.Action(nameof(Report))!;
+        AuditActionFilter.SetAuditSummary(HttpContext, $"Sektör analizi başlatıldı: {keyword} ({string.Join(",", selection.Select(s => s.Code))})");
+
+        _ = Task.Run(async () =>
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            var sectors = scope.ServiceProvider.GetRequiredService<SectorAnalysisService>();
+            try
+            {
+                var (report, error) = await sectors.AnalyzeAsync(keyword, selection, userId, userName, job.Token,
+                    (pct, stage) => progress.Report(job.Id, pct, stage));
+                if (report is null) progress.Fail(job.Id, error ?? "Sektör analizi tamamlanamadı.");
+                else progress.Complete(job.Id, $"{reportBase}/{report.Id}");
+            }
+            catch (OperationCanceledException) when (job.CancelRequested)
+            {
+                progress.MarkCancelled(job.Id, null, detail: "Analiz iptal edildi; rapor kaydedilmedi.");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Sektör analizi başarısız (arka plan).");
+                progress.Fail(job.Id, ex.Message);
+            }
+        });
+
+        return Json(new { jobId = job.Id, progressUrl = Url.Action("JobStatus", "Company", new { jobId = job.Id }) });
     }
 
     [HttpGet]

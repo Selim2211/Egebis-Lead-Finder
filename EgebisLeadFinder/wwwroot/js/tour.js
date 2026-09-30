@@ -99,7 +99,7 @@
             ]
         },
         {
-            key: 'compose', match: /^\/email\/compose/i, title: 'E-posta yazma',
+            key: 'compose', help: 'leads', match: /^\/email\/compose/i, title: 'E-posta yazma',
             steps: [
                 { sel: '#aiDraftButton', title: 'Yapay zekâ ile yaz', text: 'Firma analizine ve şirket profilimize göre kişiye özel ilk mail taslağı üretir.' },
                 { sel: '#subject', title: 'Konu ve metin', text: 'Taslağı düzenleyin; taslak düzenleyicideki şablonları da kullanabilirsiniz.' },
@@ -114,7 +114,7 @@
             ]
         },
         {
-            key: 'templates', match: /^\/template/i, title: 'Taslak düzenleyici',
+            key: 'templates', help: 'sequences', match: /^\/template/i, title: 'Taslak düzenleyici',
             steps: [
                 { sel: '#tplList', title: 'Taslaklar', text: 'Hazır e-posta şablonları. Soldan seçip düzenleyin.' },
                 { sel: '#tplEditPane', title: 'Düzenle', text: 'Konu ve metin; {COMPANY_NAME}, {CONTACT_NAME} gibi alanlar gönderirken doldurulur.' },
@@ -142,7 +142,7 @@
             ]
         },
         {
-            key: 'audit', match: /^\/audit/i, title: 'Audit log',
+            key: 'audit', help: 'users', match: /^\/audit/i, title: 'Audit log',
             steps: [
                 { title: 'Audit log (yönetici)', text: 'Kim, ne zaman, ne yaptı: girişler, aramalar, silmeler, ayar değişiklikleri. Tarih, kullanıcı ve işleme göre süzün.' },
                 { sel: 'a[href*="format=xlsx"]', title: 'Excel\'e aktar', text: 'Filtredeki kayıtlar; kullanıcı/işlem özeti ve filtre bilgisi ayrı sayfalarda.' }
@@ -249,7 +249,7 @@
         var nav = document.createElement('div');
         nav.className = 'tour-pop-nav';
         var guide = document.createElement('a');
-        guide.href = '/Help#' + tour.key;
+        guide.href = '/Help#' + (tour.help || tour.key); // kilavuzdaki bolum
         guide.className = 'tour-pop-guide';
         guide.textContent = 'Kılavuzda oku';
         var back = document.createElement('button');

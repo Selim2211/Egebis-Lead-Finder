@@ -30,7 +30,10 @@
 <div class="card mb-4 icp-suggest-card" id="icp-suggestion">
     <div class="card-header d-flex align-items-center gap-2">@Icons.Sparkles(16) Sitemizden ICP öner</div>
     <div class="card-body">
-        <form method="post" asp-action="Suggest" class="d-flex flex-wrap gap-2 align-items-center" data-busy-text="Site okunuyor, ICP hazırlanıyor…">
+        <form method="post" asp-action="Suggest" class="d-flex flex-wrap gap-2 align-items-center"
+              data-progress-start="@Url.Action("StartSuggest")"
+              data-progress-title="ICP önerisi hazırlanıyor"
+              data-progress-hint="Siteniz okunuyor ve yapay zekâ müşteri profilinizi çıkarıyor; öneri siz kaydedene kadar uygulanmaz.">
             @Html.AntiForgeryToken()
             <input class="form-control flex-grow-1" style="min-width:240px;max-width:420px" name="website" value="@ViewBag.Website"
                    placeholder="ör. egebis.com" required />
@@ -224,14 +227,6 @@
 @section Scripts {
 <script>
     (function () {
-        document.querySelectorAll('form[data-busy-text]').forEach(function (f) {
-            f.addEventListener('submit', function () {
-                var b = f.querySelector('button[type=submit]');
-                b.disabled = true;
-                b.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>' + f.getAttribute('data-busy-text');
-            });
-        });
-
         var data = document.getElementById('icpSuggestionData');
         if (!data) return;
         var s = JSON.parse(data.textContent);

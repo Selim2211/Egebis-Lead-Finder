@@ -308,3 +308,24 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindThemeToggle);
     else bindThemeToggle();
 })();
+
+// Uzun suren normal form istekleri: <form data-busy-text="Kodlar aranıyor…"> gonderilince dugme kilitlenir ve
+// bekleme yazisi cikar. Geri tusuyla donulurse (sayfa onbellegi) dugme eski haline gelir.
+(function () {
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!form.matches || !form.matches('form[data-busy-text]:not([data-progress-start])') || e.defaultPrevented) return;
+        var btn = e.submitter || form.querySelector('button[type=submit]');
+        if (!btn) return;
+        btn.setAttribute('data-busy-original', btn.innerHTML);
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>' + form.getAttribute('data-busy-text');
+    });
+    window.addEventListener('pageshow', function () {
+        document.querySelectorAll('[data-busy-original]').forEach(function (b) {
+            b.innerHTML = b.getAttribute('data-busy-original');
+            b.removeAttribute('data-busy-original');
+            b.disabled = false;
+        });
+    });
+})();

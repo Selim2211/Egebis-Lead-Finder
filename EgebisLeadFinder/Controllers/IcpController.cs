@@ -88,23 +88,76 @@ public class IcpController : Controller
             return RedirectToAction(nameof(Index));
         }
 
-        var site = await scraper.ScrapeAsync(url, ct);
-        if (!site.Success)
+        var (suggestion, error) = await SuggestFromSiteAsync(url, scraper, ai, ct);
+        if (suggestion is null)
         {
-            TempData["IcpError"] = $"Site okunamadı: {site.Error ?? "içerik bulunamadı"}";
+            TempData["IcpError"] = error;
             return RedirectToAction(nameof(Index));
         }
 
-        var suggestion = await ai.SuggestIcpAsync(url, site.Text, ct);
-        if (!suggestion.Success)
-        {
-            TempData["IcpError"] = $"ICP önerisi alınamadı: {suggestion.Error}";
-            return RedirectToAction(nameof(Index));
-        }
-
-        cache.Set(SuggestionKey(), suggestion, TimeSpan.FromHours(2));
+        cache.Set(SuggestionKey(), suggestion, SuggestionLifetime);
         AuditActionFilter.SetAuditSummary(HttpContext, $"Siteden ICP önerisi alındı: {url}");
         return RedirectToAction(nameof(Index), null, "icp-suggestion");
+    }
+
+    private static readonly TimeSpan SuggestionLifetime = TimeSpan.FromHours(2);
+
+    /// <summary>Site okuma + yapay zeka onerisi; hata olursa kullaniciya gosterilecek mesaj doner.</summary>
+    private static async Task<(IcpSuggestion? Suggestion, string? Error)> SuggestFromSiteAsync(string url, IWebScraperService scraper,
+        IInsightAi ai, CancellationToken ct, Action<int, string>? progress = null)
+    {
+        progress?.Invoke(15, "Siteniz okunuyor");
+        var site = await scraper.ScrapeAsync(url, ct);
+        if (!site.Success) return (null, $"Site okunamadı: {site.Error ?? "içerik bulunamadı"}");
+
+        progress?.Invoke(45, "Yapay zekâ müşteri profilinizi çıkarıyor");
+        var suggestion = await ai.SuggestIcpAsync(url, site.Text, ct);
+        return suggestion.Success ? (suggestion, null) : (null, $"ICP önerisi alınamadı: {suggestion.Error}");
+    }
+
+    /// <summary>Oneriyi arka planda hazirlar (ilerleme cubugu + iptal); JavaScript kapaliysa form Suggest'e duser.</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult StartSuggest(string? website, [FromServices] JobProgressStore progress, [FromServices] IServiceScopeFactory scopes,
+        [FromServices] IMemoryCache cache, [FromServices] ILogger<IcpController> logger)
+    {
+        var url = BusinessProfileService.NormalizeUrl(website);
+        if (url is null) return BadRequest(new { error = "Geçerli bir web sitesi adresi girin (ör. egebis.com)." });
+
+        var job = progress.Create();
+        var key = SuggestionKey();
+        var resultUrl = Url.Action(nameof(Index))! + "#icp-suggestion";
+        AuditActionFilter.SetAuditSummary(HttpContext, $"Siteden ICP önerisi istendi: {url}");
+
+        _ = Task.Run(async () =>
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            try
+            {
+                var (suggestion, error) = await SuggestFromSiteAsync(url,
+                    scope.ServiceProvider.GetRequiredService<IWebScraperService>(),
+                    scope.ServiceProvider.GetRequiredService<IInsightAi>(), job.Token,
+                    (pct, stage) => progress.Report(job.Id, pct, stage));
+                if (suggestion is null)
+                {
+                    progress.Fail(job.Id, error ?? "ICP önerisi alınamadı.");
+                    return;
+                }
+                cache.Set(key, suggestion, SuggestionLifetime);
+                progress.Complete(job.Id, resultUrl);
+            }
+            catch (OperationCanceledException) when (job.CancelRequested)
+            {
+                progress.MarkCancelled(job.Id, null, detail: "ICP önerisi iptal edildi.");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "ICP önerisi başarısız (arka plan).");
+                progress.Fail(job.Id, ex.Message);
+            }
+        });
+
+        return Json(new { jobId = job.Id, progressUrl = Url.Action("JobStatus", "Company", new { jobId = job.Id }) });
     }
 
     /// <summary>Oneriyi ekrandan kaldirir.</summary>

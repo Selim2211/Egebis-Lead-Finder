@@ -97,12 +97,19 @@ public class SectorAnalysisService
         return (matches, ai.Error);
     }
 
+    /// <summary>Kod basina kayitli firma sayisi: ilgili bolumlerin kodlari tek sorguda cekilir, bellekte sayilir.</summary>
     private async Task<Dictionary<string, int>> CountsAsync(IEnumerable<string> codes, CancellationToken ct)
     {
-        var result = new Dictionary<string, int>();
-        foreach (var code in codes.Distinct())
-            result[code] = await _db.Companies.CountAsync(c => c.NaceCode != null && c.NaceCode.StartsWith(code), ct);
-        return result;
+        var list = codes.Distinct().ToList();
+        var divisions = list.Select(c => c[..2]).Distinct().ToList();
+        var naceCodes = divisions.Count == 0
+            ? new List<string>()
+            : await _db.Companies.AsNoTracking()
+                .Where(c => c.NaceCode != null && divisions.Contains(c.NaceCode.Substring(0, 2)))
+                .Select(c => c.NaceCode!)
+                .ToListAsync(ct);
+
+        return list.ToDictionary(code => code, code => naceCodes.Count(n => n.StartsWith(code, StringComparison.Ordinal)));
     }
 
     /// <summary>Uygulamada bu NACE koduyla kayitli firmalarin ozeti.</summary>
@@ -139,19 +146,29 @@ public class SectorAnalysisService
         return result;
     }
 
-    /// <summary>Secilen sektorleri analiz eder ve raporu kaydeder. Hata olursa rapor kaydedilmez.</summary>
-    public async Task<(SectorReport? Report, string? Error)> AnalyzeAsync(string keyword, IReadOnlyList<(string Code, string Name)> selection,
-        int? userId, string? userName, CancellationToken ct = default)
-    {
-        if (selection.Count == 0) return (null, "En az bir NACE kodu seçin.");
-        if (selection.Count > MaxSectors) return (null, $"En fazla {MaxSectors} sektör seçebilirsiniz.");
+    public static string? ValidateSelection(IReadOnlyCollection<(string Code, string Name)> selection) =>
+        selection.Count == 0 ? "En az bir NACE kodu seçin."
+        : selection.Count > MaxSectors ? $"En fazla {MaxSectors} sektör seçebilirsiniz."
+        : null;
 
+    /// <summary>
+    /// Secilen sektorleri analiz eder ve raporu kaydeder. Hata olursa rapor kaydedilmez.
+    /// progress: arka plan isinde ilerleme cubugu icin asama bildirimi (yuzde, asama).
+    /// </summary>
+    public async Task<(SectorReport? Report, string? Error)> AnalyzeAsync(string keyword, IReadOnlyList<(string Code, string Name)> selection,
+        int? userId, string? userName, CancellationToken ct = default, Action<int, string>? progress = null)
+    {
+        if (ValidateSelection(selection) is { } invalid) return (null, invalid);
+
+        progress?.Invoke(10, "Uygulamadaki sektör istatistikleri hazırlanıyor");
         var inputs = new List<SectorInput>();
         foreach (var (code, name) in selection)
             inputs.Add(new SectorInput(code, name, await StatsAsync(code, ct)));
 
+        progress?.Invoke(35, "Yapay zekâ sektörleri değerlendiriyor");
         var profile = await _profiles.GetAsync(ct);
         var result = await _ai.AnalyzeSectorsAsync(profile, keyword, inputs, ct);
+        progress?.Invoke(95, "Rapor kaydediliyor");
         if (!result.Success) return (null, result.Error);
 
         var top = result.Sectors.OrderByDescending(s => s.FitScore).FirstOrDefault();

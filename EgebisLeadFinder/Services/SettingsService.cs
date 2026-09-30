@@ -1,6 +1,7 @@
 using EgebisLeadFinder.Data;
 using EgebisLeadFinder.Models;
 using Microsoft.EntityFrameworkCore;
+using EgebisLeadFinder.Services.Security;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace EgebisLeadFinder.Services;
@@ -82,10 +83,18 @@ public class SettingsService : ISettingsService
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
         // API anahtarlari ve sifreler veritabaninda sifreli; bellekte (5 dk onbellek) cozulmus tutulur.
-        var settings = (await db.AppSettings
-                .AsNoTracking()
-                .ToListAsync(ct))
-            .ToDictionary(s => s.Key, s => EgebisLeadFinder.Services.Security.FieldEncryption.Unprotect(s.Value));
+        // Cozulemeyen deger (anahtar degismis) bos sayilir: servislere yer tutucu metin anahtar diye gitmez.
+        var settings = new Dictionary<string, string?>();
+        foreach (var row in await db.AppSettings.AsNoTracking().ToListAsync(ct))
+        {
+            var value = FieldEncryption.Unprotect(row.Value);
+            if (value == FieldEncryption.DecryptFailed)
+            {
+                _logger.LogWarning("{Key} ayarı çözülemedi; şifreleme anahtarı değişmiş olabilir.", row.Key);
+                value = null;
+            }
+            settings[row.Key] = value;
+        }
 
         _cache.Set(CacheKey, settings, CacheDuration);
         return settings;
@@ -100,7 +109,14 @@ public class SettingsService : ISettingsService
 
         foreach (var (key, raw) in values)
         {
-            var value = SettingKeys.IsSecret(key) ? EgebisLeadFinder.Services.Security.FieldEncryption.Protect(raw) : raw;
+            if (raw == FieldEncryption.DecryptFailed) continue;
+
+            // Cozulemeyen sifreli deger bos gelen formla ezilmez: dogru anahtar geri yuklenince kurtarilir.
+            if (existing.TryGetValue(key, out var current) && string.IsNullOrWhiteSpace(raw)
+                && FieldEncryption.IsEncrypted(current.Value) && FieldEncryption.Unprotect(current.Value) == FieldEncryption.DecryptFailed)
+                continue;
+
+            var value = SettingKeys.IsSecret(key) ? FieldEncryption.Protect(raw) : raw;
             if (existing.TryGetValue(key, out var row))
             {
                 row.Value = value;

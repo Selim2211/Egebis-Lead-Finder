@@ -65,13 +65,18 @@ public static class EncryptionBackfill
         if (t.HashColumn is not null)
             pending += $" OR (\"{t.HashSource}\" <> '' AND \"{t.HashColumn}\" IS NULL)";
 
-        var select = $"SELECT \"Id\", {string.Join(", ", t.Columns.Select(c => $"\"{c}\""))} FROM \"{t.Table}\" WHERE {pending} ORDER BY \"Id\" LIMIT 500";
+        // Id sirasiyla sayfalanir: her satir bir calismada en fazla bir kez islenir. Islendikten sonra da
+        // "bekliyor" gorunen satir (ör. yalnizca bosluktan olusan e-posta: indeksi hep bos) donguye sokmaz.
+        var columns = string.Join(", ", t.Columns.Select(c => $"\"{c}\""));
         var updated = 0;
+        var lastId = 0;
 
         while (true)
         {
+            var select = $"SELECT \"Id\", {columns} FROM \"{t.Table}\" WHERE \"Id\" > {lastId} AND ({pending}) ORDER BY \"Id\" LIMIT 500";
             var rows = await ReadRowsAsync(db, select, t.Columns.Length, ct);
             if (rows.Count == 0) break;
+            lastId = rows[^1].Id;
 
             foreach (var (id, values) in rows)
             {

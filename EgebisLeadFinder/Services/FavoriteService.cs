@@ -17,11 +17,12 @@ public class FavoriteService
 
     public FavoriteService(ApplicationDbContext db) => _db = db;
 
-    /// <summary>Favoriye ekler ya da cikarir; yeni durumu doner (true = favoride). Firma yoksa null.</summary>
-    public async Task<bool?> ToggleAsync(int userId, int companyId, CancellationToken ct = default)
+    /// <summary>
+    /// Favoriye ekler ya da cikarir; yeni durumu doner (true = favoride). Firma yoksa veya kullanici
+    /// goremiyorsa (baskasinin ozel arama sonucu) null. Favoriden cikarmak her zaman serbesttir.
+    /// </summary>
+    public async Task<bool?> ToggleAsync(int userId, int companyId, bool isAdmin = false, CancellationToken ct = default)
     {
-        if (!await _db.Companies.AnyAsync(c => c.Id == companyId, ct)) return null;
-
         var existing = await _db.FavoriteCompanies.FirstOrDefaultAsync(f => f.UserId == userId && f.CompanyId == companyId, ct);
         if (existing is not null)
         {
@@ -29,6 +30,8 @@ public class FavoriteService
             await _db.SaveChangesAsync(ct);
             return false;
         }
+
+        if (!await _db.Companies.VisibleTo(_db, userId, isAdmin).AnyAsync(c => c.Id == companyId, ct)) return null;
 
         _db.FavoriteCompanies.Add(new FavoriteCompany { UserId = userId, CompanyId = companyId });
         try

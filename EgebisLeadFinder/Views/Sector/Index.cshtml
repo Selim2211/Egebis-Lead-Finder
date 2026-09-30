@@ -36,7 +36,10 @@
 
         @if (Model.Keyword is not null)
         {
-            <form method="post" asp-action="Analyze" class="card" data-busy-text="Sektörler analiz ediliyor…" id="analyzeForm">
+            <form method="post" asp-action="Analyze" class="card" id="analyzeForm"
+                  data-progress-start="@Url.Action("StartAnalyze")"
+                  data-progress-title="Sektörler analiz ediliyor"
+                  data-progress-hint="Yapay zekâ seçtiğiniz sektörleri şirket profilimize göre puanlıyor; rapor bitince açılır.">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="keyword" value="@Model.Keyword" />
                 <div class="card-header d-flex justify-content-between align-items-center">
@@ -141,18 +144,16 @@
         boxes.forEach(function (b) { b.addEventListener('change', sync); });
         sync();
 
-        document.querySelectorAll('form[data-busy-text]').forEach(function (f) {
-            f.addEventListener('submit', function (e) {
-                if (f.id === 'analyzeForm' && !f.querySelector('[data-sector-check]:checked')) {
-                    e.preventDefault();
-                    if (window.egToast) egToast.error('En az bir sektör seçin.');
-                    return;
-                }
-                var b = f.querySelector('button[type=submit]');
-                b.disabled = true;
-                b.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>' + f.getAttribute('data-busy-text');
+        // Hic sektor secilmediyse ilerleme penceresi hic acilmaz.
+        var analyzeForm = document.getElementById('analyzeForm');
+        if (analyzeForm) {
+            analyzeForm.addEventListener('submit', function (e) {
+                if (analyzeForm.querySelector('[data-sector-check]:checked')) return;
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                if (window.egToast) egToast.error('En az bir sektör seçin.');
             });
-        });
+        }
     })();
 </script>
 }

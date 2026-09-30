@@ -92,6 +92,9 @@ public class AuditActionFilter : IAsyncActionFilter
             ["Sector.Delete"] = ("sector.delete", "Sektör analizi raporu silindi"),
             ["Icp.Suggest"] = ("icp.suggest", "Siteden ICP önerisi alındı"),
             ["Icp.DismissSuggestion"] = ("icp.suggest.dismiss", "ICP önerisi kapatıldı"),
+            ["Icp.StartSuggest"] = ("icp.suggest", "Siteden ICP önerisi istendi"),
+            ["Sector.StartAnalyze"] = ("sector.analyze", "Sektör analizi başlatıldı"),
+            ["Company.StartCompareAi"] = ("company.compare.ai", "Firma karşılaştırma yapay zekâ yorumu"),
         };
 
     private static readonly string[] EntityKeys = { "id", "leadId", "companyId", "profileId", "sequenceId", "userId" };

@@ -65,11 +65,13 @@ public class CompanyComparisonService
         _cache = cache;
     }
 
-    public async Task<CompanyComparison?> BuildAsync(int idA, int idB, CancellationToken ct = default)
+    /// <summary>Iki firmayi karsilastirir; firmalardan biri kullaniciya gorunmuyorsa (baskasinin arama sonucu) null.</summary>
+    public async Task<CompanyComparison?> BuildAsync(int idA, int idB, int? userId, bool isAdmin, CancellationToken ct = default)
     {
         if (idA == idB) return null;
 
         var companies = await _db.Companies.AsNoTracking()
+            .VisibleTo(_db, userId, isAdmin)
             .Include(c => c.Contacts)
             .Include(c => c.Leads)
             .Where(c => c.Id == idA || c.Id == idB)

@@ -194,7 +194,10 @@
                     güçlü yanları, riskleri ve sonraki adımları yazar. Yorum rapora ve Excel'e eklenir.
                 </p>
             }
-            <form method="post" asp-action="CompareAi" class="no-print m-0" data-busy-text="Yorum hazırlanıyor…">
+            <form method="post" asp-action="CompareAi" class="no-print m-0"
+                  data-progress-start="@Url.Action("StartCompareAi")"
+                  data-progress-title="Yapay zekâ yorumu hazırlanıyor"
+                  data-progress-hint="İki firma şirket profilimize göre karşılaştırılıyor; bitince yorum bu sayfada görünür.">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="a" value="@r.A.Id" />
                 <input type="hidden" name="b" value="@r.B.Id" />
@@ -246,12 +249,5 @@
 <script>
     // Karsilastirma acildi: alttaki secim cubugu temizlenir.
     if (window.egCompare) window.egCompare.clear();
-    document.querySelectorAll('form[data-busy-text]').forEach(function (f) {
-        f.addEventListener('submit', function () {
-            var b = f.querySelector('button[type=submit]');
-            b.disabled = true;
-            b.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>' + f.getAttribute('data-busy-text');
-        });
-    });
 </script>
 }

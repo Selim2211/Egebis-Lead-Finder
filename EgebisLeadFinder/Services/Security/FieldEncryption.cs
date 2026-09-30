@@ -43,7 +43,11 @@ public sealed class FieldEncryption
     public string? Encrypt(string? plain)
     {
         // Bos deger sifrelenmez: "bos mu?" sorgulari (Email == "") calismaya devam eder.
-        if (string.IsNullOrEmpty(plain) || IsEncrypted(plain)) return plain;
+        if (string.IsNullOrEmpty(plain)) return plain;
+
+        // Zaten bu anahtarla sifrelenmis deger iki kez sifrelenmez. On eki tasiyan ama cozulemeyen
+        // deger (ör. "enc:v1:" ile baslayan bir metin) duz metindir: o da sifrelenir.
+        if (IsEncrypted(plain) && TryDecrypt(plain, out _)) return plain;
 
         var data = Encoding.UTF8.GetBytes(plain);
         var buffer = new byte[NonceSize + TagSize + data.Length];
@@ -67,6 +71,20 @@ public sealed class FieldEncryption
         using var aes = new AesGcm(_key, TagSize);
         aes.Decrypt(buffer.AsSpan(0, NonceSize), buffer.AsSpan(NonceSize + TagSize), buffer.AsSpan(NonceSize, TagSize), plain);
         return Encoding.UTF8.GetString(plain);
+    }
+
+    public bool TryDecrypt(string stored, out string? plain)
+    {
+        try
+        {
+            plain = Decrypt(stored);
+            return true;
+        }
+        catch (Exception ex) when (ex is CryptographicException or FormatException)
+        {
+            plain = null;
+            return false;
+        }
     }
 
     /// <summary>
