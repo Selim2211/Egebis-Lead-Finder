@@ -33,6 +33,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<SearchRun> SearchRuns => Set<SearchRun>();
     public DbSet<SearchRunCompany> SearchRunCompanies => Set<SearchRunCompany>();
     public DbSet<FavoriteCompany> FavoriteCompanies => Set<FavoriteCompany>();
+    public DbSet<SectorReport> SectorReports => Set<SectorReport>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -223,6 +224,13 @@ public class ApplicationDbContext : DbContext
             e.HasIndex(x => x.CompanyId);
             e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<SectorReport>(e =>
+        {
+            e.Property(x => x.ResultJson).HasColumnType("jsonb");
+            e.HasIndex(x => new { x.UserId, x.CreatedAt });
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.SetNull);
         });
 
         b.Entity<EmailTemplate>().HasData(EmailTemplateSeed.All);

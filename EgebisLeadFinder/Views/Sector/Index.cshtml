@@ -1,0 +1,158 @@
+@model SectorIndexViewModel
+@using EgebisLeadFinder.Services
+@{
+    ViewData["Title"] = "Sektör analizi";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Sektör analizi (NACE)</h1>
+        <div class="page-sub">Bir sektörün bize ne kadar uygun olduğunu yapay zekâ ile değerlendirin; NACE kodunu bilmenize gerek yok</div>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(TempData["SettingsError"] as string))
+{
+    <div class="alert alert-danger" data-flash="error">@TempData["SettingsError"]</div>
+}
+@if (!string.IsNullOrWhiteSpace(TempData["SettingsSaved"] as string))
+{
+    <div class="alert alert-success" data-flash="success">@TempData["SettingsSaved"]</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header">1. Sektörü anahtar kelimeyle tarif edin</div>
+            <div class="card-body">
+                <form method="get" class="d-flex flex-wrap gap-2" data-busy-text="Kodlar aranıyor…">
+                    <input class="form-control flex-grow-1" style="min-width:240px" name="q" value="@Model.Keyword" maxlength="150"
+                           placeholder="ör. plastik ambalaj, otomotiv yan sanayi, süt ürünleri, 22.22" required autofocus />
+                    <button type="submit" class="btn btn-accent">NACE kodlarını bul</button>
+                </form>
+                <div class="form-text">Yazdığınız kelimeye uyan NACE kodlarını hem resmi listeden hem yapay zekâdan getiririz.</div>
+            </div>
+        </div>
+
+        @if (Model.Keyword is not null)
+        {
+            <form method="post" asp-action="Analyze" class="card" data-busy-text="Sektörler analiz ediliyor…" id="analyzeForm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="keyword" value="@Model.Keyword" />
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>2. Analiz edilecek sektörleri seçin</span>
+                    <span class="small text-muted-2 fw-normal">En fazla @SectorAnalysisService.MaxSectors · <span id="selCount">0</span> seçili</span>
+                </div>
+                <div class="card-body">
+                    @if (Model.AiError is not null)
+                    {
+                        <div class="alert alert-warning small">Yapay zekâ eşleştirmesi yapılamadı (@Model.AiError). Yalnızca resmi listedeki eşleşmeler gösteriliyor.</div>
+                    }
+                    @if (Model.Matches.Count == 0)
+                    {
+                        <p class="text-muted-2 mb-0">“@Model.Keyword” için eşleşen NACE kodu bulunamadı. Daha genel bir kelime deneyin (ör. “plastik”, “gıda”, “metal”).</p>
+                    }
+                    else
+                    {
+                        <div class="d-grid gap-2">
+                            @for (var i = 0; i < Model.Matches.Count; i++)
+                            {
+                                var m = Model.Matches[i];
+                                <label class="nace-match">
+                                    <input class="form-check-input" type="checkbox" name="codes" value="@($"{m.Code}|{m.Name}")"
+                                           checked="@(i < 3 ? "checked" : null)" data-sector-check />
+                                    <span class="flex-grow-1">
+                                        <span class="d-flex flex-wrap align-items-center gap-2">
+                                            <span class="nace-code">@m.Code</span>
+                                            <span class="fw-semibold">@m.Name</span>
+                                            @if (m.FromAi)
+                                            {
+                                                <span class="tag tag-amber d-inline-flex align-items-center gap-1">@Icons.Sparkles(11) yapay zekâ</span>
+                                            }
+                                        </span>
+                                        <span class="d-block small text-muted-2 mt-1">
+                                            @m.Reason
+                                            @(m.Reason is null ? "" : " · ")Uygulamada @m.Companies firma
+                                            @if (NaceCatalog.Division(m.Code) is { } div && div.Code != m.Code)
+                                            {
+                                                <span> · Bölüm: @div.Code @div.Name</span>
+                                            }
+                                        </span>
+                                    </span>
+                                </label>
+                            }
+                        </div>
+                    }
+                </div>
+                @if (Model.Matches.Count > 0)
+                {
+                    <div class="card-body pt-0 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <span class="small text-muted-2">Yapay zekâ, seçilen sektörleri “Biz ne arıyoruz?” şirket profilimize göre puanlar ve raporlar.</span>
+                        <button type="submit" class="btn btn-accent">Seçilenleri analiz et</button>
+                    </div>
+                }
+            </form>
+        }
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">Kayıtlı raporlar</div>
+            <div class="card-body p-2">
+                @if (Model.Reports.Count == 0)
+                {
+                    <div class="small text-muted-2 p-2">Henüz rapor yok. Analiz ettiğiniz sektörler burada saklanır.</div>
+                }
+                @foreach (var r in Model.Reports)
+                {
+                    <a class="fav-list-item" asp-action="Report" asp-route-id="@r.Id">
+                        <span class="min-w-0">
+                            <span class="d-block text-truncate">@r.Keyword</span>
+                            <span class="d-block small text-muted-2 fw-normal text-truncate">
+                                @r.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy") · @(r.TopSector ?? r.Codes)
+                                @if (User.IsInRole(nameof(UserRole.Admin)) && r.UserName is not null)
+                                {
+                                    <span> · @r.UserName</span>
+                                }
+                            </span>
+                        </span>
+                        @if (r.TopScore is int top)
+                        {
+                            <span class="meta-chip fit-chip @FitDisplay.Css(top)">%@top</span>
+                        }
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    (function () {
+        var max = @SectorAnalysisService.MaxSectors;
+        var boxes = document.querySelectorAll('[data-sector-check]');
+        var count = document.getElementById('selCount');
+        function sync() {
+            var n = Array.prototype.filter.call(boxes, function (b) { return b.checked; }).length;
+            if (count) count.textContent = n;
+            boxes.forEach(function (b) { b.disabled = !b.checked && n >= max; });
+        }
+        boxes.forEach(function (b) { b.addEventListener('change', sync); });
+        sync();
+
+        document.querySelectorAll('form[data-busy-text]').forEach(function (f) {
+            f.addEventListener('submit', function (e) {
+                if (f.id === 'analyzeForm' && !f.querySelector('[data-sector-check]:checked')) {
+                    e.preventDefault();
+                    if (window.egToast) egToast.error('En az bir sektör seçin.');
+                    return;
+                }
+                var b = f.querySelector('button[type=submit]');
+                b.disabled = true;
+                b.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>' + f.getAttribute('data-busy-text');
+            });
+        });
+    })();
+</script>
+}

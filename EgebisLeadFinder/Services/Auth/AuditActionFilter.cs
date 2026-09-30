@@ -87,6 +87,9 @@ public class AuditActionFilter : IAsyncActionFilter
             ["Favorites.Export"] = ("export.favorites", "Favori firmalar dışa aktarıldı"),
             ["Company.CompareAi"] = ("company.compare.ai", "Firma karşılaştırma yapay zekâ yorumu"),
             ["Company.CompareExport"] = ("export.compare", "Firma karşılaştırma raporu dışa aktarıldı"),
+            ["Sector.Analyze"] = ("sector.analyze", "Sektör analizi yapıldı"),
+            ["Sector.Export"] = ("export.sector", "Sektör analizi raporu dışa aktarıldı"),
+            ["Sector.Delete"] = ("sector.delete", "Sektör analizi raporu silindi"),
         };
 
     private static readonly string[] EntityKeys = { "id", "leadId", "companyId", "profileId", "sequenceId", "userId" };

@@ -598,3 +598,18 @@ public class CompareViewModel
 }
 
 public record CompareOption(int Id, string Name, string? Domain, int Score);
+
+/// <summary>Sektor analizi: anahtar kelime, eslesen NACE kodlari ve gecmis raporlar.</summary>
+public class SectorIndexViewModel
+{
+    public string? Keyword { get; set; }
+    public List<EgebisLeadFinder.Services.NaceMatch> Matches { get; set; } = new();
+    public string? AiError { get; set; }
+    public List<SectorReport> Reports { get; set; } = new();
+}
+
+public class SectorReportViewModel
+{
+    public SectorReport Report { get; set; } = null!;
+    public EgebisLeadFinder.Services.SectorAiResult Result { get; set; } = new();
+}

@@ -108,12 +108,20 @@
                            asp-controller="Company" asp-action="Search">Firma Ara</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @(controller == "Company" && action != "Search" ? "active" : "")"
+                        <a class="nav-link @(controller == "Company" && action is not ("Search" or "Compare") ? "active" : "")"
                            asp-controller="Company" asp-action="Index">Firmalar</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link @(controller == "Favorites" ? "active" : "")"
                            asp-controller="Favorites" asp-action="Index">Favoriler</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <button type="button" class="nav-link dropdown-toggle btn btn-link @(controller == "Sector" || (controller == "Company" && action == "Compare") ? "active" : "")"
+                                data-bs-toggle="dropdown" aria-expanded="false">Raporlar</button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" asp-controller="Sector" asp-action="Index">Sektör analizi (NACE)</a></li>
+                            <li><a class="dropdown-item" asp-controller="Company" asp-action="Compare">Firma karşılaştırma</a></li>
+                        </ul>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link @(controller == "Lead" || controller == "Email" ? "active" : "")"

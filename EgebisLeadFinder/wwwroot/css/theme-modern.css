@@ -273,3 +273,27 @@ h1, h2, h3, h4, h5, h6 { font-weight: 650; letter-spacing: -.022em; }
     .compare-card.is-leader { box-shadow: none; }
     .compare-table td.is-better { background: #eefaf4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ---------- Sektor analizi ---------- */
+.nace-match { display: flex; gap: .75rem; align-items: flex-start; padding: .7rem .85rem; border: 1px solid var(--eg-border);
+    border-radius: 12px; background: var(--eg-surface); cursor: pointer; transition: border-color .15s, background .15s; }
+.nace-match:hover { border-color: var(--eg-brand-soft-border); }
+.nace-match:has(input:checked) { border-color: var(--eg-brand-soft-border); background: var(--eg-brand-soft); }
+.nace-match input { margin-top: .25rem; }
+.nace-code { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--eg-navy-soft-text); background: var(--eg-navy-soft);
+    border-radius: 8px; padding: .05rem .45rem; font-size: .8rem; }
+.sector-card { border-radius: var(--eg-radius); border: 1px solid var(--eg-border); background: var(--eg-surface); box-shadow: var(--eg-shadow-sm); break-inside: avoid; }
+.sector-card + .sector-card { margin-top: 1rem; }
+.sector-card-head { display: flex; gap: 1rem; align-items: center; padding: 1rem 1.2rem; border-bottom: 1px solid var(--eg-border); }
+.sector-score { flex-shrink: 0; width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 1.15rem;
+    background: conic-gradient(var(--ring, #f59e0b) calc(var(--p) * 1%), var(--eg-soft) 0); position: relative; }
+.sector-score::before { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: var(--eg-surface); }
+.sector-score span { position: relative; }
+.sector-score.fit-high { --ring: #10b981; } .sector-score.fit-good { --ring: #0891b2; } .sector-score.fit-mid { --ring: #f59e0b; } .sector-score.fit-low { --ring: #ef4444; }
+.sector-card-body { padding: 1rem 1.2rem; }
+.sector-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.sector-cols h3 { font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color: var(--eg-text-muted); font-weight: 700; margin-bottom: .35rem; }
+.sector-cols ul { margin: 0; padding-left: 1.05rem; font-size: .9rem; }
+.sector-stats { display: flex; flex-wrap: wrap; gap: .4rem; }
+@media (max-width: 991.98px) { .sector-cols { grid-template-columns: 1fr; } }
+@media print { .sector-score { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }

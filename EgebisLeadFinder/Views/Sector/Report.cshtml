@@ -1,0 +1,137 @@
+@model SectorReportViewModel
+@using EgebisLeadFinder.Services
+@{
+    ViewData["Title"] = $"Sektör analizi — {Model.Report.Keyword}";
+    var r = Model.Report;
+    var result = Model.Result;
+    var ranked = result.Sectors.OrderByDescending(s => s.FitScore).ToList();
+}
+
+<div class="page-head">
+    <div>
+        <h1>Sektör analizi: @r.Keyword</h1>
+        <div class="page-sub">
+            @r.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+            @if (r.UserName is not null)
+            {
+                <span>· Hazırlayan: @r.UserName</span>
+            }
+            · Bu sektörler bize ne kadar uygun?
+        </div>
+    </div>
+    <div class="d-flex gap-2 align-items-center no-print">
+        <a class="btn btn-outline-secondary" asp-action="Index">← Sektör analizi</a>
+        <a class="btn btn-outline-secondary" asp-action="Export" asp-route-id="@r.Id">Excel'e aktar</a>
+        <button type="button" class="btn btn-primary" onclick="window.print()">Yazdır / PDF</button>
+    </div>
+</div>
+
+<div class="report">
+    <header class="report-head d-none d-print-flex">
+        <img class="report-logo" src="~/img/logo.png" asp-append-version="true" width="46" height="46" alt="" />
+        <div class="report-head-main">
+            <h1>Sektör analizi raporu</h1>
+            <div class="report-meta"><span>@r.Keyword</span><span>@r.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span></div>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(result.Overview))
+    {
+        <div class="card mb-4">
+            <div class="card-header d-inline-flex align-items-center gap-2">@Icons.Sparkles(16) Genel değerlendirme</div>
+            <div class="card-body">
+                <p class="mb-3">@result.Overview</p>
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0 align-middle">
+                        <thead><tr><th>Sıra</th><th>NACE</th><th>Sektör</th><th>Uygunluk</th><th>Kayıtlı firma</th></tr></thead>
+                        <tbody>
+                            @for (var i = 0; i < ranked.Count; i++)
+                            {
+                                var s = ranked[i];
+                                <tr>
+                                    <td>@(i + 1)</td>
+                                    <td><span class="nace-code">@s.Code</span></td>
+                                    <td>@s.Name</td>
+                                    <td><span class="meta-chip fit-chip @FitDisplay.Css(s.FitScore)">%@s.FitScore · @SectorAnalysisService.VerdictLabel(s.Verdict)</span></td>
+                                    <td>@(s.Stats?.Companies ?? 0)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+
+    @foreach (var s in ranked)
+    {
+        <section class="sector-card mb-3">
+            <div class="sector-card-head">
+                <div class="sector-score @FitDisplay.Css(s.FitScore)" style="--p:@s.FitScore"><span>@s.FitScore</span></div>
+                <div class="flex-grow-1 min-w-0">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="nace-code">@s.Code</span>
+                        <span class="fw-semibold fs-5">@s.Name</span>
+                        <span class="meta-chip fit-chip @FitDisplay.Css(s.FitScore)">@SectorAnalysisService.VerdictLabel(s.Verdict)</span>
+                    </div>
+                    <div class="text-muted-2 mt-1">@s.Summary</div>
+                </div>
+                <a class="btn btn-sm btn-accent no-print flex-shrink-0" asp-controller="Company" asp-action="Search"
+                   asp-route-industry="@(s.SearchTerms.FirstOrDefault() ?? s.Name)">Bu sektörde firma ara</a>
+            </div>
+            <div class="sector-card-body">
+                <div class="sector-cols mb-3">
+                    <div>
+                        <h3>Neden uygun</h3>
+                        <ul>@foreach (var x in s.Reasons) { <li>@x</li> }</ul>
+                    </div>
+                    <div>
+                        <h3>Çözdüğümüz ihtiyaçlar</h3>
+                        <ul>@foreach (var x in s.Needs) { <li>@x</li> }</ul>
+                    </div>
+                    <div>
+                        <h3>Riskler</h3>
+                        <ul>@foreach (var x in s.Risks) { <li>@x</li> }</ul>
+                    </div>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(s.IdealCompany))
+                {
+                    <p class="mb-2"><span class="fw-semibold">Hedef firma profili:</span> @s.IdealCompany</p>
+                }
+                <div class="d-flex flex-wrap gap-3 small">
+                    @if (s.SearchTerms.Count > 0)
+                    {
+                        <div><span class="text-muted-2">Arama terimleri:</span> @foreach (var t in s.SearchTerms) { <a class="tag tag-muted me-1" asp-controller="Company" asp-action="Search" asp-route-industry="@t">@t</a> }</div>
+                    }
+                    @if (s.Titles.Count > 0)
+                    {
+                        <div><span class="text-muted-2">Ulaşılacak unvanlar:</span> @string.Join(", ", s.Titles)</div>
+                    }
+                </div>
+                @if (s.Stats is { } st)
+                {
+                    <div class="sector-stats mt-3">
+                        <span class="meta-chip meta-chip-muted">Uygulamada @st.Companies firma</span>
+                        @if (st.Companies > 0)
+                        {
+                            <span class="meta-chip meta-chip-muted">Ort. lead puanı @st.AvgScore</span>
+                            @if (st.AvgFit is int af)
+                            {
+                                <span class="meta-chip meta-chip-muted">Ort. uygunluk %@af</span>
+                            }
+                            <span class="meta-chip meta-chip-muted">ICP'ye uyan @st.IcpMatches</span>
+                            <span class="meta-chip meta-chip-muted">@st.Leads lead · @st.Projects proje</span>
+                            <a class="meta-chip no-print" asp-controller="Company" asp-action="Index" asp-route-run="all" asp-route-nace="@s.Code">Firmaları gör →</a>
+                        }
+                    </div>
+                }
+            </div>
+        </section>
+    }
+
+    <form method="post" asp-action="Delete" asp-route-id="@r.Id" class="no-print mt-4"
+          data-confirm="Rapor kalıcı olarak silinecek." data-confirm-title="Rapor silinsin mi?" data-confirm-ok="Sil" data-confirm-tone="danger">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn-sm btn-outline-danger">Raporu sil</button>
+    </form>
+</div>

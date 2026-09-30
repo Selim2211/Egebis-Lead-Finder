@@ -186,6 +186,7 @@ builder.Services.AddScoped<ISearchPlannerAi>(sp => (ISearchPlannerAi)sp.GetRequi
 builder.Services.AddScoped<SearchPlanService>();
 builder.Services.AddScoped<IInsightAi>(sp => (IInsightAi)sp.GetRequiredService<IAiService>());
 builder.Services.AddScoped<CompanyComparisonService>();
+builder.Services.AddScoped<SectorAnalysisService>();
 builder.Services.AddScoped<EgebisLeadFinder.Services.Sequences.SequenceService>();
 builder.Services.AddScoped<EgebisLeadFinder.Services.Sequences.ReplyDetectionService>();
 builder.Services.AddHostedService<EgebisLeadFinder.Services.Sequences.SequenceSenderWorker>();

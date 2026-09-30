@@ -61,9 +61,10 @@ public class CompanyController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Search(CancellationToken ct)
+    public async Task<IActionResult> Search(string? industry, CancellationToken ct)
     {
         var model = new CompanySearchViewModel();
+        if (!string.IsNullOrWhiteSpace(industry)) model.Criteria.Industry = industry.Trim()[..Math.Min(industry.Trim().Length, 150)];
         await FillSearchPageAsync(model, ct);
         return View(model);
     }
