@@ -484,3 +484,7 @@ $RECYCLE.BIN/
 # Egebis
 *.user
 logs/
+
+# Alan sifreleme anahtari ve yerel uygulama verisi: ASLA commit edilmez.
+**/App_Data/
+*.key

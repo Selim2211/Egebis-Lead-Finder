@@ -1,6 +1,8 @@
 using EgebisLeadFinder.Models;
 using EgebisLeadFinder.Services.Auth;
+using EgebisLeadFinder.Services.Security;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace EgebisLeadFinder.Data;
 
@@ -39,6 +41,7 @@ public class ApplicationDbContext : DbContext
     {
         StampCreatedBy();
         ResetChangedEmailVerification();
+        UpdateBlindIndexes();
         var pending = SalesforceChangeTracker.Collect(ChangeTracker);
         var result = base.SaveChanges(acceptAllChangesOnSuccess);
         if (!pending.IsEmpty) SalesforceChangeTracker.MarkDirtyAsync(this, pending, CancellationToken.None).GetAwaiter().GetResult();
@@ -51,6 +54,7 @@ public class ApplicationDbContext : DbContext
         // "senkron bekliyor" olarak isaretlenir (bkz. SalesforceAutoSyncService).
         StampCreatedBy();
         ResetChangedEmailVerification();
+        UpdateBlindIndexes();
         var pending = SalesforceChangeTracker.Collect(ChangeTracker);
         var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
         if (!pending.IsEmpty) await SalesforceChangeTracker.MarkDirtyAsync(this, pending, cancellationToken);
@@ -89,9 +93,49 @@ public class ApplicationDbContext : DbContext
         }
     }
 
+    /// <summary>Sifreli e-posta alanlarinin arama indeksleri, deger her degistiginde yeniden hesaplanir.</summary>
+    private void UpdateBlindIndexes()
+    {
+        foreach (var entry in ChangeTracker.Entries<Contact>())
+            if (entry.State == EntityState.Added || (entry.State == EntityState.Modified && entry.Property(c => c.Email).IsModified))
+                entry.Entity.EmailHash = FieldEncryption.BlindIndex(entry.Entity.Email);
+
+        foreach (var entry in ChangeTracker.Entries<SentEmail>())
+            if (entry.State == EntityState.Added || (entry.State == EntityState.Modified && entry.Property(e => e.ToAddress).IsModified))
+                entry.Entity.ToAddressHash = FieldEncryption.BlindIndex(entry.Entity.ToAddress);
+    }
+
+    /// <summary>Kritik alanlar veritabaninda sifreli (AES-256-GCM) saklanir; uygulama icinde duz metindir.</summary>
+    private static readonly ValueConverter<string?, string?> Encrypted =
+        new(v => FieldEncryption.Protect(v), v => FieldEncryption.Unprotect(v));
+
+    private static readonly ValueConverter<string, string> EncryptedRequired =
+        new(v => FieldEncryption.Protect(v)!, v => FieldEncryption.Unprotect(v)!);
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
+
+        // ---- Sifreli alanlar: kisi iletisim bilgileri, gonderilen mail alicisi, kullanici bilgileri ----
+        // Sifreli metin duz metinden uzun oldugu icin kolonlar "text"; uzunluk siniri
+        // StringLengthGuard ile duz metin uzerinde uygulanir.
+        b.Entity<Contact>(e =>
+        {
+            e.Property(x => x.Email).HasConversion(Encrypted).HasColumnType("text");
+            e.Property(x => x.Phone).HasConversion(Encrypted).HasColumnType("text");
+            e.Property(x => x.SourceUrl).HasConversion(Encrypted).HasColumnType("text");
+            e.HasIndex(x => x.EmailHash);
+        });
+        b.Entity<SentEmail>(e =>
+        {
+            e.Property(x => x.ToAddress).HasConversion(EncryptedRequired).HasColumnType("text");
+            e.HasIndex(x => x.ToAddressHash);
+        });
+        b.Entity<AppUser>(e =>
+        {
+            e.Property(x => x.Email).HasConversion(Encrypted).HasColumnType("text");
+            e.Property(x => x.FullName).HasConversion(Encrypted).HasColumnType("text");
+        });
 
         b.Entity<LeadSequence>().HasIndex(x => new { x.Status, x.NextSendAt });
         b.Entity<LeadSequence>().HasIndex(x => x.LeadId);

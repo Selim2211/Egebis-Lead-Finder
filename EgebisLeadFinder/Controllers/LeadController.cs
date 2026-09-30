@@ -210,12 +210,14 @@ public class LeadController : Controller
         if (!string.IsNullOrWhiteSpace(q))
         {
             var term = $"%{q.Trim()}%";
+            // E-posta sifreli saklanir: parca aramasi yapilamaz, tam adres kor indeksle eslesir.
+            var emailHash = q.Contains('@') ? EgebisLeadFinder.Services.Security.FieldEncryption.BlindIndex(q) : null;
             query = query.Where(l =>
                 EF.Functions.ILike(l.Company!.Name, term) ||
                 (l.Contact != null && (
                     (l.Contact.Name != null && EF.Functions.ILike(l.Contact.Name, term)) ||
                     (l.Contact.Title != null && EF.Functions.ILike(l.Contact.Title, term)) ||
-                    (l.Contact.Email != null && EF.Functions.ILike(l.Contact.Email, term)))));
+                    (emailHash != null && l.Contact.EmailHash == emailHash))));
         }
 
         if (status is not null)

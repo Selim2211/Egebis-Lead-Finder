@@ -81,9 +81,11 @@ public class SettingsService : ISettingsService
         await using var scope = _scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-        var settings = await db.AppSettings
-            .AsNoTracking()
-            .ToDictionaryAsync(s => s.Key, s => s.Value, ct);
+        // API anahtarlari ve sifreler veritabaninda sifreli; bellekte (5 dk onbellek) cozulmus tutulur.
+        var settings = (await db.AppSettings
+                .AsNoTracking()
+                .ToListAsync(ct))
+            .ToDictionary(s => s.Key, s => EgebisLeadFinder.Services.Security.FieldEncryption.Unprotect(s.Value));
 
         _cache.Set(CacheKey, settings, CacheDuration);
         return settings;
@@ -96,8 +98,9 @@ public class SettingsService : ISettingsService
 
         var existing = await db.AppSettings.ToDictionaryAsync(s => s.Key, s => s, ct);
 
-        foreach (var (key, value) in values)
+        foreach (var (key, raw) in values)
         {
+            var value = SettingKeys.IsSecret(key) ? EgebisLeadFinder.Services.Security.FieldEncryption.Protect(raw) : raw;
             if (existing.TryGetValue(key, out var row))
             {
                 row.Value = value;

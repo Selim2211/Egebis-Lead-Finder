@@ -62,6 +62,27 @@ Canlıya çıkarken `cp .env.example .env` yapıp `POSTGRES_PASSWORD`'u değişt
   sunucuda önce yalnız veritabanını başlatın (`docker compose up -d db`), yedeği yükleyin
   (`docker compose exec -T db psql -U egebis egebisleadfinder < yedek.sql`), sonra
   `docker compose up -d --build` ile uygulamayı başlatın.
+  **Şifreli alanlar** yerel anahtarla şifrelendiği için yerel `EgebisLeadFinder/App_Data/field-encryption.key`
+  dosyasının içeriğini sunucudaki `.env` dosyasına `ENCRYPTION_KEY=...` olarak yazın (uygulamayı başlatmadan önce).
+
+### Veri şifreleme
+
+Kritik bilgiler veritabanında **AES-256-GCM** ile şifreli saklanır; uygulama içinde normal görünür:
+
+- Lead/kişi iletişim bilgileri: e-posta, telefon, LinkedIn/profil adresi
+- Gönderilen maillerin alıcı adresi
+- Kullanıcıların ad-soyad ve e-postası (giriş şifreleri zaten tek yönlü PBKDF2 ile saklanır)
+- API anahtarları ve şifreler: Serper, Gemini, Apollo, SMTP/IMAP şifresi, Salesforce gizli bilgileri
+
+Şifreli e-postada arama için ayrıca tek yönlü bir "kör indeks" tutulur: lead aramasında **tam e-posta adresi**
+yazılınca kayıt bulunur (e-postanın bir parçasıyla arama yapılamaz). Kullanıcı adı (giriş için) ve kişi adı
+(arama ve sıralama için) şifrelenmez.
+
+Anahtar ilk açılışta otomatik üretilir: Docker'da `appkeys` volume'unda (`/app/keys/field-encryption.key`),
+yerelde `EgebisLeadFinder/App_Data/field-encryption.key`. İstenirse `.env` içindeki `ENCRYPTION_KEY` ile
+(base64, 32 bayt) verilir. **Anahtar kaybolursa şifreli alanlar okunamaz** — dosyayı veritabanı yedeğiyle birlikte,
+ayrı ve güvenli bir yerde yedekleyin; git'e eklemeyin (`.gitignore`'da). Eski (şifresiz) kayıtlar uygulama
+açılırken otomatik şifrelenir.
 
 ## Kurulum (geliştirme)
 

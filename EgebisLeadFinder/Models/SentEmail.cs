@@ -29,6 +29,10 @@ public class SentEmail
     [MaxLength(255)]
     public string ToAddress { get; set; } = string.Empty;
 
+    /// <summary>Alici adresinin kor indeksi: sifreli adreste cevap/geri donus eslemesi icin.</summary>
+    [MaxLength(64)]
+    public string? ToAddressHash { get; set; }
+
     [MaxLength(500)]
     public string Subject { get; set; } = string.Empty;
 

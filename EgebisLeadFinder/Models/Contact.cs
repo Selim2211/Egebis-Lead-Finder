@@ -82,6 +82,13 @@ public class Contact
     [MaxLength(50)]
     public string? Phone { get; set; }
 
+    /// <summary>
+    /// E-posta sifreli saklandigi icin esitlik aramasi (geri donen mail, lead aramasi) bu kor
+    /// indeks uzerinden yapilir; kayit sirasinda otomatik hesaplanir (bkz. FieldEncryption).
+    /// </summary>
+    [MaxLength(64)]
+    public string? EmailHash { get; set; }
+
     [MaxLength(500)]
     public string? SourceUrl { get; set; }
 

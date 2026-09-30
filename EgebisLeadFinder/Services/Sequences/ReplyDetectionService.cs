@@ -194,7 +194,8 @@ public class ReplyDetectionService
                 var bounced = ReplyMatcher.BouncedRecipient(m, recipients);
                 if (bounced is null) return false;
 
-                var contacts = await _db.Contacts.Where(c => c.Email != null && c.Email.ToLower() == bounced.ToLower()).ToListAsync(ct);
+                var bouncedHash = EgebisLeadFinder.Services.Security.FieldEncryption.BlindIndex(bounced);
+                var contacts = await _db.Contacts.Where(c => c.EmailHash == bouncedHash).ToListAsync(ct);
                 foreach (var c in contacts)
                 {
                     c.EmailStatus = EmailStatus.Invalid;
@@ -240,8 +241,9 @@ public class ReplyDetectionService
         var from = m.FromAddress.Trim().ToLowerInvariant();
 
         // Adres eslesmesi: bu adrese mail gitmis en son lead.
+        var fromHash = EgebisLeadFinder.Services.Security.FieldEncryption.BlindIndex(from);
         var leadId = await _db.SentEmails.AsNoTracking()
-            .Where(e => e.ToAddress.ToLower() == from)
+            .Where(e => e.ToAddressHash == fromHash)
             .OrderByDescending(e => e.SentAt).Select(e => (int?)e.LeadId).FirstOrDefaultAsync(ct);
         return leadId is null ? null : await _db.Leads.FirstOrDefaultAsync(l => l.Id == leadId, ct);
     }

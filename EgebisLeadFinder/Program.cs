@@ -98,6 +98,17 @@ if (builder.Configuration["Database:Name"] is { Length: > 0 } databaseName)
 
 builder.Services.AddDbContext<ApplicationDbContext>(o => o.UseNpgsql(connectionString));
 
+// Kritik alan sifrelemesi (kisi e-posta/telefonu, kullanici bilgileri, API anahtarlari). Anahtar
+// "Encryption:Key" ayarindan (base64, 32 bayt) ya da anahtar dosyasindan gelir; dosya yoksa ilk
+// acilista uretilir. Anahtar kaybolursa sifreli veriler okunamaz: dosyayi yedekleyin.
+var encryptionKeyFile = builder.Configuration["Encryption:KeyFile"] is { Length: > 0 } configuredKeyFile
+    ? configuredKeyFile
+    : Path.Combine(keysPath is { Length: > 0 } ? keysPath : Path.Combine(builder.Environment.ContentRootPath, "App_Data"),
+        "field-encryption.key");
+var (fieldEncryption, encryptionKeySource, encryptionKeyCreated) =
+    EgebisLeadFinder.Services.Security.FieldEncryption.Load(builder.Configuration["Encryption:Key"], encryptionKeyFile);
+EgebisLeadFinder.Services.Security.FieldEncryption.Current = fieldEncryption;
+
 // Ayarlar servisi singleton: firma analizleri paralel calisiyor ve DbContext
 // thread-safe degil, bu yuzden servis her okumada kendi scope'unu aciyor.
 builder.Services.AddSingleton<ISettingsService, SettingsService>();
@@ -241,6 +252,24 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
     using var scope = app.Services.CreateScope();
     scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.Migrate();
+}
+
+if (encryptionKeyCreated)
+    app.Logger.LogWarning("Yeni şifreleme anahtarı oluşturuldu: {KeyFile}. Bu dosyayı yedekleyin; kaybolursa şifreli veriler okunamaz.",
+        encryptionKeySource);
+else
+    app.Logger.LogInformation("Şifreleme anahtarı yüklendi ({Source}, anahtar {KeyId}).", encryptionKeySource, fieldEncryption.KeyId);
+
+// Sifreleme oncesinden kalan duz metin kritik alanlar sifrelenir (tekrar calismasi guvenli).
+try
+{
+    using var scope = app.Services.CreateScope();
+    await EgebisLeadFinder.Services.Security.EncryptionBackfill.RunAsync(
+        scope.ServiceProvider.GetRequiredService<ApplicationDbContext>(), app.Logger);
+}
+catch (Exception ex)
+{
+    app.Logger.LogError(ex, "Kritik alanlar şifrelenemedi; veritabanı güncel değilse migration'ları uygulayın.");
 }
 
 app.UseSerilogRequestLogging();
