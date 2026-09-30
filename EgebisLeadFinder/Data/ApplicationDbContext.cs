@@ -149,7 +149,12 @@ public class ApplicationDbContext : DbContext
             e.HasIndex(x => x.Status);
         });
 
-        b.Entity<SearchProfile>().HasIndex(x => x.Name).IsUnique();
+        // Sablon adi kullanici basina tekildir (farkli kullanicilar ayni adi kullanabilir).
+        b.Entity<SearchProfile>(e =>
+        {
+            e.HasIndex(x => new { x.OwnerUserId, x.Name }).IsUnique().AreNullsDistinct(false);
+            e.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerUserId).OnDelete(DeleteBehavior.SetNull);
+        });
 
         // Lead silinirse e-posta gecmisi de gider (kisi/firma kaydi etkilenmez).
         b.Entity<SentEmail>(e =>
@@ -163,7 +168,8 @@ public class ApplicationDbContext : DbContext
 
         b.Entity<CompanySearchProfile>(e =>
         {
-            e.HasIndex(x => new { x.CompanyId, x.SearchProfileId }).IsUnique();
+            e.HasIndex(x => new { x.CompanyId, x.SearchProfileId, x.UserId }).IsUnique().AreNullsDistinct(false);
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
 
             e.HasOne(x => x.Company)
              .WithMany()

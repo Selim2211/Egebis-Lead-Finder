@@ -30,6 +30,9 @@ public class SearchCriteria
     /// </summary>
     public int? ProfileId { get; set; }
 
+    /// <summary>Kaydedilen arama sablonu tum kullanicilara acik mi (sonuclar yine kisiye ozel).</summary>
+    public bool ProfilePublic { get; set; }
+
     /// <summary>
     /// Doluysa sektor yerine belirli bir firma aranir ("Toyota", "Egebis"). Sorgular
     /// firma adina gore kurulur ve sadece birkac aday site islenir.

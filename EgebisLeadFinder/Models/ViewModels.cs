@@ -92,6 +92,9 @@ public class CompanyListViewModel
     /// <summary>Firmalar ekranindaki arama secicisi: son aramalar ve secili olan (null = tum firmalar).</summary>
     public List<SearchRun> Runs { get; set; } = new();
     public int? RunId { get; set; }
+
+    /// <summary>"Tum firmalar" secenegindeki sayi: kullanicinin gorebildigi firmalar.</summary>
+    public int AllCount { get; set; }
     public SearchRun? SelectedRun { get; set; }
 
     /// <summary>Bu sayfadaki firmalardan secili aramada yeni eklenenler ("yeni" etiketi).</summary>

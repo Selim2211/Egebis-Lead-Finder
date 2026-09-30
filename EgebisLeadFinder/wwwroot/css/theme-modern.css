@@ -191,3 +191,8 @@ h1, h2, h3, h4, h5, h6 { font-weight: 650; letter-spacing: -.022em; }
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; }
 }
+
+/* ---------- Arama sablonu paylasim rozeti ---------- */
+.profile-share { display: inline-block; margin-left: .35rem; padding: .05rem .5rem; border-radius: 999px; font-size: .72rem; font-weight: 600;
+    background: var(--eg-soft); color: var(--eg-soft-text); }
+.profile-share.is-public { background: var(--eg-brand-soft); color: var(--eg-brand-soft-text); }

@@ -27,6 +27,9 @@
 
     var sortLabel = CompanySort.Options.First(o => o.Key == Model.Sort).Label;
     var profile = Model.Profiles.FirstOrDefault(p => p.Id == Model.ProfileId);
+    var me = EgebisLeadFinder.Services.Auth.ClaimsPrincipalExtensions.UserId(User);
+    var isAdmin = User.IsInRole(nameof(UserRole.Admin));
+    var canEditProfile = profile?.CanEdit(me, isAdmin) == true;
 
     // Aktif filtre cipleri (x ile tek tek kaldirilir).
     var chips = new List<(string Label, string Url)>();
@@ -95,18 +98,18 @@
             else
             {
                 <span class="run-picker-title">Tüm firmalar</span>
-                <span class="run-picker-sub">Bugüne kadar bulunan bütün firmalar (@(Model.Pool?.Companies ?? 0) firma)</span>
+                <span class="run-picker-sub">@(isAdmin ? "Bugüne kadar bulunan bütün firmalar" : "Aramalarınızda bulunan bütün firmalar") (@Model.AllCount firma)</span>
             }
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
         </summary>
         <div class="run-picker-list">
             <a class="run-picker-item @(Model.RunId is null ? "is-active" : "")" href="@RunUrl("all")">
                 <span class="run-picker-title">Tüm firmalar</span>
-                <span class="run-picker-sub">Bütün aramaların sonuçları bir arada</span>
+                <span class="run-picker-sub">@(isAdmin ? "Bütün aramaların sonuçları bir arada" : "Kendi aramalarınızın sonuçları bir arada")</span>
             </a>
             @if (Model.Runs.Count == 0)
             {
-                <div class="run-picker-empty">Henüz kayıtlı arama yok. Yeni aramalar burada listelenecek.</div>
+                <div class="run-picker-empty">Henüz kayıtlı aramanız yok. Aramalarınız burada listelenir; sonuçlar yalnızca size görünür.</div>
             }
             @foreach (var r in Model.Runs)
             {
@@ -176,6 +179,8 @@
                 <input type="hidden" name="Criteria.City" value="@profile.City" />
                 <input type="hidden" name="Criteria.RegionKey" value="@profile.RegionKey" />
                 <input type="hidden" name="Criteria.ProfileName" value="@profile.Name" />
+                <input type="hidden" name="Criteria.ProfileId" value="@profile.Id" />
+                <input type="hidden" name="Criteria.ProfilePublic" value="@(profile.IsPublic ? "true" : "false")" />
                 <button type="submit" class="filter-chip-action">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 3v6h-6" />
@@ -184,9 +189,28 @@
                 </button>
             </form>
         }
-        @if (profile is not null)
+        @if (profile is not null && canEditProfile)
         {
-            <button type="submit" form="deleteProfileForm" class="filter-chip-danger ms-auto"
+            <form method="post" asp-action="SetProfileVisibility" class="d-inline-flex m-0 ms-auto">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="profileId" value="@profile.Id" />
+                <input type="hidden" name="isPublic" value="@(profile.IsPublic ? "false" : "true")" />
+                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                <button type="submit" class="filter-chip-action"
+                        title="@(profile.IsPublic ? "Şablon şu an herkese açık" : "Şablon şu an yalnızca size özel") — sonuçlar her durumda size özel kalır">
+                    @(profile.IsPublic ? "Herkese açık · Özel yap" : "Size özel · Herkese aç")
+                </button>
+            </form>
+        }
+        else if (profile is not null)
+        {
+            <span class="filter-chip-action ms-auto" title="Bu şablonu başka bir kullanıcı paylaştı; yalnızca sizin sonuçlarınız gösteriliyor.">
+                Paylaşan: @(profile.Owner?.DisplayName ?? "başka kullanıcı")
+            </span>
+        }
+        @if (profile is not null && canEditProfile)
+        {
+            <button type="submit" form="deleteProfileForm" class="filter-chip-danger"
                     data-confirm="Firmalar silinmez; yalnızca bu profil ve firmalardaki profil etiketi kaldırılır."
                     data-confirm-title="Arama profili silinsin mi?" data-confirm-subject="@profile.Name"
                     data-confirm-ok="Profili sil" data-confirm-tone="danger">
@@ -288,7 +312,7 @@
                     @foreach (var p in Model.Profiles)
                     {
                         <option value="@p.Id" selected="@(Model.ProfileId == p.Id)">
-                            @p.Name — @SearchRegions.Get(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key).Name — @p.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")
+                            @p.Name — @SearchRegions.Get(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key).Name — @p.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")@(p.OwnerUserId is not null && p.OwnerUserId != me ? $" — paylaşan: {p.Owner?.DisplayName}" : p.IsPublic ? " — herkese açık" : "")
                         </option>
                     }
                 </select>

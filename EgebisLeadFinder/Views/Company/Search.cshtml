@@ -20,6 +20,8 @@
     // "Biz ne arıyoruz?" segmentleri: tek tikla sektor + bolge doldurur.
     var segments = EgebisLeadFinder.Services.BusinessProfileService
         .Parse(await SearchSettings.GetAsync(SettingKeys.BusinessProfile)).Segments;
+    var me = EgebisLeadFinder.Services.Auth.ClaimsPrincipalExtensions.UserId(User);
+    var isAdmin = User.IsInRole(nameof(UserRole.Admin));
 }
 
 <div class="page-head">
@@ -415,6 +417,14 @@
                             <div class="form-text" id="profileEditHint">
                                 Aynı adla kaydederseniz mevcut profil güncellenir. Aşağıdan bir profile tıklayıp düzenleyebilirsiniz.
                             </div>
+                            <label class="form-check mt-2 mb-0">
+                                <input class="form-check-input" type="checkbox" id="advProfilePublic" name="Criteria.ProfilePublic" value="true"
+                                       checked="@(Model.Criteria.ProfilePublic ? "checked" : null)" />
+                                <span class="form-check-label small">
+                                    Şablonu tüm kullanıcılarla paylaş
+                                    <span class="text-muted-2">— yalnızca arama kriterleri paylaşılır, bulduğunuz firmalar size özel kalır.</span>
+                                </span>
+                            </label>
                         </div>
 
                         <div class="form-label d-flex justify-content-between align-items-baseline">
@@ -430,15 +440,20 @@
                             }
                             @foreach (var p in Model.Profiles)
                             {
+                                var mine = p.CanEdit(me, isAdmin);
                                 <button type="button" class="profile-item" data-id="@p.Id" data-name="@p.Name"
                                         data-industry="@p.Industry" data-city="@p.City"
+                                        data-public="@(p.IsPublic ? "true" : "false")" data-mine="@(mine ? "true" : "false")"
                                         data-region="@SearchRegions.Get(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key).Key">
                                     <span class="profile-item-name">
                                         @p.Name
                                         <span class="profile-region">@SearchRegions.Get(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key).Name</span>
                                     </span>
                                     <span class="profile-item-meta">@p.Industry · @ProfileCityLabel(p.City)</span>
-                                    <span class="profile-item-date">Kaydedildi: @p.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+                                    <span class="profile-item-date">
+                                        Kaydedildi: @p.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                        <span class="profile-share @(p.IsPublic ? "is-public" : "")">@ShareLabel(p, me)</span>
+                                    </span>
                                 </button>
                             }
                         </div>
@@ -520,6 +535,12 @@
 </div>
 
 @functions {
+    /// <summary>Sablon rozeti: "Size özel", "Herkese açık" veya paylasan kisinin adi.</summary>
+    private static string ShareLabel(SearchProfile p, int? me) =>
+        p.OwnerUserId is not null && p.OwnerUserId != me
+            ? $"Paylaşan: {p.Owner?.DisplayName ?? "başka kullanıcı"}"
+            : p.IsPublic ? "Herkese açık" : "Size özel";
+
     private static string ProfileCityLabel(string? city)
     {
         var cities = (city ?? string.Empty)
@@ -548,6 +569,7 @@
         var status = document.getElementById('profileSaveStatus');
         var advRegion = document.getElementById('advRegion');
         var advProfileId = document.getElementById('advProfileId');
+        var advPublic = document.getElementById('advProfilePublic');
         var basicRegion = document.getElementById('basicRegionSelect');
         var provincePanel = document.getElementById('provincePanel');
         var freePanel = document.getElementById('freePanel');
@@ -665,8 +687,11 @@
                 setRegion(item.getAttribute('data-region') || 'TR');
                 if (advRegion.value === 'TR') setCities(list); else { setCities([]); freeText.value = list.join(', '); }
                 advProfileId.value = item.getAttribute('data-id') || '';
-                document.getElementById('profileEditHint').textContent =
-                    'Düzenleme: "' + advName.value + '" — alanları değiştirip "Arama Profilini Kaydet"e basın (adı da değiştirebilirsiniz).';
+                var mine = item.getAttribute('data-mine') === 'true';
+                advPublic.checked = mine && item.getAttribute('data-public') === 'true';
+                document.getElementById('profileEditHint').textContent = mine
+                    ? 'Düzenleme: "' + advName.value + '" — alanları değiştirip "Arama Profilini Kaydet"e basın (adı da değiştirebilirsiniz).'
+                    : 'Paylaşılan şablon: olduğu gibi arayabilirsiniz; değiştirip kaydederseniz size özel bir kopyası oluşur. Sonuçlar size özeldir.';
                 document.querySelectorAll('.profile-item').forEach(function (i) { i.classList.remove('is-active'); });
                 item.classList.add('is-active');
             });
@@ -725,6 +750,8 @@
             item.setAttribute('data-industry', p.industry || '');
             item.setAttribute('data-city', p.city || '');
             item.setAttribute('data-region', p.regionKey || 'TR');
+            item.setAttribute('data-public', p.isPublic ? 'true' : 'false');
+            item.setAttribute('data-mine', p.canEdit ? 'true' : 'false');
             item.querySelector('.profile-item-name').textContent = p.name;
             var reg = document.createElement('span');
             reg.className = 'profile-region';
@@ -732,7 +759,12 @@
             item.querySelector('.profile-item-name').appendChild(reg);
             advProfileId.value = p.id;
             item.querySelector('.profile-item-meta').textContent = (p.industry || '') + ' · ' + formatCities(p.city);
-            item.querySelector('.profile-item-date').textContent = 'Kaydedildi: ' + p.createdAt;
+            var date = item.querySelector('.profile-item-date');
+            date.textContent = 'Kaydedildi: ' + p.createdAt + ' ';
+            var share = document.createElement('span');
+            share.className = 'profile-share' + (p.isPublic ? ' is-public' : '');
+            share.textContent = p.isPublic ? 'Herkese açık' : 'Size özel';
+            date.appendChild(share);
             list.prepend(item);
 
             document.querySelectorAll('.profile-item').forEach(function (i) { i.classList.remove('is-active'); });

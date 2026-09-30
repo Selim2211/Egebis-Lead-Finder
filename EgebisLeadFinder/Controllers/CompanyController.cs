@@ -75,8 +75,18 @@ public class CompanyController : Controller
         model.MaxCompanies = maxCompanies;
         model.Region = region;
         model.DefaultCountry = region.Name;
-        model.Profiles = await _db.SearchProfiles.AsNoTracking()
-            .OrderByDescending(p => p.CreatedAt)
+        model.Profiles = await VisibleProfilesAsync(ct);
+    }
+
+    /// <summary>Kullanicinin gorebildigi arama sablonlari: kendi sablonlari once, sonra herkese acik olanlar.</summary>
+    private Task<List<SearchProfile>> VisibleProfilesAsync(CancellationToken ct)
+    {
+        var me = User.UserId();
+        return _db.SearchProfiles.AsNoTracking()
+            .VisibleTo(me)
+            .Include(p => p.Owner)
+            .OrderByDescending(p => p.OwnerUserId == me)
+            .ThenByDescending(p => p.CreatedAt)
             .ToListAsync(ct);
     }
 
@@ -223,22 +233,35 @@ public class CompanyController : Controller
         if (string.IsNullOrWhiteSpace(name)) return null;
         if (name.Length > 150) name = name[..150].TrimEnd();
 
-        // Duzenleme: ayni Id'li kayit bulunursa yeniden adlandirma dahil uzerine yazilir.
-        // Yeni ad baska bir profilde varsa o profil guncellenir (eski davranis).
+        var me = User.UserId();
+        var isAdmin = User.IsAdmin();
+
+        // Duzenleme: kullanicinin duzenleyebildigi ayni Id'li kayit bulunursa yeniden adlandirma dahil
+        // uzerine yazilir. Yeni ad kullanicinin baska bir sablonunda varsa o sablon guncellenir.
         SearchProfile? profile = null;
         if (criteria.ProfileId is int editId)
         {
             profile = await _db.SearchProfiles.FirstOrDefaultAsync(p => p.Id == editId, ct);
+
+            // Baskasinin herkese acik sablonu: aynen kullaniliyorsa ona baglanir (sablon degismez,
+            // sonuclar yine kisiye ozel); kriter veya ad degistiyse kullanicinin kendi kopyasi olusur.
+            if (profile is not null && !profile.CanEdit(me, isAdmin))
+            {
+                if (profile.IsVisibleTo(me) && profile.Name == name && SameCriteria(profile, criteria))
+                    return profile;
+                profile = null;
+            }
+
             if (profile is not null
-                && await _db.SearchProfiles.AnyAsync(p => p.Name == name && p.Id != editId, ct))
+                && await _db.SearchProfiles.AnyAsync(p => p.Name == name && p.OwnerUserId == profile.OwnerUserId && p.Id != editId, ct))
                 profile = null;
             if (profile is not null) profile.Name = name;
         }
 
-        profile ??= await _db.SearchProfiles.FirstOrDefaultAsync(p => p.Name == name, ct);
+        profile ??= await _db.SearchProfiles.FirstOrDefaultAsync(p => p.Name == name && p.OwnerUserId == me, ct);
         if (profile is null)
         {
-            profile = new SearchProfile { Name = name };
+            profile = new SearchProfile { Name = name, OwnerUserId = me };
             _db.SearchProfiles.Add(profile);
         }
 
@@ -246,10 +269,16 @@ public class CompanyController : Controller
         profile.City = criteria.City;
         profile.Country = criteria.Country;
         profile.RegionKey = criteria.RegionKey;
+        profile.IsPublic = criteria.ProfilePublic;
 
         await _db.SaveChangesAsync(ct);
         return profile;
     }
+
+    private static bool SameCriteria(SearchProfile p, SearchCriteria c) =>
+        string.Equals(p.Industry?.Trim(), c.Industry?.Trim(), StringComparison.OrdinalIgnoreCase)
+        && string.Equals(p.City ?? "", c.City ?? "", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key, c.RegionKey, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Gelismis arama ekranindaki "Profili Kaydet": arama yapmadan sadece profili kaydeder.</summary>
     [HttpPost]
@@ -270,8 +299,31 @@ public class CompanyController : Controller
             city = profile.City,
             regionKey = profile.RegionKey,
             regionName = SearchRegions.Get(profile.RegionKey).Name,
-            createdAt = profile.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+            createdAt = profile.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm"),
+            isPublic = profile.IsPublic,
+            canEdit = profile.CanEdit(User.UserId(), User.IsAdmin())
         });
+    }
+
+    /// <summary>Sablonu herkese acar veya kisiye ozel yapar (yalnizca sahibi). Arama sonuclari hic paylasilmaz.</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetProfileVisibility(int profileId, bool isPublic, string? returnUrl, CancellationToken ct)
+    {
+        var profile = await _db.SearchProfiles.FirstOrDefaultAsync(p => p.Id == profileId, ct);
+        if (profile is null || !profile.IsVisibleTo(User.UserId())) return NotFound();
+        if (!profile.CanEdit(User.UserId(), User.IsAdmin())) return Forbid();
+
+        profile.IsPublic = isPublic;
+        await _db.SaveChangesAsync(ct);
+        AuditActionFilter.SetAuditSummary(HttpContext,
+            $"Arama şablonu {(isPublic ? "herkese açıldı" : "kişiye özel yapıldı")}: {profile.Name}");
+
+        if (WantsJson()) return Json(new { ok = true, isPublic });
+        TempData["SettingsSaved"] = isPublic
+            ? $"\"{profile.Name}\" şablonu artık tüm kullanıcılara açık (arama sonuçlarınız paylaşılmaz)."
+            : $"\"{profile.Name}\" şablonu artık yalnızca size özel.";
+        return RedirectToLocal(returnUrl);
     }
 
     // ============ İlerleme göstergeli (arka planda çalışan) firma araması ============
@@ -490,13 +542,13 @@ public class CompanyController : Controller
         page = PagerModel.Clamp(page, total);
 
         // Il/ulke secimindeki sayilar: diger filtrelerden bagimsiz, tum firmalar uzerinden.
-        geo.CityCounts = await _db.Companies.AsNoTracking()
+        geo.CityCounts = await VisibleCompanies()
             .Where(c => c.City != null)
             .GroupBy(c => c.City!)
             .Select(g => new { g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
 
-        var countryRows = await _db.Companies.AsNoTracking()
+        var countryRows = await VisibleCompanies()
             .Where(c => c.Country != null)
             .GroupBy(c => c.Country!)
             .Select(g => new { g.Key, Count = g.Count() })
@@ -507,7 +559,8 @@ public class CompanyController : Controller
         var runs = HttpContext.RequestServices.GetRequiredService<SearchRunService>();
         var model = new CompanyListViewModel
         {
-            Runs = await runs.RecentAsync(30, ct),
+            Runs = await runs.RecentAsync(User.UserId(), User.IsAdmin(), 30, ct),
+            AllCount = await VisibleCompanies().CountAsync(ct),
             RunId = runId,
             NotEvaluated = notEvaluated,
             NotEvaluatedCount = await ScopeToRun(_db.Companies.AsNoTracking(), runId)
@@ -527,18 +580,16 @@ public class CompanyController : Controller
             Signal = signal,
             Nace = nace,
             Icp = icp,
-            NaceCounts = await _db.Companies.AsNoTracking()
+            NaceCounts = await VisibleCompanies()
                 .Where(c => c.NaceCode != null)
                 .GroupBy(c => c.NaceCode!.Substring(0, 2))
                 .Select(g => new { g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.Key, x => x.Count, ct),
-            IcpCount = await _db.Companies.CountAsync(c => c.IcpMatch, ct),
+            IcpCount = await ScopeToRun(_db.Companies.AsNoTracking(), runId).CountAsync(c => c.IcpMatch, ct),
             Sort = sort,
             Geo = geo,
             Pager = new PagerModel { Page = page, TotalItems = total },
-            Profiles = await _db.SearchProfiles.AsNoTracking()
-                .OrderByDescending(p => p.CreatedAt)
-                .ToListAsync(ct),
+            Profiles = await VisibleProfilesAsync(ct),
             Companies = await ordered
                 .ThenBy(c => c.Id)
                 .Skip((page - 1) * PagerModel.DefaultPageSize)
@@ -623,13 +674,30 @@ public class CompanyController : Controller
     private async Task<int?> ResolveRunAsync(string? run, int? profileId, CancellationToken ct)
     {
         if (string.Equals(run, "all", StringComparison.OrdinalIgnoreCase)) return null;
-        if (int.TryParse(run, out var id) && id > 0) return id;
+        var runs = HttpContext.RequestServices.GetRequiredService<SearchRunService>();
+        // Baskasinin aramasi istenirse (sonuclar kisiye ozel) kullanicinin kendi varsayilanina donulur.
+        if (int.TryParse(run, out var id) && id > 0 && await runs.CanViewAsync(id, User.UserId(), User.IsAdmin(), ct)) return id;
         if (profileId is > 0) return null;
-        return await HttpContext.RequestServices.GetRequiredService<SearchRunService>().DefaultRunIdAsync(User.UserId(), ct);
+        return await runs.DefaultRunIdAsync(User.UserId(), ct);
     }
 
-    private IQueryable<Company> ScopeToRun(IQueryable<Company> query, int? runId) =>
-        runId is int id ? query.Where(c => _db.SearchRunCompanies.Any(x => x.SearchRunId == id && x.CompanyId == c.Id)) : query;
+    /// <summary>
+    /// "Tum firmalar": yonetici tum havuzu gorur; kullanici kendi aramalarinda bulunan firmalari ve
+    /// hicbir aramaya bagli olmayan eski kayitlari gorur (baskalarinin arama sonuclari gizli).
+    /// </summary>
+    private IQueryable<Company> VisibleCompanies() => ScopeToRun(_db.Companies.AsNoTracking(), null);
+
+    /// <summary>Secili aramanin firmalari; arama secili degilse kullanicinin gorebildigi tum firmalar.</summary>
+    private IQueryable<Company> ScopeToRun(IQueryable<Company> query, int? runId)
+    {
+        if (runId is int id)
+            return query.Where(c => _db.SearchRunCompanies.Any(x => x.SearchRunId == id && x.CompanyId == c.Id));
+        if (User.IsAdmin()) return query;
+        var me = User.UserId();
+        return query.Where(c =>
+            _db.SearchRunCompanies.Any(x => x.CompanyId == c.Id && x.SearchRun.UserId == me)
+            || !_db.SearchRunCompanies.Any(x => x.CompanyId == c.Id));
+    }
 
     /// <summary>Firmalar listesi ve disa aktarim ayni suzgeci kullanir: ekranda ne varsa o iner.</summary>
     private async Task<IQueryable<Company>> FilterCompaniesAsync(string? search, int minScore, bool onlyWithoutLead,
@@ -690,8 +758,10 @@ public class CompanyController : Controller
 
         if (profileId is > 0)
         {
+            // Sablon herkese acik olsa da sonuclar kisiye ozel: yalnizca kendi baglari (+ eski sahipsiz baglar).
+            var me = User.UserId();
             var companyIds = await _db.CompanySearchProfiles
-                .Where(x => x.SearchProfileId == profileId)
+                .Where(x => x.SearchProfileId == profileId && (x.UserId == me || x.UserId == null))
                 .Select(x => x.CompanyId)
                 .ToListAsync(ct);
             query = query.Where(c => companyIds.Contains(c.Id));
@@ -880,18 +950,19 @@ public class CompanyController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveToProfile(int profileId, int[] companyIds, CancellationToken ct)
     {
+        var me = User.UserId();
         var profile = await _db.SearchProfiles.FindAsync(new object[] { profileId }, ct);
-        if (profile is null) return NotFound();
+        if (profile is null || !profile.IsVisibleTo(me)) return NotFound();
 
         if (companyIds.Length > 0)
         {
             var already = await _db.CompanySearchProfiles
-                .Where(x => x.SearchProfileId == profileId && companyIds.Contains(x.CompanyId))
+                .Where(x => x.SearchProfileId == profileId && x.UserId == me && companyIds.Contains(x.CompanyId))
                 .Select(x => x.CompanyId)
                 .ToListAsync(ct);
 
             var toAdd = companyIds.Except(already)
-                .Select(id => new CompanySearchProfile { CompanyId = id, SearchProfileId = profileId });
+                .Select(id => new CompanySearchProfile { CompanyId = id, SearchProfileId = profileId, UserId = me });
 
             _db.CompanySearchProfiles.AddRange(toAdd);
             await _db.SaveChangesAsync(ct);
@@ -913,7 +984,12 @@ public class CompanyController : Controller
     public async Task<IActionResult> DeleteProfile(int profileId, CancellationToken ct)
     {
         var profile = await _db.SearchProfiles.FindAsync(new object[] { profileId }, ct);
-        if (profile is null) return NotFound();
+        if (profile is null || !profile.IsVisibleTo(User.UserId())) return NotFound();
+        if (!profile.CanEdit(User.UserId(), User.IsAdmin()))
+        {
+            TempData["SettingsError"] = "Bu şablon başka bir kullanıcıya ait; yalnızca sahibi silebilir.";
+            return RedirectToAction(nameof(Index), new { profileId });
+        }
 
         _db.SearchProfiles.Remove(profile);
         await _db.SaveChangesAsync(ct);

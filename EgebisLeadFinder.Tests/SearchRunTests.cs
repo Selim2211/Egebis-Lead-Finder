@@ -101,8 +101,68 @@ public class SearchRunTests
         await service.CompleteAsync(empty.Id, new DiscoveryResult());
 
         Assert.Equal(mine.Id, await service.DefaultRunIdAsync(1));
-        Assert.Equal(others.Id, await service.DefaultRunIdAsync(99));
-        Assert.Equal(others.Id, await service.DefaultRunIdAsync(null));
+        // Sonuclar kisiye ozel: aramasi olmayan kullanici baskasinin aramasini gormez (tum firmalar).
+        Assert.Null(await service.DefaultRunIdAsync(99));
+        Assert.Null(await service.DefaultRunIdAsync(null));
+    }
+
+    [Fact]
+    public async Task Arama_sonuclari_kisiye_ozel_yonetici_hepsini_gorur()
+    {
+        await using var db = Db();
+        var (known, _) = await SeedCompaniesAsync(db);
+        var service = new SearchRunService(db);
+
+        var mine = await service.StartAsync(new SearchCriteria { Industry = "A" }, null, userId: 1);
+        await service.CompleteAsync(mine.Id, new DiscoveryResult { Companies = { known } });
+        var others = await service.StartAsync(new SearchCriteria { Industry = "B" }, null, userId: 2);
+        await service.CompleteAsync(others.Id, new DiscoveryResult { Companies = { known } });
+
+        Assert.Equal(new[] { mine.Id }, (await service.RecentAsync(1, isAdmin: false)).Select(r => r.Id));
+        Assert.Equal(2, (await service.RecentAsync(1, isAdmin: true)).Count);
+        Assert.True(await service.CanViewAsync(mine.Id, 1, false));
+        Assert.False(await service.CanViewAsync(others.Id, 1, false));
+        Assert.True(await service.CanViewAsync(others.Id, 1, true));
+    }
+
+    [Fact]
+    public async Task Herkese_acik_sablonda_sonuclar_aramayi_yapana_baglanir()
+    {
+        await using var db = Db();
+        var (known, fresh) = await SeedCompaniesAsync(db);
+        var profile = new SearchProfile { Name = "Ege Otomotiv", Industry = "Otomotiv", OwnerUserId = 1, IsPublic = true };
+        db.SearchProfiles.Add(profile);
+        await db.SaveChangesAsync();
+
+        var service = new SearchRunService(db);
+        var own = await service.StartAsync(new SearchCriteria { Industry = "Otomotiv" }, profile, userId: 1);
+        await service.CompleteAsync(own.Id, new DiscoveryResult { Companies = { known } });
+        var other = await service.StartAsync(new SearchCriteria { Industry = "Otomotiv" }, profile, userId: 2);
+        await service.CompleteAsync(other.Id, new DiscoveryResult { Companies = { known, fresh } });
+
+        Assert.Equal(1, await db.CompanySearchProfiles.CountAsync(x => x.SearchProfileId == profile.Id && x.UserId == 1));
+        Assert.Equal(2, await db.CompanySearchProfiles.CountAsync(x => x.SearchProfileId == profile.Id && x.UserId == 2));
+    }
+
+    [Fact]
+    public void Sablon_gorunurlugu_ve_duzenleme_yetkisi()
+    {
+        var privateOwn = new SearchProfile { OwnerUserId = 1 };
+        var publicOther = new SearchProfile { OwnerUserId = 2, IsPublic = true };
+        var legacy = new SearchProfile();
+
+        Assert.True(privateOwn.IsVisibleTo(1));
+        Assert.False(privateOwn.IsVisibleTo(2));
+        Assert.True(publicOther.IsVisibleTo(1));
+        Assert.False(publicOther.CanEdit(1, isAdmin: false));
+        Assert.False(publicOther.CanEdit(1, isAdmin: true));
+        Assert.True(legacy.IsVisibleTo(5));
+        Assert.True(legacy.CanEdit(5, isAdmin: true));
+        Assert.False(legacy.CanEdit(5, isAdmin: false));
+
+        var list = new[] { privateOwn, publicOther, legacy }.AsQueryable();
+        Assert.Equal(2, list.VisibleTo(2).Count());
+        Assert.Equal(3, list.VisibleTo(1).Count());
     }
 
     [Fact]

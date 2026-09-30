@@ -45,10 +45,12 @@ public class SearchRunService
 
         if (run.SearchProfileId is int profileId)
         {
-            var linked = await _db.CompanySearchProfiles.Where(x => x.SearchProfileId == profileId && ids.Contains(x.CompanyId))
+            // Bag aramayi yapan kullaniciya aittir: herkese acik sablonu kullanan baskasi sonuclari gormez.
+            var linked = await _db.CompanySearchProfiles
+                .Where(x => x.SearchProfileId == profileId && x.UserId == run.UserId && ids.Contains(x.CompanyId))
                 .Select(x => x.CompanyId).ToListAsync(ct);
             foreach (var id in ids.Except(linked))
-                _db.CompanySearchProfiles.Add(new CompanySearchProfile { SearchProfileId = profileId, CompanyId = id });
+                _db.CompanySearchProfiles.Add(new CompanySearchProfile { SearchProfileId = profileId, CompanyId = id, UserId = run.UserId });
         }
 
         run.FinishedAt = DateTime.UtcNow;
@@ -74,29 +76,31 @@ public class SearchRunService
         await _db.SaveChangesAsync(ct);
     }
 
-    /// <summary>Firmalar ekranindaki secici: son aramalar (sonucu olanlar), en yeni en ustte.</summary>
-    public Task<List<SearchRun>> RecentAsync(int take = 30, CancellationToken ct = default) =>
+    /// <summary>
+    /// Firmalar ekranindaki secici: son aramalar (sonucu olanlar), en yeni en ustte. Sonuclar kisiye
+    /// ozeldir; yonetici denetim icin herkesin aramasini gorur.
+    /// </summary>
+    public Task<List<SearchRun>> RecentAsync(int? userId, bool isAdmin, int take = 30, CancellationToken ct = default) =>
         _db.SearchRuns.AsNoTracking()
+            .VisibleTo(userId, isAdmin)
             .Include(r => r.User)
             .Where(r => r.Companies.Any())
             .OrderByDescending(r => r.StartedAt)
             .Take(take)
             .ToListAsync(ct);
 
-    /// <summary>Varsayilan arama: kullanicinin son sonuclu aramasi, yoksa herkesin son aramasi; hic yoksa null (tum firmalar).</summary>
+    /// <summary>Varsayilan arama: kullanicinin son sonuclu aramasi; yoksa null (tum firmalar).</summary>
     public async Task<int?> DefaultRunIdAsync(int? userId, CancellationToken ct = default)
     {
-        var withResults = _db.SearchRuns.AsNoTracking().Where(r => r.Companies.Any());
-
-        if (userId is not null)
-        {
-            var own = await withResults.Where(r => r.UserId == userId)
-                .OrderByDescending(r => r.StartedAt).Select(r => (int?)r.Id).FirstOrDefaultAsync(ct);
-            if (own is not null) return own;
-        }
-
-        return await withResults.OrderByDescending(r => r.StartedAt).Select(r => (int?)r.Id).FirstOrDefaultAsync(ct);
+        if (userId is null) return null;
+        return await _db.SearchRuns.AsNoTracking()
+            .Where(r => r.UserId == userId && r.Companies.Any())
+            .OrderByDescending(r => r.StartedAt).Select(r => (int?)r.Id).FirstOrDefaultAsync(ct);
     }
+
+    /// <summary>Kullanici bu aramanin sonuclarini gorebilir mi? (kendi aramasi; yonetici hepsini)</summary>
+    public Task<bool> CanViewAsync(int runId, int? userId, bool isAdmin, CancellationToken ct = default) =>
+        _db.SearchRuns.AsNoTracking().VisibleTo(userId, isAdmin).AnyAsync(r => r.Id == runId, ct);
 
     private static string? Trim(string? value, int max)
     {
