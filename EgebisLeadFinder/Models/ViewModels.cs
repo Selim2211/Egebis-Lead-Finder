@@ -585,3 +585,16 @@ public class FavoritesViewModel
     public List<FavoriteCompany> Entries { get; set; } = new();
     public HashSet<int> MyFavoriteIds { get; set; } = new();
 }
+
+/// <summary>Iki firma karsilastirma ekrani: secici + sonuc.</summary>
+public class CompareViewModel
+{
+    public int? A { get; set; }
+    public int? B { get; set; }
+    public EgebisLeadFinder.Services.CompanyComparison? Result { get; set; }
+
+    /// <summary>Firma secici: kullanicinin gorebildigi firmalar (puana gore).</summary>
+    public List<CompareOption> Options { get; set; } = new();
+}
+
+public record CompareOption(int Id, string Name, string? Domain, int Score);

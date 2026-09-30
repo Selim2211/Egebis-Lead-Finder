@@ -1060,6 +1060,77 @@ public class CompanyController : Controller
         return model;
     }
 
+    // ============ Iki firma karsilastirma (Faz-II madde 3) ============
+
+    /// <summary>Iki firmayi kriterlerimize uygunluk ve genel durum acisindan yan yana gosterir.</summary>
+    [HttpGet]
+    public async Task<IActionResult> Compare(int? a, int? b, [FromServices] CompanyComparisonService comparer, CancellationToken ct)
+    {
+        var model = new CompareViewModel
+        {
+            A = a,
+            B = b,
+            Options = await VisibleCompanies()
+                .OrderByDescending(c => c.Score).ThenBy(c => c.Name)
+                .Take(500)
+                .Select(c => new CompareOption(c.Id, c.Name, c.Domain, c.Score))
+                .ToListAsync(ct)
+        };
+
+        if (a is int ia && b is int ib)
+        {
+            if (ia == ib)
+                ViewBag.CompareError = "Karşılaştırmak için iki farklı firma seçin.";
+            else
+            {
+                model.Result = await comparer.BuildAsync(ia, ib, ct);
+                if (model.Result is null) return NotFound();
+                AddMissingOption(model, model.Result.A);
+                AddMissingOption(model, model.Result.B);
+            }
+        }
+
+        return View(model);
+    }
+
+    private static void AddMissingOption(CompareViewModel model, Company c)
+    {
+        if (model.Options.All(o => o.Id != c.Id)) model.Options.Insert(0, new CompareOption(c.Id, c.Name, c.Domain, c.Score));
+    }
+
+    /// <summary>Karsilastirmaya yapay zeka yorumu ekler (Gemini; ayni iki firma icin 12 saat onbellekte).</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CompareAi(int a, int b, [FromServices] CompanyComparisonService comparer, CancellationToken ct)
+    {
+        var comparison = await comparer.BuildAsync(a, b, ct);
+        if (comparison is null) return NotFound();
+
+        var ai = await comparer.GenerateAiAsync(comparison, ct);
+        AuditActionFilter.SetAuditSummary(HttpContext, $"Firma karşılaştırma yorumu: {comparison.A.Name} / {comparison.B.Name}");
+        if (!ai.Success) TempData["SettingsError"] = $"Yapay zekâ yorumu alınamadı: {ai.Error}";
+        return RedirectToAction(nameof(Compare), new { a, b });
+    }
+
+    /// <summary>Karsilastirma raporunu Excel olarak indirir (yapay zeka yorumu varsa o da eklenir).</summary>
+    [HttpGet]
+    public async Task<IActionResult> CompareExport(int a, int b, [FromServices] CompanyComparisonService comparer, CancellationToken ct)
+    {
+        var comparison = await comparer.BuildAsync(a, b, ct);
+        if (comparison is null) return NotFound();
+
+        var bytes = ExportService.ToXlsx(CompanyComparisonService.ToExport(comparison));
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            $"karsilastirma-{Slug(comparison.A.Name)}-{Slug(comparison.B.Name)}-{DateTime.Now:yyyy-MM-dd}.xlsx");
+    }
+
+    private static string Slug(string name)
+    {
+        var s = new string(TurkishText.Normalize(name).Select(ch => char.IsLetterOrDigit(ch) ? ch : '-').ToArray());
+        s = System.Text.RegularExpressions.Regex.Replace(s, "-+", "-").Trim('-');
+        return s.Length > 30 ? s[..30].TrimEnd('-') : s;
+    }
+
     /// <summary>
     /// Tek sayfalik, yazdirilabilir firma raporu (gorusmeye goturulebilir).
     /// Detay ekraniyla ayni veriyi kullanir, sade bir duzende basar.

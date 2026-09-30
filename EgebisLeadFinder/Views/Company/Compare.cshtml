@@ -1,0 +1,257 @@
+@model CompareViewModel
+@using EgebisLeadFinder.Services
+@{
+    ViewData["Title"] = "Firma karşılaştırma";
+    var r = Model.Result;
+
+    string Cell(CompareRow row, CompareSide side) => row.Better == side ? "is-better" : "";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Firma karşılaştırma</h1>
+        <div class="page-sub">İki firmayı kriterlerimize uygunluk (müşteri olabilme potansiyeli) ve genel durum açısından yan yana görün</div>
+    </div>
+    @if (r is not null)
+    {
+        <div class="d-flex gap-2 align-items-center no-print">
+            <a class="btn btn-outline-secondary" asp-action="CompareExport" asp-route-a="@r.A.Id" asp-route-b="@r.B.Id">Excel'e aktar</a>
+            <button type="button" class="btn btn-primary" onclick="window.print()">Yazdır / PDF</button>
+        </div>
+    }
+</div>
+
+@if (!string.IsNullOrWhiteSpace(TempData["SettingsError"] as string))
+{
+    <div class="alert alert-danger" data-flash="error">@TempData["SettingsError"]</div>
+}
+@if (ViewBag.CompareError is string compareError)
+{
+    <div class="alert alert-warning">@compareError</div>
+}
+
+<form method="get" class="card mb-4 no-print">
+    <div class="card-body d-flex flex-wrap gap-3 align-items-end">
+        <div class="flex-grow-1" style="min-width:220px">
+            <label class="form-label" for="cmpA"><span class="compare-side">A</span>Birinci firma</label>
+            <select class="form-select" id="cmpA" name="a" required>
+                <option value="">Firma seçin…</option>
+                @foreach (var o in Model.Options)
+                {
+                    <option value="@o.Id" selected="@(Model.A == o.Id)">@o.Name — @o.Domain (@o.Score)</option>
+                }
+            </select>
+        </div>
+        <div class="flex-grow-1" style="min-width:220px">
+            <label class="form-label" for="cmpB"><span class="compare-side">B</span>İkinci firma</label>
+            <select class="form-select" id="cmpB" name="b" required>
+                <option value="">Firma seçin…</option>
+                @foreach (var o in Model.Options)
+                {
+                    <option value="@o.Id" selected="@(Model.B == o.Id)">@o.Name — @o.Domain (@o.Score)</option>
+                }
+            </select>
+        </div>
+        <button type="submit" class="btn btn-accent">Karşılaştır</button>
+    </div>
+    <div class="card-body pt-0 small text-muted-2">
+        İpucu: Firmalar ekranında kartlardaki <strong>Kıyasla</strong> düğmesiyle iki firma seçip alttaki çubuktan da açabilirsiniz.
+    </div>
+</form>
+
+@if (r is null)
+{
+    return;
+}
+
+@{
+    var leader = r.Leader == CompareSide.None ? null : r.Side(r.Leader);
+}
+
+<div class="report">
+    <header class="report-head d-none d-print-flex">
+        <img class="report-logo" src="~/img/logo.png" asp-append-version="true" width="46" height="46" alt="" />
+        <div class="report-head-main">
+            <h1>Firma karşılaştırma raporu</h1>
+            <div class="report-meta"><span>@r.A.Name</span><span>@r.B.Name</span><span>@DateTime.Now.ToString("dd.MM.yyyy HH:mm")</span></div>
+        </div>
+    </header>
+
+    <div class="compare-head mb-4">
+        @foreach (var side in new[] { CompareSide.A, CompareSide.B })
+        {
+            var c = r.Side(side);
+            <div class="compare-card @(r.Leader == side ? "is-leader" : "")">
+                @if (r.Leader == side)
+                {
+                    <span class="compare-card-badge">Önde</span>
+                }
+                <div class="d-flex align-items-center gap-3">
+                    <span class="company-logo avatar-hue-@PersonDisplay.Hue(c.Name)">@PersonDisplay.Initials(c.Name)</span>
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="fw-semibold fs-5 text-truncate"><span class="compare-side">@side</span>@c.Name</div>
+                        <div class="small text-muted-2 text-truncate">@c.Domain @(c.City is null ? "" : $"· {c.City}")</div>
+                    </div>
+                    <partial name="_CompanyScore" model="c" />
+                </div>
+                <div class="d-flex flex-wrap gap-2 mt-3">
+                    @if (c.FitScore is int fit)
+                    {
+                        <span class="meta-chip fit-chip @FitDisplay.Css(fit)">Uygunluk %@fit</span>
+                    }
+                    @if (c.FitSegment is not null)
+                    {
+                        <span class="meta-chip meta-chip-segment">@Icons.Target(12) @c.FitSegment</span>
+                    }
+                    @if (c.IcpMatch)
+                    {
+                        <span class="tag tag-success">ICP</span>
+                    }
+                    <a class="small ms-auto no-print" asp-action="Details" asp-route-id="@c.Id">Firma detayı →</a>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between gap-3">
+                <div>
+                    <div class="small text-muted-2 fw-semibold mb-1">Kurallara göre sonuç</div>
+                    <div class="fs-5 fw-semibold">
+                        @(leader is null ? "İki firma eşit görünüyor" : $"{leader.Name} önde")
+                    </div>
+                    <div class="text-muted-2">@r.LeaderReason Karşılaştırılan kriterlerde @r.A.Name @r.AWins, @r.B.Name @r.BWins kez önde.</div>
+                </div>
+                <div class="small text-muted-2" style="max-width:420px">
+                    <div class="fw-semibold mb-1">Kriterlerimiz</div>
+                    <ul class="mb-0 ps-3">
+                        @foreach (var c in r.Criteria)
+                        {
+                            <li>@c</li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="d-inline-flex align-items-center gap-2">@Icons.Sparkles(16) Yapay zekâ yorumu</span>
+            @if (r.Ai is not null)
+            {
+                <span class="small text-muted-2 fw-normal">@r.Ai.GeneratedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+            }
+        </div>
+        <div class="card-body">
+            @if (r.Ai is { Success: true } ai)
+            {
+                var pick = ai.Recommended switch { "A" => r.A.Name, "B" => r.B.Name, _ => null };
+                <p class="fs-6 fw-semibold mb-2">@ai.Headline</p>
+                <p>@ai.Summary</p>
+                @if (pick is not null)
+                {
+                    <p class="mb-3"><span class="tag tag-amber">Önce gidilecek: @pick</span></p>
+                }
+                <div class="row g-3">
+                    @foreach (var (name, strengths, risks) in new[] { (r.A.Name, ai.AStrengths, ai.ARisks), (r.B.Name, ai.BStrengths, ai.BRisks) })
+                    {
+                        <div class="col-md-6">
+                            <div class="fw-semibold mb-1">@name</div>
+                            <div class="small text-muted-2">Güçlü yanlar</div>
+                            <ul class="compare-ai-list mb-2">
+                                @foreach (var s in strengths)
+                                {
+                                    <li>@s</li>
+                                }
+                            </ul>
+                            <div class="small text-muted-2">Riskler / bilinmeyenler</div>
+                            <ul class="compare-ai-list">
+                                @foreach (var s in risks)
+                                {
+                                    <li>@s</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                </div>
+                @if (ai.NextSteps.Count > 0)
+                {
+                    <div class="fw-semibold mt-2 mb-1">Sonraki adımlar</div>
+                    <ol class="compare-ai-list mb-0">
+                        @foreach (var s in ai.NextSteps)
+                        {
+                            <li>@s</li>
+                        }
+                    </ol>
+                }
+            }
+            else
+            {
+                <p class="text-muted-2 mb-3">
+                    Yapay zekâ, iki firmayı şirket profilimize göre yorumlar; hangisine önce gidilmesi gerektiğini,
+                    güçlü yanları, riskleri ve sonraki adımları yazar. Yorum rapora ve Excel'e eklenir.
+                </p>
+            }
+            <form method="post" asp-action="CompareAi" class="no-print m-0" data-busy-text="Yorum hazırlanıyor…">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="a" value="@r.A.Id" />
+                <input type="hidden" name="b" value="@r.B.Id" />
+                <button type="submit" class="btn @(r.Ai is { Success: true } ? "btn-outline-secondary btn-sm mt-3" : "btn-accent")">
+                    @(r.Ai is { Success: true } ? "Yorumu yenile" : "Yapay zekâ yorumu al")
+                </button>
+            </form>
+        </div>
+    </div>
+
+    @foreach (var sec in r.Sections)
+    {
+        <div class="card mb-4 report-section-card">
+            <div class="card-header">
+                @sec.Title
+                @if (sec.Note is not null)
+                {
+                    <span class="small text-muted-2 fw-normal ms-2">@sec.Note</span>
+                }
+            </div>
+            <div class="table-responsive">
+                <table class="compare-table">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <td class="fw-semibold"><span class="compare-side">A</span>@r.A.Name</td>
+                            <td class="fw-semibold"><span class="compare-side">B</span>@r.B.Name</td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in sec.Rows)
+                        {
+                            <tr>
+                                <th scope="row">@row.Label</th>
+                                <td class="@Cell(row, CompareSide.A)">@row.A</td>
+                                <td class="@Cell(row, CompareSide.B)">@row.B</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <p class="small text-muted-2">Yeşil vurgulu hücre, o kriterde bizim açımızdan önde olan firmayı gösterir.</p>
+</div>
+
+@section Scripts {
+<script>
+    // Karsilastirma acildi: alttaki secim cubugu temizlenir.
+    if (window.egCompare) window.egCompare.clear();
+    document.querySelectorAll('form[data-busy-text]').forEach(function (f) {
+        f.addEventListener('submit', function () {
+            var b = f.querySelector('button[type=submit]');
+            b.disabled = true;
+            b.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>' + f.getAttribute('data-busy-text');
+        });
+    });
+</script>
+}

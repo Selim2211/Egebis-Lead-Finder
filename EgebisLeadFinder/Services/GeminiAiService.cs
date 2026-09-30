@@ -11,7 +11,7 @@ namespace EgebisLeadFinder.Services;
 /// AI #1: firma analizi. Gemini'ye responseSchema verilerek JSON ciktisi sema ile zorlanir,
 /// boylece serbest metin ayristirma riski ortadan kalkar.
 /// </summary>
-public class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INaceClassifierAi, IBusinessProfileAi, ISearchPlannerAi
+public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWriterAi, INaceClassifierAi, IBusinessProfileAi, ISearchPlannerAi
 {
     private readonly HttpClient _http;
     private readonly AiOptions _options;

@@ -228,3 +228,48 @@ h1, h2, h3, h4, h5, h6 { font-weight: 650; letter-spacing: -.022em; }
 @media (min-width: 992px) and (max-width: 1180px) {
     .eg-navbar .navbar-nav .nav-link { padding: .4rem .45rem; font-size: .84rem; }
 }
+
+/* ---------- Firma karsilastirma ---------- */
+.company-card-actions { grid-template-columns: repeat(4, minmax(0, 1fr)) auto auto; }
+.company-card-actions .action-compare .action-label { display: none; }
+.action-compare { --c: #b45309; --c-bg: var(--eg-brand-soft); --c-border: var(--eg-brand-soft-border); }
+@media (max-width: 420px) {
+    .company-card-actions { grid-template-columns: 1fr 1fr; }
+    .company-card-actions .action-delete { grid-column: auto; }
+    .company-card-actions .action-compare .action-label { display: inline; }
+}
+.action-btn.action-compare.is-active { background: var(--eg-brand-soft); color: var(--eg-brand-soft-text); border-color: var(--eg-brand-soft-border); }
+[data-compare-add].btn.is-active { background: var(--eg-brand-soft); color: var(--eg-brand-soft-text); border-color: var(--eg-brand-soft-border); }
+.compare-tray { position: fixed; left: 50%; bottom: 1.1rem; transform: translateX(-50%); z-index: 1040; display: flex; align-items: center;
+    flex-wrap: nowrap; gap: .5rem; max-width: calc(100vw - 32px); white-space: nowrap; padding: .55rem .7rem .55rem 1rem; border-radius: 999px;
+    background: var(--eg-navy-grad); color: #fff; box-shadow: 0 14px 34px rgba(11, 28, 51, .35); }
+.compare-tray-label { font-weight: 700; font-size: .85rem; }
+@media (max-width: 575.98px) { .compare-tray { flex-wrap: wrap; border-radius: 18px; } .compare-tray-label { display: none; } }
+.compare-tray-chip { display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .35rem .2rem .7rem; border-radius: 999px;
+    background: rgba(255, 255, 255, .14); font-size: .83rem; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.compare-tray-chip button { border: 0; background: rgba(255, 255, 255, .18); color: #fff; width: 20px; height: 20px; border-radius: 50%; line-height: 1; }
+.compare-tray-hint { font-size: .8rem; opacity: .75; }
+.compare-tray .compare-tray-clear { color: rgba(255, 255, 255, .8); text-decoration: none; }
+.compare-head { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.compare-card { position: relative; padding: 1.1rem 1.2rem; border-radius: var(--eg-radius); background: var(--eg-surface); border: 1px solid var(--eg-border); box-shadow: var(--eg-shadow-sm); }
+.compare-card.is-leader { border-color: var(--eg-brand-soft-border); box-shadow: 0 0 0 3px rgba(245, 158, 11, .18), var(--eg-shadow-sm); }
+.compare-card-badge { position: absolute; top: -.7rem; right: 1rem; padding: .15rem .65rem; border-radius: 999px; font-size: .74rem; font-weight: 700;
+    background: var(--eg-amber-grad); color: #1f1300; }
+.compare-side { display: inline-flex; width: 1.6rem; height: 1.6rem; align-items: center; justify-content: center; border-radius: 8px;
+    background: var(--eg-navy-soft); color: var(--eg-navy-soft-text); font-weight: 800; font-size: .85rem; margin-right: .5rem; }
+.compare-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.compare-table th, .compare-table td { padding: .6rem .8rem; border-bottom: 1px solid var(--eg-border); vertical-align: top; font-size: .9rem; }
+.compare-table th { width: 26%; color: var(--eg-text-muted); font-weight: 600; }
+.compare-table td { width: 37%; }
+.compare-table td.is-better { background: linear-gradient(90deg, rgba(16, 185, 129, .10), rgba(16, 185, 129, .03)); box-shadow: inset 3px 0 0 var(--eg-success); font-weight: 600; }
+.compare-table tr:last-child th, .compare-table tr:last-child td { border-bottom: 0; }
+.compare-ai-list { margin: 0; padding-left: 1.1rem; }
+.compare-ai-list li { margin-bottom: .25rem; }
+@media (max-width: 767.98px) {
+    .compare-head { grid-template-columns: 1fr; }
+    .compare-table th { width: 30%; }
+}
+@media print {
+    .compare-card.is-leader { box-shadow: none; }
+    .compare-table td.is-better { background: #eefaf4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

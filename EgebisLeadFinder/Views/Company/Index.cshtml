@@ -543,6 +543,13 @@ else
                         </svg>
                         <span class="action-label">@(company.SalesforceId is not null ? "SF'de" : "Salesforce")</span>
                     </button>
+                    <button type="button" class="action-btn action-compare" title="Karşılaştırmaya ekle (iki firma seçin)"
+                            data-compare-add="@company.Id" data-company-name="@company.Name">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M8 3 4 7l4 4" /><path d="M4 7h16" /><path d="m16 21 4-4-4-4" /><path d="M20 17H4" />
+                        </svg>
+                        <span class="action-label">Kıyasla</span>
+                    </button>
                     <button type="button" class="action-btn action-delete" title="Firmayı sil"
                             data-delete-company="@company.Id" data-company-name="@company.Name">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
