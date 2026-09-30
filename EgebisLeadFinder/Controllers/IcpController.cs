@@ -4,6 +4,8 @@ using EgebisLeadFinder.Services;
 using Microsoft.AspNetCore.Mvc;
 using EgebisLeadFinder.Services.Progress;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using EgebisLeadFinder.Services.Auth;
 
 namespace EgebisLeadFinder.Controllers;
 
@@ -21,8 +23,11 @@ public class IcpController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Index(CancellationToken ct)
+    public async Task<IActionResult> Index([FromServices] IMemoryCache cache, [FromServices] BusinessProfileService profiles,
+        CancellationToken ct)
     {
+        ViewBag.Suggestion = cache.TryGetValue(SuggestionKey(), out IcpSuggestion? suggestion) ? suggestion : null;
+        ViewBag.Website = suggestion?.Website ?? (await profiles.GetAsync(ct)).Website;
         ViewBag.MatchCount = await _db.Companies.CountAsync(c => c.IcpMatch, ct);
         ViewBag.MissingNace = await _db.Companies.CountAsync(c => c.NaceCode == null, ct);
         ViewBag.NaceCounts = await _db.Companies.AsNoTracking()
@@ -62,6 +67,52 @@ public class IcpController : Controller
             TempData["SettingsSaved"] = "ICP kaydedildi. Yeni analiz edilen firmalar bu profile göre puanlanacak.";
         }
 
+        return RedirectToAction(nameof(Index));
+    }
+
+    private string SuggestionKey() => $"icp-suggest:{User.UserId()}";
+
+    /// <summary>
+    /// Faz-II madde 5: sirketin kendi sitesini okuyup yapay zekaya ICP onerisi cikartir. Oneri
+    /// kaydedilmez; ekranda gerekceleriyle gosterilir, kullanici forma uygulayip kaydeder.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Suggest(string? website, [FromServices] IWebScraperService scraper,
+        [FromServices] IInsightAi ai, [FromServices] IMemoryCache cache, CancellationToken ct)
+    {
+        var url = BusinessProfileService.NormalizeUrl(website);
+        if (url is null)
+        {
+            TempData["IcpError"] = "Geçerli bir web sitesi adresi girin (ör. egebis.com).";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var site = await scraper.ScrapeAsync(url, ct);
+        if (!site.Success)
+        {
+            TempData["IcpError"] = $"Site okunamadı: {site.Error ?? "içerik bulunamadı"}";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var suggestion = await ai.SuggestIcpAsync(url, site.Text, ct);
+        if (!suggestion.Success)
+        {
+            TempData["IcpError"] = $"ICP önerisi alınamadı: {suggestion.Error}";
+            return RedirectToAction(nameof(Index));
+        }
+
+        cache.Set(SuggestionKey(), suggestion, TimeSpan.FromHours(2));
+        AuditActionFilter.SetAuditSummary(HttpContext, $"Siteden ICP önerisi alındı: {url}");
+        return RedirectToAction(nameof(Index), null, "icp-suggestion");
+    }
+
+    /// <summary>Oneriyi ekrandan kaldirir.</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult DismissSuggestion([FromServices] IMemoryCache cache)
+    {
+        cache.Remove(SuggestionKey());
         return RedirectToAction(nameof(Index));
     }
 

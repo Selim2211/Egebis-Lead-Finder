@@ -297,3 +297,14 @@ h1, h2, h3, h4, h5, h6 { font-weight: 650; letter-spacing: -.022em; }
 .sector-stats { display: flex; flex-wrap: wrap; gap: .4rem; }
 @media (max-width: 991.98px) { .sector-cols { grid-template-columns: 1fr; } }
 @media print { .sector-score { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+
+/* ---------- Siteden ICP onerisi ---------- */
+.icp-suggest-card { border-color: var(--eg-brand-soft-border); }
+.icp-suggest-card > .card-header { background: linear-gradient(135deg, var(--eg-surface), var(--eg-brand-soft)); }
+.icp-suggest-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.25rem; }
+.icp-suggest-grid h3 { font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color: var(--eg-text-muted); font-weight: 700; margin: 0 0 .35rem; }
+.icp-suggest-grid ul { margin: 0; padding-left: 0; list-style: none; font-size: .9rem; }
+.icp-suggest-grid li { margin-bottom: .45rem; }
+.icp-filled { box-shadow: 0 0 0 3px rgba(245, 158, 11, .25) !important; border-color: var(--eg-brand-soft-border) !important; }
+@media (max-width: 1199.98px) { .icp-suggest-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 575.98px) { .icp-suggest-grid { grid-template-columns: 1fr; } }

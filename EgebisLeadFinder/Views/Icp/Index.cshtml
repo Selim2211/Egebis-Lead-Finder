@@ -4,6 +4,7 @@
     var naceCounts = (Dictionary<string, int>)ViewBag.NaceCounts;
     var selected = new HashSet<string>(Model.NaceCodes);
     var sections = NaceCatalog.Divisions.GroupBy(d => (d.SectionCode, d.SectionName));
+    var suggestion = ViewBag.Suggestion as EgebisLeadFinder.Services.IcpSuggestion;
 }
 
 <div class="page-head">
@@ -21,6 +22,93 @@
     <div class="alert alert-success" data-flash="success">@saved</div>
 }
 
+@if (TempData["IcpError"] is string icpError)
+{
+    <div class="alert alert-danger" data-flash="error">@icpError</div>
+}
+
+<div class="card mb-4 icp-suggest-card" id="icp-suggestion">
+    <div class="card-header d-flex align-items-center gap-2">@Icons.Sparkles(16) Sitemizden ICP öner</div>
+    <div class="card-body">
+        <form method="post" asp-action="Suggest" class="d-flex flex-wrap gap-2 align-items-center" data-busy-text="Site okunuyor, ICP hazırlanıyor…">
+            @Html.AntiForgeryToken()
+            <input class="form-control flex-grow-1" style="min-width:240px;max-width:420px" name="website" value="@ViewBag.Website"
+                   placeholder="ör. egebis.com" required />
+            <button type="submit" class="btn btn-accent">Siteyi analiz et</button>
+            <span class="small text-muted-2">Yapay zekâ sitenizdeki ürün ve hizmetlere bakıp müşterilerinizin profilini önerir. Öneri siz kaydedene kadar uygulanmaz.</span>
+        </form>
+
+        @if (suggestion is not null)
+        {
+            <hr />
+            <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+                <div>
+                    <div class="fw-semibold">Öneri: @suggestion.Website</div>
+                    <div class="small text-muted-2">@suggestion.GeneratedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @suggestion.CompanySummary</div>
+                </div>
+                <div class="d-flex gap-2 align-items-start">
+                    <button type="button" class="btn btn-sm btn-accent" data-icp-apply="merge" title="Listeleri mevcut değerlerle birleştirir">Forma ekle</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-icp-apply="replace" title="Formdaki değerleri öneriyle değiştirir">Formu öneriyle değiştir</button>
+                    <form method="post" asp-action="DismissSuggestion" class="m-0">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-sm btn-link text-muted-2">Kapat</button>
+                    </form>
+                </div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(suggestion.IdealCustomer))
+            {
+                <p class="mb-3"><span class="fw-semibold">İdeal müşteri:</span> @suggestion.IdealCustomer</p>
+            }
+            <div class="icp-suggest-grid">
+                <div>
+                    <h3>Hedef sektörler (NACE)</h3>
+                    <ul>
+                        @foreach (var n in suggestion.Nace)
+                        {
+                            <li><span class="nace-code">@n.Code</span> @n.Name<span class="d-block small text-muted-2">@n.Reason</span></li>
+                        }
+                    </ul>
+                </div>
+                <div>
+                    <h3>Sektör kelimeleri</h3>
+                    <p>@string.Join(", ", suggestion.IndustryKeywords)</p>
+                    <h3>Bölge</h3>
+                    <p class="mb-1">@string.Join(", ", suggestion.Countries.Concat(suggestion.Cities).DefaultIfEmpty("Şart yok"))</p>
+                    <p class="small text-muted-2">@suggestion.LocationReason</p>
+                </div>
+                <div>
+                    <h3>Ölçek ve tür</h3>
+                    <p class="mb-1">Asgari çalışan: <strong>@(suggestion.MinEmployees > 0 ? suggestion.MinEmployees.ToString() : "şart yok")</strong></p>
+                    <p class="small text-muted-2">@suggestion.MinEmployeesReason</p>
+                    <p class="mb-1">Yalnızca üretici: <strong>@(suggestion.RequireManufacturer ? "Evet" : "Hayır")</strong></p>
+                    <p class="small text-muted-2">@suggestion.ManufacturerReason</p>
+                </div>
+                <div>
+                    <h3>Hariç tutulacaklar</h3>
+                    <p class="mb-1">@string.Join(", ", suggestion.ExcludeKeywords)</p>
+                    <p class="small text-muted-2">@suggestion.ExcludeReason</p>
+                    @if (suggestion.TargetTitles.Count > 0)
+                    {
+                        <h3>Ulaşılacak unvanlar</h3>
+                        <p class="mb-1">@string.Join(", ", suggestion.TargetTitles)</p>
+                        <p class="small text-muted-2">Unvanlar ICP'nin parçası değil; <a asp-controller="BusinessProfile" asp-action="Index">Biz ne arıyoruz?</a> ekranındaki hedef unvanlara ekleyebilirsiniz.</p>
+                    }
+                </div>
+            </div>
+            <script type="application/json" id="icpSuggestionData">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                nace = suggestion.DivisionCodes,
+                industries = suggestion.IndustryKeywords,
+                cities = suggestion.Cities,
+                countries = suggestion.Countries,
+                minEmployees = suggestion.MinEmployees,
+                requireManufacturer = suggestion.RequireManufacturer,
+                exclude = suggestion.ExcludeKeywords
+            }))</script>
+        }
+    </div>
+</div>
+
 <form id="fillNaceForm" method="post" asp-action="StartFillNace" class="d-none"
       data-progress-start="@Url.Action("StartFillNace")"
       data-progress-title="NACE kodları belirleniyor"
@@ -28,7 +116,7 @@
     @Html.AntiForgeryToken()
 </form>
 
-<form method="post">
+<form method="post" id="icpForm">
     @Html.AntiForgeryToken()
     <div class="row g-4">
         <div class="col-lg-7">
@@ -132,3 +220,53 @@
         </div>
     </div>
 </form>
+
+@section Scripts {
+<script>
+    (function () {
+        document.querySelectorAll('form[data-busy-text]').forEach(function (f) {
+            f.addEventListener('submit', function () {
+                var b = f.querySelector('button[type=submit]');
+                b.disabled = true;
+                b.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>' + f.getAttribute('data-busy-text');
+            });
+        });
+
+        var data = document.getElementById('icpSuggestionData');
+        if (!data) return;
+        var s = JSON.parse(data.textContent);
+        var form = document.getElementById('icpForm');
+
+        function split(v) { return (v || '').split(/[,;\n]/).map(function (x) { return x.trim(); }).filter(Boolean); }
+        function setList(name, values, merge) {
+            var input = form.querySelector('[name="' + name + '"]');
+            var list = merge ? split(input.value) : [];
+            values.forEach(function (v) {
+                if (!list.some(function (x) { return x.toLocaleLowerCase('tr') === v.toLocaleLowerCase('tr'); })) list.push(v);
+            });
+            input.value = list.join(', ');
+            input.classList.add('icp-filled');
+        }
+
+        document.querySelectorAll('[data-icp-apply]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var merge = btn.getAttribute('data-icp-apply') === 'merge';
+                form.querySelectorAll('input[name="nace"]').forEach(function (cb) {
+                    var on = s.nace.indexOf(cb.value) !== -1;
+                    if (on || !merge) cb.checked = on || (merge && cb.checked);
+                    if (on) { var d = cb.closest('details'); if (d) d.open = true; cb.closest('label').classList.add('icp-filled'); }
+                });
+                setList('industries', s.industries, merge);
+                setList('cities', s.cities, merge);
+                setList('countries', s.countries, merge);
+                setList('exclude', s.exclude, merge);
+                var min = form.querySelector('[name="minEmployees"]');
+                if (!merge || s.minEmployees > 0) { min.value = s.minEmployees; min.classList.add('icp-filled'); }
+                document.getElementById('reqMan').checked = s.requireManufacturer;
+                if (window.egToast) egToast.success('Öneri forma uygulandı. Kontrol edip "Kaydet" ile kaydedin.');
+                form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        });
+    })();
+</script>
+}

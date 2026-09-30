@@ -90,6 +90,8 @@ public class AuditActionFilter : IAsyncActionFilter
             ["Sector.Analyze"] = ("sector.analyze", "Sektör analizi yapıldı"),
             ["Sector.Export"] = ("export.sector", "Sektör analizi raporu dışa aktarıldı"),
             ["Sector.Delete"] = ("sector.delete", "Sektör analizi raporu silindi"),
+            ["Icp.Suggest"] = ("icp.suggest", "Siteden ICP önerisi alındı"),
+            ["Icp.DismissSuggestion"] = ("icp.suggest.dismiss", "ICP önerisi kapatıldı"),
         };
 
     private static readonly string[] EntityKeys = { "id", "leadId", "companyId", "profileId", "sequenceId", "userId" };

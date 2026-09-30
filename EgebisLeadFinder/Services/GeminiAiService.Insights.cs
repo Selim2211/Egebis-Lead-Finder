@@ -265,4 +265,125 @@ public partial class GeminiAiService : IInsightAi
         overview: tüm sektörleri kıyaslayan 2-4 cümle; hangisine öncelik verilmeli söyle.
         Tüm metinleri Türkçe yaz. Uydurma rakam verme.
         """;
+    // ================= Siteden ICP onerisi (Faz-II madde 5) =================
+
+    public async Task<IcpSuggestion> SuggestIcpAsync(string siteUrl, string siteText, CancellationToken ct = default)
+    {
+        var input = siteText.Length > _options.MaxInputChars ? siteText[.._options.MaxInputChars] : siteText;
+        var schema = new
+        {
+            type = "object",
+            properties = new
+            {
+                companySummary = new { type = "string", description = "Şirket ne yapıyor, 1-2 cümle" },
+                idealCustomer = new { type = "string", description = "İdeal müşteri tanımı, 2-3 cümle" },
+                nace = ObjectArray(new
+                {
+                    code = new { type = "string", description = "Müşteri sektörünün NACE Rev.2 kodu (\"22\" veya \"22.22\")" },
+                    name = new { type = "string" },
+                    reason = new { type = "string" }
+                }, new[] { "code", "name", "reason" }),
+                industryKeywords = StringArray,
+                countries = StringArray,
+                cities = StringArray,
+                locationReason = new { type = "string" },
+                minEmployees = new { type = "integer", description = "Asgari çalışan sayısı; şart yoksa 0" },
+                minEmployeesReason = new { type = "string" },
+                requireManufacturer = new { type = "boolean" },
+                manufacturerReason = new { type = "string" },
+                excludeKeywords = StringArray,
+                excludeReason = new { type = "string" },
+                targetTitles = StringArray
+            },
+            required = new[]
+            {
+                "companySummary", "idealCustomer", "nace", "industryKeywords", "countries", "cities", "minEmployees",
+                "minEmployeesReason", "requireManufacturer", "manufacturerReason", "excludeKeywords", "targetTitles"
+            }
+        };
+
+        var (json, error) = await AskJsonAsync(IcpPrompt, $"Şirketimizin sitesi: {siteUrl}\n\nSite metni:\n\n{input}", schema, 0.2, ct);
+        if (error is not null) return new IcpSuggestion { Error = error, Website = siteUrl };
+
+        var result = ParseIcpSuggestion(json!);
+        result.Website = siteUrl;
+        return result;
+    }
+
+    public static IcpSuggestion ParseIcpSuggestion(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            string? Str(string name) => root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString()?.Trim() : null;
+            List<string> List(string name, int max) => root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Array
+                ? BusinessProfileService.CleanList(v.EnumerateArray().Select(x => x.ValueKind == JsonValueKind.String ? x.GetString() : null)).Take(max).ToList()
+                : new List<string>();
+
+            var result = new IcpSuggestion
+            {
+                CompanySummary = Str("companySummary"),
+                IdealCustomer = Str("idealCustomer"),
+                IndustryKeywords = List("industryKeywords", 12),
+                Countries = List("countries", 10),
+                // Il onerileri yalnizca gercek il adlariyla sinirli (yazim farki duzeltilir).
+                Cities = List("cities", 20)
+                    .Select(c => EgebisLeadFinder.Data.TurkishProvinces.All.FirstOrDefault(p => TurkishText.Normalize(p) == TurkishText.Normalize(c)))
+                    .OfType<string>().Distinct().ToList(),
+                LocationReason = Str("locationReason"),
+                MinEmployees = root.TryGetProperty("minEmployees", out var me) && me.TryGetInt32(out var n) ? Math.Clamp(n, 0, 100000) : 0,
+                MinEmployeesReason = Str("minEmployeesReason"),
+                RequireManufacturer = root.TryGetProperty("requireManufacturer", out var rm) && rm.ValueKind == JsonValueKind.True,
+                ManufacturerReason = Str("manufacturerReason"),
+                ExcludeKeywords = List("excludeKeywords", 15),
+                ExcludeReason = Str("excludeReason"),
+                TargetTitles = List("targetTitles", 12)
+            };
+
+            if (root.TryGetProperty("nace", out var nace) && nace.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in nace.EnumerateArray())
+                {
+                    var code = NaceCatalog.Normalize(item.TryGetProperty("code", out var c) ? c.GetString() : null);
+                    if (code is null || NaceCatalog.Division(code) is null || result.Nace.Any(x => x.Code == code)) continue;
+                    var name = item.TryGetProperty("name", out var nm) ? nm.GetString() : null;
+                    var reason = item.TryGetProperty("reason", out var r) ? r.GetString() : null;
+                    result.Nace.Add(new NaceSuggestion(code, string.IsNullOrWhiteSpace(name) ? NaceCatalog.Division(code)!.Name : name!.Trim(), reason));
+                }
+            }
+
+            return result;
+        }
+        catch (JsonException)
+        {
+            return new IcpSuggestion { Error = "Yapay zekâ yanıtı çözümlenemedi." };
+        }
+    }
+
+    private const string IcpPrompt = """
+        Bir B2B şirketinin kendi web sitesi metni verilecek. Bu şirket, potansiyel müşteri
+        bulma uygulamasında "İdeal Müşteri Profili (ICP)" tanımlayacak. Sitedeki ürün ve
+        hizmetlere bakarak bu şirketin MÜŞTERİLERİNİN (şirketin kendisinin değil) profilini
+        çıkar ve verilen şemaya uygun JSON döndür.
+
+        - companySummary: şirket ne satıyor, 1-2 cümle.
+        - idealCustomer: bu ürünleri kim satın alır; sektör, ölçek, özellikler; 2-3 cümle.
+        - nace: müşterilerin faaliyet gösterdiği 3-8 NACE Rev.2 kodu, en önemlisi başta;
+          her biri için kısa gerekçe. Şirketin kendi NACE kodunu değil, müşterilerinkini yaz.
+        - industryKeywords: müşteri sektörlerini tanıyan 4-10 Türkçe kelime ("plastik", "kalıp").
+        - countries / cities: site belirli bir pazarı işaret ediyorsa hedef ülke(ler) ve
+          Türkiye illeri; işaret yoksa ülke olarak şirketin bulunduğu ülkeyi yaz, il listesi boş.
+          locationReason: kısa gerekçe.
+        - minEmployees: ürün küçük işletmelere uygun değilse makul asgari çalışan sayısı
+          (ör. 20, 50, 100); ölçek şartı yoksa 0. minEmployeesReason: kısa gerekçe.
+        - requireManufacturer: müşteriler üretim yapan firmalar olmalıysa true.
+          manufacturerReason: kısa gerekçe.
+        - excludeKeywords: müşteri olmayan firma türlerini eleyecek 3-10 kelime (ör. "bayi",
+          "distribütör", "danışmanlık", rakip türleri). excludeReason: kısa gerekçe.
+        - targetTitles: müşteride ulaşılacak 4-10 karar verici unvanı.
+
+        Sitede olmayan bilgiyi uydurma; makul çıkarım yapabilirsin. Tüm metinleri Türkçe yaz.
+        """;
 }

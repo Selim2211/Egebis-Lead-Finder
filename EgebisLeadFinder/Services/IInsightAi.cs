@@ -15,6 +15,35 @@ public interface IInsightAi
 
     /// <summary>Secilen NACE sektorlerinin sirketimize ne kadar uygun oldugunu degerlendirir.</summary>
     Task<SectorAiResult> AnalyzeSectorsAsync(BusinessProfile? profile, string keyword, IReadOnlyList<SectorInput> sectors, CancellationToken ct = default);
+
+    /// <summary>Sirketin kendi sitesinden ideal musteri profili (ICP) onerisi cikarir.</summary>
+    Task<IcpSuggestion> SuggestIcpAsync(string siteUrl, string siteText, CancellationToken ct = default);
+}
+
+/// <summary>Sirket sitesinden yapay zekanin onerdigi ICP; her alanin gerekcesiyle.</summary>
+public class IcpSuggestion
+{
+    public string? Website { get; set; }
+    public string? CompanySummary { get; set; }
+    public string? IdealCustomer { get; set; }
+    public List<NaceSuggestion> Nace { get; set; } = new();
+    public List<string> IndustryKeywords { get; set; } = new();
+    public List<string> Countries { get; set; } = new();
+    public List<string> Cities { get; set; } = new();
+    public string? LocationReason { get; set; }
+    public int MinEmployees { get; set; }
+    public string? MinEmployeesReason { get; set; }
+    public bool RequireManufacturer { get; set; }
+    public string? ManufacturerReason { get; set; }
+    public List<string> ExcludeKeywords { get; set; } = new();
+    public string? ExcludeReason { get; set; }
+    public List<string> TargetTitles { get; set; } = new();
+    public string? Error { get; set; }
+    public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
+    public bool Success => Error is null;
+
+    /// <summary>ICP ekranindaki NACE secimleri bolum (2 hane) duzeyinde.</summary>
+    public List<string> DivisionCodes => Nace.Select(n => NaceCatalog.DivisionCode(n.Code)).OfType<string>().Distinct().ToList();
 }
 
 public record NaceSuggestion(string Code, string Name, string? Reason);
