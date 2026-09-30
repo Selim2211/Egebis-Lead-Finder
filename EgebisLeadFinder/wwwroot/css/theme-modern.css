@@ -221,7 +221,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 650; letter-spacing: -.022em; }
     .eg-navbar .navbar-nav .nav-link { padding: .4rem .6rem; font-size: .88rem; }
     .eg-navbar .navbar-brand { margin-right: .5rem; }
 }
-@media (min-width: 992px) and (max-width: 1340px) {
+@media (min-width: 992px) and (max-width: 1500px) {
     .eg-navbar .nav-settings-label, .eg-navbar .nav-target-label { display: none; }
     .eg-navbar .nav-target { padding-left: .6rem; padding-right: .6rem; }
 }
@@ -308,3 +308,71 @@ h1, h2, h3, h4, h5, h6 { font-weight: 650; letter-spacing: -.022em; }
 .icp-filled { box-shadow: 0 0 0 3px rgba(245, 158, 11, .25) !important; border-color: var(--eg-brand-soft-border) !important; }
 @media (max-width: 1199.98px) { .icp-suggest-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 575.98px) { .icp-suggest-grid { grid-template-columns: 1fr; } }
+
+/* ---------- Sayfa turu ---------- */
+.tour-spot { position: fixed; z-index: 2000; border-radius: 12px; pointer-events: none;
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, .9), 0 0 0 9999px rgba(8, 20, 38, .58); transition: all .25s ease; }
+.tour-spot.is-center { left: 50%; top: 50%; width: 0; height: 0; box-shadow: 0 0 0 9999px rgba(8, 20, 38, .58); }
+.tour-pop { position: fixed; z-index: 2001; width: min(360px, calc(100vw - 32px)); padding: 1rem 1.1rem .9rem; border-radius: 16px;
+    background: var(--eg-surface); color: var(--eg-text); box-shadow: var(--eg-shadow-lg); border: 1px solid var(--eg-border); }
+.tour-pop-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: .35rem; }
+.tour-pop-count { font-size: .75rem; font-weight: 700; color: var(--eg-brand-soft-text); background: var(--eg-brand-soft); padding: .1rem .55rem; border-radius: 999px; }
+.tour-pop-close { border: 0; background: transparent; color: var(--eg-text-muted); padding: .2rem; border-radius: 8px; }
+.tour-pop-close:hover { background: var(--eg-soft); }
+.tour-pop-title { font-weight: 700; font-size: 1.02rem; margin-bottom: .3rem; }
+.tour-pop-text { font-size: .9rem; color: var(--eg-text-muted); margin-bottom: .8rem; line-height: 1.5; }
+.tour-pop-nav { display: flex; align-items: center; gap: .4rem; }
+.tour-pop-guide { margin-right: auto; font-size: .82rem; }
+.tour-offer { position: fixed; right: 1.1rem; bottom: 1.1rem; z-index: 1045; width: min(320px, calc(100vw - 32px)); padding: .9rem 1rem;
+    border-radius: 16px; background: var(--eg-surface); border: 1px solid var(--eg-brand-soft-border); box-shadow: var(--eg-shadow-lg);
+    animation: tourIn .3s ease; }
+@keyframes tourIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.nav-help { display: inline-flex; align-items: center; justify-content: center; }
+
+/* ---------- Kullanici kilavuzu ---------- */
+.guide { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 2rem; align-items: start; }
+.guide-toc { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow: auto; padding: .8rem; border-radius: var(--eg-radius);
+    background: var(--eg-surface); border: 1px solid var(--eg-border); box-shadow: var(--eg-shadow-sm); }
+.guide-toc a { display: flex; gap: .5rem; align-items: baseline; padding: .35rem .55rem; border-radius: 8px; color: var(--eg-text); text-decoration: none; font-size: .88rem; }
+.guide-toc a:hover { background: var(--eg-soft); }
+.guide-toc .guide-toc-group { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--eg-text-muted); font-weight: 700; margin: .7rem .55rem .25rem; }
+.guide-toc-num { color: var(--eg-text-muted); font-variant-numeric: tabular-nums; min-width: 1.4rem; }
+.guide-section { scroll-margin-top: 1rem; padding: 1.4rem 1.5rem; margin-bottom: 1.25rem; border-radius: var(--eg-radius);
+    background: var(--eg-surface); border: 1px solid var(--eg-border); box-shadow: var(--eg-shadow-sm); }
+.guide-section h2 { font-size: 1.3rem; display: flex; align-items: center; gap: .6rem; margin-bottom: .35rem; }
+.guide-num { display: inline-grid; place-items: center; width: 2rem; height: 2rem; border-radius: 10px; background: var(--eg-navy-grad); color: #fff; font-size: .95rem; flex-shrink: 0; }
+.guide-lead { color: var(--eg-text-muted); margin-bottom: 1rem; }
+.guide-shot { margin: 1rem 0; border-radius: 14px; overflow: hidden; border: 1px solid var(--eg-border); box-shadow: var(--eg-shadow); background: var(--eg-surface-alt); }
+.guide-shot img { display: block; width: 100%; height: auto; }
+.guide-shot figcaption { padding: .55rem .85rem; font-size: .82rem; color: var(--eg-text-muted); border-top: 1px solid var(--eg-border); }
+.guide-steps { counter-reset: gstep; list-style: none; padding: 0; margin: 0 0 1rem; }
+.guide-steps li { counter-increment: gstep; position: relative; padding: .15rem 0 .55rem 2.4rem; }
+.guide-steps li::before { content: counter(gstep); position: absolute; left: 0; top: 0; width: 1.7rem; height: 1.7rem; border-radius: 50%;
+    display: grid; place-items: center; font-weight: 700; font-size: .82rem; background: var(--eg-amber-grad); color: #1f1300; }
+.guide-tip { display: flex; gap: .6rem; padding: .7rem .9rem; border-radius: 12px; background: var(--eg-brand-soft); color: var(--eg-brand-soft-text); font-size: .9rem; margin-top: .5rem; }
+.guide-tip.is-info { background: var(--eg-navy-soft); color: var(--eg-navy-soft-text); }
+.guide-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+.guide-roles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.guide-flow { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .5rem 0 1rem; }
+.guide-flow span { padding: .35rem .75rem; border-radius: 999px; background: var(--eg-soft); color: var(--eg-soft-text); font-weight: 600; font-size: .85rem; }
+.guide-flow i { color: var(--eg-text-muted); font-style: normal; }
+@media (max-width: 991.98px) { .guide { grid-template-columns: 1fr; } .guide-toc { position: static; max-height: none; } .guide-roles { grid-template-columns: 1fr; } }
+@media print {
+    .guide { display: block; }
+    .guide-toc, .guide-actions { display: none !important; }
+    .guide-section { box-shadow: none; break-inside: auto; page-break-before: always; }
+    .guide-section:first-of-type { page-break-before: auto; }
+    .guide-shot { break-inside: avoid; box-shadow: none; }
+    .guide-steps li::before { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+@media (min-width: 992px) and (max-width: 1380px) {
+    .eg-navbar .eg-brand-sub { display: none; }
+}
+@media (min-width: 992px) and (max-width: 1180px) {
+    .eg-navbar .navbar-brand > span:not(.eg-brand-mark) { display: none; }
+    .eg-navbar .navbar-nav.gap-lg-2 { gap: .25rem !important; }
+}
+/* Genis ekranda ust menu tam etiketlerle tek satira sigsin (icerik 1320px kalir). */
+@media (min-width: 1501px) {
+    .eg-navbar > .container { max-width: min(1600px, calc(100vw - 32px)); }
+}

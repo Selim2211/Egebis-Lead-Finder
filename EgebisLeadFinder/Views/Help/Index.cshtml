@@ -1,0 +1,319 @@
+@{
+    ViewData["Title"] = "Kullanıcı kılavuzu";
+
+    // Icindekiler: (id, baslik, grup). Id'ler sayfa turlarindaki anahtarlarla ayni (tur > "Kılavuzda oku").
+    var toc = new (string Id, string Title, string Group)[]
+    {
+        ("baslarken", "Başlarken", "Genel"),
+        ("panel", "Panel", "Genel"),
+        ("profile", "Biz ne arıyoruz?", "Kurulum"),
+        ("icp", "İdeal müşteri profili (ICP)", "Kurulum"),
+        ("search", "Firma arama", "Firma bulma"),
+        ("companies", "Firmalar listesi", "Firma bulma"),
+        ("details", "Firma detayı", "Firma bulma"),
+        ("favorites", "Favoriler", "Firma bulma"),
+        ("compare", "Firma karşılaştırma", "Raporlar"),
+        ("sector", "Sektör analizi (NACE)", "Raporlar"),
+        ("leads", "Lead'ler ve e-posta", "Satış"),
+        ("sequences", "Mail dizileri ve taslaklar", "Satış"),
+        ("usage", "API kullanımı", "Yönetim"),
+        ("settings", "Ayarlar", "Yönetim"),
+        ("users", "Kullanıcılar ve audit log", "Yönetim"),
+        ("security", "Veri güvenliği", "Yönetim"),
+        ("sss", "Sık sorulanlar", "Yardım")
+    };
+    int Num(string id) => Array.FindIndex(toc, t => t.Id == id) + 1;
+
+    string Shot(string file) => Url.Content($"~/img/guide/{file}.jpg");
+}
+
+<div class="page-head">
+    <div>
+        <h1>Kullanıcı kılavuzu</h1>
+        <div class="page-sub">Egebis Lead Finder'ı adım adım, ekran görüntüleriyle anlatır. Her ekranda sağ üstteki <strong>?</strong> düğmesinden o sayfanın turunu da başlatabilirsiniz.</div>
+    </div>
+    <div class="d-flex gap-2 no-print">
+        <button type="button" class="btn btn-primary" onclick="window.print()">Yazdır / PDF</button>
+    </div>
+</div>
+
+<div class="guide">
+    <nav class="guide-toc no-print" aria-label="İçindekiler">
+        @foreach (var g in toc.GroupBy(t => t.Group))
+        {
+            <div class="guide-toc-group">@g.Key</div>
+            @foreach (var t in g)
+            {
+                <a href="#@t.Id"><span class="guide-toc-num">@Num(t.Id).</span><span>@t.Title</span></a>
+            }
+        }
+    </nav>
+
+    <div>
+        @* ---------------------------------------------------------------- *@
+        <section class="guide-section" id="baslarken">
+            <h2><span class="guide-num">@Num("baslarken")</span> Başlarken</h2>
+            <p class="guide-lead">
+                Egebis Lead Finder, satış ekibinin <strong>doğru firmaları</strong> bulmasını, yapay zekâ ile değerlendirmesini ve
+                karar vericilere ulaşmasını sağlayan bir potansiyel müşteri (lead) bulma uygulamasıdır.
+            </p>
+            <div class="guide-flow">
+                <span>Biz ne arıyoruz?</span><i>→</i><span>Firma ara</span><i>→</i><span>Değerlendir</span><i>→</i>
+                <span>Karar vericiyi bul</span><i>→</i><span>Lead &amp; e-posta</span><i>→</i><span>Takip</span>
+            </div>
+            <h3 class="h6 mt-3">Giriş</h3>
+            <ol class="guide-steps">
+                <li>Tarayıcıda uygulamanın adresini açın; kullanıcı adınız ve şifrenizle giriş yapın.</li>
+                <li>Yönetici şifrenizi sıfırladıysa ilk girişte yeni şifre belirlemeniz istenir.</li>
+                <li>Arka arkaya 5 hatalı girişte hesap 15 dakika kilitlenir.</li>
+                <li>Şifrenizi sağ üstteki baş harflerinize tıklayıp <strong>Şifremi değiştir</strong> ile değiştirebilirsiniz.</li>
+            </ol>
+            <div class="guide-roles">
+                <div class="guide-tip is-info"><div><strong>Kullanıcı</strong> — firma arar, firmaları değerlendirir, favori listesi tutar, lead açar, mail yazar ve gönderir, rapor alır.</div></div>
+                <div class="guide-tip is-info"><div><strong>Yönetici</strong> — kullanıcıların yaptıklarına ek olarak ayarları, API anahtarlarını, ICP'yi, kullanıcıları ve audit log'u yönetir.</div></div>
+            </div>
+            <h3 class="h6 mt-4">Sayfa turu: her ekranda adım adım yönlendirme</h3>
+            <p class="mb-2">Bir ekranı ilk açtığınızda sağ altta <em>“Bu ekranı tanıyalım mı?”</em> daveti çıkar. İstediğiniz zaman sağ üstteki
+                <strong>?</strong> düğmesi → <strong>Bu sayfanın turu</strong> ile turu başlatabilirsiniz. Tur, önemli alanları sırayla vurgular;
+                <em>İleri / Geri</em> düğmeleri veya klavyedeki ok tuşlarıyla ilerler, <em>Esc</em> ile kapanır.</p>
+            <figure class="guide-shot"><img src="@Shot("tour")" alt="Sayfa turu" loading="lazy" /><figcaption>Sayfa turu: vurgulanan alan ve açıklaması (Firmalar ekranı, 5. adım).</figcaption></figure>
+            <div class="guide-tip mt-3">
+                <div><strong>Gizlilik:</strong> Arama sonuçlarınız ve favori listeniz size özeldir. Arama şablonunuzu veya favori listenizi isterseniz herkese açabilirsiniz; bu durumda bile arama <em>sonuçlarınız</em> paylaşılmaz.</div>
+            </div>
+        </section>
+
+        @* ---------------------------------------------------------------- *@
+        <section class="guide-section" id="panel">
+            <h2><span class="guide-num">@Num("panel")</span> Panel</h2>
+            <p class="guide-lead">Girişten sonra açılan özet ekran: kaç firma bulundu, satış hunisinde nerede, son olaylar neler.</p>
+            <figure class="guide-shot"><img src="@Shot("panel")" alt="Panel ekranı" loading="lazy" /><figcaption>Panel: sayı kartları ve satış hunisi. Kartlara tıklayınca ilgili liste açılır.</figcaption></figure>
+            <ol class="guide-steps">
+                <li><strong>Sayı kartları</strong> toplam firma, lead ve gönderilen maili gösterir; tıklayınca listeye gider.</li>
+                <li><strong>Satış hunisi</strong>, firmaların temas yok → iletişim kuruldu → mail atıldı → proje başladı aşamalarındaki dağılımıdır.</li>
+                <li>Üst menüdeki kadran simgesi API kotası dolmak üzereyse kırmızı noktayla uyarır.</li>
+            </ol>
+            <div class="guide-actions"><a class="btn btn-sm btn-outline-secondary" href="/?tour=1">Panel turunu başlat</a></div>
+        </section>
+
+        @* ---------------------------------------------------------------- *@
+        <section class="guide-section" id="profile">
+            <h2><span class="guide-num">@Num("profile")</span> Biz ne arıyoruz? (şirket profili)</h2>
+            <p class="guide-lead">
+                Uygulamanın “beyni”. Şirketinizin ne sattığını, ideal müşterinizi ve hedef segmentlerinizi burada tanımlarsınız.
+                Yapay zekâ firma analizini, uygunluk puanını, akıllı aramayı ve mail yazımını bu tanıma göre yapar.
+            </p>
+            <figure class="guide-shot"><img src="@Shot("profile")" alt="Biz ne arıyoruz ekranı" loading="lazy" /><figcaption>Şirket profili, siteden otomatik doldurma ve hedef segmentler.</figcaption></figure>
+            <ol class="guide-steps">
+                <li>Üst menüdeki sarı <strong>Biz ne arıyoruz?</strong> düğmesine tıklayın.</li>
+                <li><strong>Sitemizden otomatik doldur</strong> kutusuna şirket sitenizin adresini yazın; yapay zekâ taslağı birkaç saniyede doldurur.</li>
+                <li>Taslağı kontrol edin: <em>Ne satıyoruz</em>, <em>İdeal müşteri</em>, <em>Müşterimiz olmayanlar</em>, <em>Rakipler</em>.</li>
+                <li><strong>Hedef segmentler</strong>: her ürün grubu veya müşteri sektörü için bir segment ekleyin (arama terimi, bölge, anahtar kelimeler, NACE, ulaşılacak unvanlar).</li>
+                <li><strong>Kaydet</strong>. Segmentler Firma Ara ekranında tek tıkla arama düğmesi olur.</li>
+            </ol>
+            <div class="guide-tip"><div>Bu ekranı yalnızca yönetici kaydedebilir; kullanıcılar görüntüler.</div></div>
+        </section>
+
+        @* ---------------------------------------------------------------- *@
+        <section class="guide-section" id="icp">
+            <h2><span class="guide-num">@Num("icp")</span> İdeal müşteri profili (ICP) <span class="tag tag-muted">Yönetici</span></h2>
+            <p class="guide-lead">Hedef sektörler (NACE), bölge, asgari çalışan ve hariç tutulacak kelimeler. Firmaların puanı ve “ICP'ye uyanlar” filtresi buna göre çalışır.</p>
+            <figure class="guide-shot"><img src="@Shot("icp")" alt="ICP ekranı ve siteden öneri" loading="lazy" /><figcaption>Sitemizden ICP öner: yapay zekâ gerekçeleriyle öneri çıkarır, “Forma ekle” ile uygulanır.</figcaption></figure>
+            <ol class="guide-steps">
+                <li>Firmalar ekranındaki <strong>ICP ayarla</strong> çipinden veya Ayarlar'dan açın.</li>
+                <li><strong>Sitemizden ICP öner</strong>: sitenizin adresini yazıp <em>Siteyi analiz et</em>'e basın. Yapay zekâ hedef sektörleri, bölgeyi, ölçeği ve hariç tutulacakları gerekçeleriyle önerir.</li>
+                <li><strong>Forma ekle</strong> öneriyi mevcut değerlerle birleştirir; <strong>Formu öneriyle değiştir</strong> tamamen değiştirir. Uygulanan alanlar sarı çerçeveyle işaretlenir.</li>
+                <li>Kontrol edip <strong>Kaydet ve firmaları yeniden puanla</strong>'ya basın (API kredisi harcamaz).</li>
+            </ol>
+        </section>
+
+        @* ---------------------------------------------------------------- *@
+        <section class="guide-section" id="search">
+            <h2><span class="guide-num">@Num("search")</span> Firma arama</h2>
+            <p class="guide-lead">Sektör yazarak Google ve Google Haritalar'da üretici firmaları bulur; her firmanın sitesini okuyup yapay zekâ ile değerlendirir.</p>
+            <figure class="guide-shot"><img src="@Shot("search")" alt="Firma Ara ekranı" loading="lazy" /><figcaption>Firma Ara: sektör, segment düğmeleri, akıllı arama ve bölge.</figcaption></figure>
+            <ol class="guide-steps">
+                <li><strong>Sektör</strong> kutusuna aradığınız sektörü yazın (ör. “Otomotiv yan sanayi”) veya bir <strong>segment</strong> düğmesine tıklayın.</li>
+                <li><strong>Akıllı arama</strong> açık kalsın: yapay zekâ ek arama terimleri üretir ve bayi, rehber, haber sitesi, rakip gibi hedef dışı adayları siteye girmeden eler.</li>
+                <li>Bölgeyi seçip <strong>Firma Ara</strong>'ya basın. İlerleme çubuğu açılır; gerekirse <strong>İptal et</strong> ile durdurun (o ana kadar bulunanlar kaydedilir).</li>
+                <li>Arama bitince sonuç özeti gelir: kaç firma bulundu, kaçı yeni, kaçı ön elemede elendi. Her satırdaki yıldızla favoriye ekleyebilirsiniz.</li>
+            </ol>
+            <figure class="guide-shot"><img src="@Shot("search-advanced")" alt="Gelişmiş arama" loading="lazy" /><figcaption>Gelişmiş arama: il seçimi ve arama şablonu. “Şablonu tüm kullanıcılarla paylaş” yalnızca kriterleri paylaşır.</figcaption></figure>
+            <h3 class="h6 mt-3">Gelişmiş arama ve arama şablonları</h3>
+            <ol class="guide-steps">
+                <li><strong>Gelişmiş Arama</strong>'yı açın; il/bölge seçin.</li>
+                <li><strong>Arama profili adı</strong> yazıp <strong>Kaydet ve Ara</strong> derseniz arama şablon olarak saklanır; sonra tek tıkla tekrar çalıştırılır.</li>
+                <li>Şablonlar <strong>size özeldir</strong>. <em>Şablonu tüm kullanıcılarla paylaş</em> işaretlenirse diğer kullanıcılar kriterleri kullanabilir; bulunan firmalar yine kişiye özel kalır.</li>
+                <li>Başkasının paylaştığı şablonu olduğu gibi kullanabilirsiniz; değiştirip kaydederseniz size özel bir kopya oluşur.</li>
+            </ol>
+            <div class="guide-tip is-info"><div><strong>Belirli bir firmayı bul</strong>: tanıdığınız bir firmayı adıyla aratıp sisteme ekleyebilirsiniz.</div></div>
+            <div class="guide-actions"><a class="btn btn-sm btn-outline-secondary" href="/Company/Search?tour=1">Firma Ara turunu başlat</a></div>
+        </section>
+
+        @* ---------------------------------------------------------------- *@
+        <section class="guide-section" id="companies">
+            <h2><span class="guide-num">@Num("companies")</span> Firmalar listesi</h2>
+            <p class="guide-lead">Bulduğunuz firmalar; varsayılan olarak <strong>son aramanızın</strong> sonuçları gösterilir.</p>
+            <figure class="guide-shot"><img src="@Shot("companies")" alt="Firmalar ekranı" loading="lazy" /><figcaption>Firmalar: arama seçici, filtre çipleri, firma kartları ve alttaki karşılaştırma çubuğu.</figcaption></figure>
+            <ol class="guide-steps">
+                <li><strong>Gösterilen</strong> seçicisinden önceki aramalarınıza veya <em>Tüm firmalar</em>'a geçin.</li>
+                <li>Arama kutusu ve <strong>Detaylı filtre</strong> ile puan, NACE sektörü, il/ülke, şablon ve AI sinyaline göre süzün; <strong>Dışa aktar</strong> ile ekrandaki listeyi Excel'e indirin.</li>
+                <li>Çipler: satış aşaması, <em>ICP'ye uyanlar</em>, <em>İncelenemedi</em>, segmentler ve <em>Favorilerim</em>.</li>
+                <li>Kartta lead puanı, profilimize <strong>uygunluk yüzdesi</strong>, segment ve yapay zekânın kısa gerekçesi yazar.</li>
+                <li>Kart altındaki düğmeler: <em>İletişim / Mail / Proje</em> işaretleri, <em>Salesforce</em>'a aktarma, <em>Kıyasla</em> (karşılaştırmaya ekle) ve silme. Sağ üstteki <strong>yıldız</strong> favoriye ekler.</li>
+            </ol>
+            <div class="guide-tip"><div><strong>“İncelenemedi”</strong> rozeti, sitesi okunamayan veya servis hatası alan firmalardır; firma detayında <em>Yeniden Analiz Et</em> ile tekrar denenir. <strong>“Elendi”</strong> ise hedef dışı bulunan firmadır.</div></div>
+            <div class="guide-actions"><a class="btn btn-sm btn-outline-secondary" href="/Company?tour=1">Firmalar turunu başlat</a></div>
+        </section>
+
+        @* ---------------------------------------------------------------- *@
+        <section class="guide-section" id="details">
+            <h2><span class="guide-num">@Num("details")</span> Firma detayı</h2>
+            <p class="guide-lead">Bir firmanın bütün bilgisi: puanın nasıl oluştuğu, yapay zekâ analizi, konum, internet ön araştırması, kişiler ve lead'ler.</p>
+            <figure class="guide-shot"><img src="@Shot("details")" alt="Firma detayı" loading="lazy" /><figcaption>Firma detayı: favori, karşılaştır, rapor ve sekmeler.</figcaption></figure>
+            <ol class="guide-steps">
+                <li><strong>Özet</strong>: puan dökümü, profilimize uygunluk ve gerekçe, ürünler, konum haritası (tıklayınca Google Haritalar açılır).</li>
+                <li><strong>Firma analizi</strong>: haber, resmî kayıt ve finans bilgilerinden “Güçlü / İncelenmeli / Riskli” sinyali üretir.</li>
+                <li><strong>Kişiler &amp; Lead'ler</strong>: <em>Karar vericileri bul</em> ile hedef unvanlardaki kişiler aranır. E-posta açmak kredi harcar; hangi kişi için açılacağına siz karar verirsiniz.</li>
+                <li>Kişiyi seçip <strong>Lead oluştur</strong> deyin; e-posta yazma ekranına geçersiniz.</li>
+                <li><strong>Rapor</strong> düğmesi görüşmeye götürülecek tek sayfalık yazdırılabilir raporu açar.</li>
+            </ol>
+            <div class="guide-actions"><a class="btn btn-sm btn-outline-secondary" href="/Company?run=all">Firmalara git</a></div>
+        </section>
+
+        @* ---------------------------------------------------------------- *@
+        <section class="guide-section" id="favorites">
+            <h2><span class="guide-num">@Num("favorites")</span> Favoriler</h2>
+            <p class="guide-lead">Takip etmek istediğiniz firmaların kişisel listesi.</p>
+            <figure class="guide-shot"><img src="@Shot("favorites")" alt="Favoriler" loading="lazy" /><figcaption>Favoriler: kendi listeniz ve paylaşılan listeler.</figcaption></figure>
+            <ol class="guide-steps">
+                <li>Firma kartındaki, arama sonucundaki veya firma detayındaki <strong>yıldıza</strong> tıklayın.</li>
+                <li>Üst menüden <strong>Favoriler</strong>'i açın. Listeniz varsayılan olarak <strong>size özeldir</strong>.</li>
+                <li><strong>Herkese aç</strong> ile listenizi diğer kullanıcılar görebilir (yalnızca görüntüleme); <strong>Kişiye özel yap</strong> ile geri kapatın.</li>
+                <li>Sol taraftan diğer kullanıcıların paylaştığı listelere bakın; <strong>Excel'e aktar</strong> ile listeyi indirin.</li>
+            </ol>
+        </section>
+
+        @* ---------------------------------------------------------------- *@
+        <section class="guide-section" id="compare">
+            <h2><span class="guide-num">@Num("compare")</span> Firma karşılaştırma</h2>
+            <p class="guide-lead">İki firmayı kriterlerimize uygunluk (müşteri olabilme potansiyeli) ve genel durum açısından yan yana koyar.</p>
+            <figure class="guide-shot"><img src="@Shot("compare")" alt="Firma karşılaştırma" loading="lazy" /><figcaption>Karşılaştırma: önde olan firma, kriterlerimiz ve yeşil vurgulu kriter tablosu.</figcaption></figure>
+            <ol class="guide-steps">
+                <li>Firmalar ekranında iki firmanın kartındaki <strong>Kıyasla</strong> düğmesine basın (veya firma detayında <em>Karşılaştır</em>). Ekranın altında seçim çubuğu çıkar.</li>
+                <li>Çubuktaki <strong>Karşılaştır</strong>'a basın. İsterseniz <em>Raporlar → Firma karşılaştırma</em> ekranında firmaları listeden de seçebilirsiniz.</li>
+                <li>Tablo; lead puanı, uygunluk, ICP, puan kalemleri, sektör, ölçek, ERP durumu, ön araştırma ve satış durumunu gösterir. <strong>Yeşil hücre</strong> o kriterde önde olan taraftır.</li>
+                <li><strong>Yapay zekâ yorumu al</strong>: hangisine önce gidilmeli, güçlü yanlar, riskler ve sonraki adımlar.</li>
+                <li><strong>Excel'e aktar</strong> veya <strong>Yazdır / PDF</strong> ile raporu alın (yapay zekâ yorumu da eklenir).</li>
+            </ol>
+            <div class="guide-actions"><a class="btn btn-sm btn-outline-secondary" href="/Company/Compare">Karşılaştırmayı aç</a></div>
+        </section>
+
+        @* ---------------------------------------------------------------- *@
+        <section class="guide-section" id="sector">
+            <h2><span class="guide-num">@Num("sector")</span> Sektör analizi (NACE)</h2>
+            <p class="guide-lead">“Bu sektör bize ne kadar uygun?” sorusunun raporlu cevabı. NACE kodunu bilmenize gerek yok.</p>
+            <figure class="guide-shot"><img src="@Shot("sector")" alt="Sektör analizi" loading="lazy" /><figcaption>Anahtar kelime yazın; eşleşen NACE kodlarından en fazla 6'sını seçin.</figcaption></figure>
+            <ol class="guide-steps">
+                <li>Üst menüden <strong>Raporlar → Sektör analizi</strong>'ni açın.</li>
+                <li>Sektörü günlük dille yazın (ör. “plastik ambalaj”, “süt ürünleri”) ve <strong>NACE kodlarını bul</strong>'a basın. Kodlar resmî listeden ve yapay zekâdan gelir; yanında uygulamada kaç firma olduğu yazar.</li>
+                <li>Analiz edilecek kodları işaretleyip <strong>Seçilenleri analiz et</strong>'e basın.</li>
+                <li>Raporda her sektör için uygunluk puanı, neden uygun olduğu, çözdüğümüz ihtiyaçlar, riskler, hedef firma profili, arama terimleri ve ulaşılacak unvanlar yer alır.</li>
+                <li><strong>Bu sektörde firma ara</strong> düğmesi Firma Ara ekranını doldurulmuş açar. Rapor kaydedilir; Excel ve PDF olarak alınabilir.</li>
+            </ol>
+            <figure class="guide-shot"><img src="@Shot("sector-report")" alt="Sektör analizi raporu" loading="lazy" /><figcaption>Sektör raporu: sıralama, uygunluk halkası, gerekçeler ve uygulamadaki istatistikler.</figcaption></figure>
+        </section>
+
+        @* ---------------------------------------------------------------- *@
+        <section class="guide-section" id="leads">
+            <h2><span class="guide-num">@Num("leads")</span> Lead'ler ve e-posta</h2>
+            <p class="guide-lead">Firma detayında seçtiğiniz kişiler lead olur; durumlarını buradan takip edersiniz.</p>
+            <figure class="guide-shot"><img src="@Shot("leads")" alt="Lead listesi" loading="lazy" /><figcaption>Lead listesi: arama, filtre, durum ve toplu işlemler.</figcaption></figure>
+            <ol class="guide-steps">
+                <li><strong>Lead'ler</strong> ekranında firma, kişi adı veya unvanla arayın. E-postalar şifreli saklandığından e-postayla aramada <strong>tam adresi</strong> yazın.</li>
+                <li>Lead'i açıp durumunu güncelleyin (İncelendi, E-posta hazır, Mail atıldı, İlgilendi / İlgilenmedi). Pano görünümünde kartları sürükleyebilirsiniz.</li>
+                <li><strong>Mail yaz</strong>: taslak seçin veya <strong>AI ile yaz</strong> ile kişiye ve firmaya özel mail üretin, düzenleyip gönderin.</li>
+            </ol>
+            <figure class="guide-shot"><img src="@Shot("compose")" alt="E-posta yazma" loading="lazy" /><figcaption>E-posta yazma: yapay zekâ taslağı, konu, metin ve gönder.</figcaption></figure>
+        </section>
+
+        @* ---------------------------------------------------------------- *@
+        <section class="guide-section" id="sequences">
+            <h2><span class="guide-num">@Num("sequences")</span> Mail dizileri ve taslaklar</h2>
+            <p class="guide-lead">Otomatik takip mailleri ve hazır e-posta şablonları.</p>
+            <figure class="guide-shot"><img src="@Shot("templates")" alt="Taslak düzenleyici" loading="lazy" /><figcaption>Taslak düzenleyici: soldan şablon seçin, düzenleyin, sağda önizleyin.</figcaption></figure>
+            <ol class="guide-steps">
+                <li><strong>Taslak Düzenleyici</strong>'de hazır şablonları düzenleyin; {COMPANY_NAME}, {CONTACT_NAME}, {INDUSTRY} gibi alanlar gönderirken otomatik dolar.</li>
+                <li><strong>Mail Dizileri</strong>'nde adımları ve bekleme günlerini tanımlayın; lead listesinden lead'leri diziye ekleyin.</li>
+                <li>Kişi cevap verirse veya mail geri dönerse dizi kendiliğinden durur (gelen kutusu IMAP ile kontrol edilir).</li>
+            </ol>
+            <figure class="guide-shot"><img src="@Shot("sequences")" alt="Mail dizileri" loading="lazy" /><figcaption>Mail dizileri: aktif diziler ve durumları.</figcaption></figure>
+        </section>
+
+        @* ---------------------------------------------------------------- *@
+        <section class="guide-section" id="usage">
+            <h2><span class="guide-num">@Num("usage")</span> API kullanımı</h2>
+            <p class="guide-lead">Arama (Serper), yapay zekâ (Gemini) ve kişi (Apollo) servislerinin kullanımı ve kalan kredileri.</p>
+            <figure class="guide-shot"><img src="@Shot("usage")" alt="API kullanımı" loading="lazy" /><figcaption>API kullanımı: günlük/aylık kullanım, limitler ve uyarı durumları.</figcaption></figure>
+            <ol class="guide-steps">
+                <li>Üst menüdeki kadran simgesinden açın.</li>
+                <li>Her servis için bugün / bu ay kullanım, limit ve kalan yüzdesi görünür; %80'de uyarı, %95'te kritik uyarı verilir.</li>
+            </ol>
+        </section>
+
+        @* ---------------------------------------------------------------- *@
+        <section class="guide-section" id="settings">
+            <h2><span class="guide-num">@Num("settings")</span> Ayarlar <span class="tag tag-muted">Yönetici</span></h2>
+            <p class="guide-lead">API anahtarları, arama limitleri, e-posta (SMTP/IMAP) ve Salesforce bağlantısı.</p>
+            <figure class="guide-shot"><img src="@Shot("settings")" alt="Ayarlar" loading="lazy" /><figcaption>Ayarlar: API anahtarları ve şifreler veritabanında şifreli saklanır; şifre alanları kaydedildikten sonra tekrar gösterilmez.</figcaption></figure>
+            <ol class="guide-steps">
+                <li><strong>API anahtarları</strong>: Serper, Gemini ve Apollo anahtarlarını girin. Anahtarlar yalnızca yöneticiye görünür ve veritabanında şifreli saklanır.</li>
+                <li><strong>Arama</strong>: azami firma sayısı ve varsayılan bölge.</li>
+                <li><strong>E-posta</strong>: SMTP hesabını girip <em>Test e-postası gönder</em> ile deneyin; cevap takibi için IMAP bilgileri.</li>
+                <li><strong>Salesforce</strong>: bağlantıyı kurun; firmalar ve kişiler tek tıkla Salesforce'a aktarılır, sonraki değişiklikler otomatik senkronlanır.</li>
+            </ol>
+        </section>
+
+        @* ---------------------------------------------------------------- *@
+        <section class="guide-section" id="users">
+            <h2><span class="guide-num">@Num("users")</span> Kullanıcılar ve audit log <span class="tag tag-muted">Yönetici</span></h2>
+            <p class="guide-lead">Kullanıcı yönetimi ve “kim, ne zaman, ne yaptı” kaydı.</p>
+            <figure class="guide-shot"><img src="@Shot("users")" alt="Kullanıcılar" loading="lazy" /><figcaption>Kullanıcılar: yeni kullanıcı, rol, aktiflik ve şifre sıfırlama.</figcaption></figure>
+            <ol class="guide-steps">
+                <li>Sağ üstteki baş harflerinize tıklayın → <strong>Kullanıcılar</strong>. Yeni kullanıcı ekleyin, rolünü seçin.</li>
+                <li><strong>Şifre sıfırla</strong> ile geçici şifre verin; kullanıcı ilk girişte yeni şifre belirler. Son aktif yönetici silinemez.</li>
+                <li><strong>Audit log</strong>'da girişler, aramalar, silmeler, ayar değişiklikleri görünür (şifre ve anahtar değerleri asla yazılmaz). Tarih, kullanıcı ve işleme göre süzün.</li>
+                <li><strong>Excel'e aktar</strong>: filtredeki kayıtlar; kullanıcı/işlem özeti ve filtre bilgisi ayrı sayfalarda iner.</li>
+            </ol>
+            <figure class="guide-shot"><img src="@Shot("audit")" alt="Audit log" loading="lazy" /><figcaption>Audit log: filtreler ve Excel'e aktarma.</figcaption></figure>
+        </section>
+
+        @* ---------------------------------------------------------------- *@
+        <section class="guide-section" id="security">
+            <h2><span class="guide-num">@Num("security")</span> Veri güvenliği</h2>
+            <p class="guide-lead">Kritik bilgiler veritabanında şifreli (AES-256) saklanır; uygulama içinde normal görünür.</p>
+            <ul>
+                <li>Lead/kişi iletişim bilgileri: e-posta, telefon, profil adresi; gönderilen maillerin alıcı adresi.</li>
+                <li>Kullanıcıların ad-soyad ve e-postası. Giriş şifreleri geri çözülemeyecek şekilde (PBKDF2) saklanır.</li>
+                <li>API anahtarları, SMTP/IMAP şifreleri ve Salesforce gizli bilgileri.</li>
+            </ul>
+            <div class="guide-tip"><div><strong>Yönetici için:</strong> Şifreleme anahtarı sunucuda ayrı bir dosyada durur. Anahtar kaybolursa şifreli alanlar okunamaz; veritabanı yedeğiyle birlikte güvenli bir yerde yedekleyin.</div></div>
+        </section>
+
+        @* ---------------------------------------------------------------- *@
+        <section class="guide-section" id="sss">
+            <h2><span class="guide-num">@Num("sss")</span> Sık sorulanlar</h2>
+            <dl class="mb-0">
+                <dt>Arama çok az firma getirdi.</dt>
+                <dd>Sektörü daha genel yazın, akıllı aramayı açık tutun veya bölgeyi genişletin. Azami firma sayısı Ayarlar'dadır.</dd>
+                <dt>Bir firma yanlışlıkla elendi.</dt>
+                <dd>Firma detayında <em>Yeniden Analiz Et</em> deyin; hariç tutulan kelimeler ICP ekranındadır.</dd>
+                <dt>Başka bir kullanıcının bulduğu firmaları neden görmüyorum?</dt>
+                <dd>Arama sonuçları kişiye özeldir. Paylaşmak istediği firmaları favori listesini herkese açarak paylaşabilir.</dd>
+                <dt>“Kota doldu” uyarısı aldım.</dt>
+                <dd>API kullanımı ekranından hangi servisin dolduğunu görün; yönetici limiti veya anahtarı Ayarlar'dan günceller.</dd>
+                <dt>Bir ekranda ne yapacağımı bilmiyorum.</dt>
+                <dd>Sağ üstteki <strong>?</strong> → <em>Bu sayfanın turu</em>; ekranın önemli bölümleri adım adım gösterilir.</dd>
+            </dl>
+        </section>
+    </div>
+</div>

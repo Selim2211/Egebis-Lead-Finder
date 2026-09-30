@@ -170,6 +170,18 @@
                             }
                         </a>
                     </li>
+                    <li class="nav-item dropdown">
+                        <button type="button" class="theme-toggle nav-help" data-bs-toggle="dropdown" aria-expanded="false"
+                                title="Yardım" aria-label="Yardım">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10" /><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3" /><path d="M12 17h.01" />
+                            </svg>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><button type="button" class="dropdown-item" data-tour-start data-tour-menu>Bu sayfanın turu</button></li>
+                            <li><a class="dropdown-item" asp-controller="Help" asp-action="Index">Kullanıcı kılavuzu</a></li>
+                        </ul>
+                    </li>
                     <li class="nav-item">
                         <button type="button" class="theme-toggle" id="themeToggle"
                                 title="Açık / koyu tema" aria-label="Açık / koyu tema">
@@ -240,6 +252,7 @@
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script src="~/js/favorites.js" asp-append-version="true"></script>
     <script src="~/js/compare.js" asp-append-version="true"></script>
+    <script src="~/js/tour.js" asp-append-version="true"></script>
     <script src="~/js/progress-overlay.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
