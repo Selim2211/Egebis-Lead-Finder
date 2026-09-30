@@ -32,6 +32,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<SearchRun> SearchRuns => Set<SearchRun>();
     public DbSet<SearchRunCompany> SearchRunCompanies => Set<SearchRunCompany>();
+    public DbSet<FavoriteCompany> FavoriteCompanies => Set<FavoriteCompany>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -212,6 +213,15 @@ public class ApplicationDbContext : DbContext
             e.HasIndex(x => new { x.SearchRunId, x.CompanyId }).IsUnique();
             e.HasIndex(x => x.CompanyId);
             e.HasOne(x => x.SearchRun).WithMany(r => r.Companies).HasForeignKey(x => x.SearchRunId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Kullanici basina tek favori listesi; firma veya kullanici silinirse kayit da gider.
+        b.Entity<FavoriteCompany>(e =>
+        {
+            e.HasIndex(x => new { x.UserId, x.CompanyId }).IsUnique();
+            e.HasIndex(x => x.CompanyId);
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
         });
 

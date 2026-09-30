@@ -1,0 +1,14 @@
+@model FavoriteStar
+@* Favori yildizi: tiklayinca sayfa yenilenmeden eklenir/cikarilir (wwwroot/js/favorites.js). *@
+<button type="button" class="fav-star @(Model.IsFavorite ? "is-on" : "") @(Model.WithLabel ? "fav-star-labeled" : "")"
+        data-fav-toggle="@Url.Action("Toggle", "Favorites", new { id = Model.CompanyId })"
+        aria-pressed="@(Model.IsFavorite ? "true" : "false")"
+        title="@(Model.IsFavorite ? "Favorilerden çıkar" : "Favorilere ekle")">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" />
+    </svg>
+    @if (Model.WithLabel)
+    {
+        <span class="fav-star-label">@(Model.IsFavorite ? "Favorilerde" : "Favorilere ekle")</span>
+    }
+</button>

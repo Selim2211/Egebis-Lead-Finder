@@ -46,6 +46,9 @@ public class AppUser
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastLoginAt { get; set; }
 
+    /// <summary>Favori firma listesi tum kullanicilara acik mi (varsayilan: kisiye ozel).</summary>
+    public bool FavoritesPublic { get; set; }
+
     public string DisplayName => string.IsNullOrWhiteSpace(FullName) ? UserName : FullName!;
 }
 

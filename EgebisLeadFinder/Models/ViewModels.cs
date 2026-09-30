@@ -64,6 +64,9 @@ public class CompanySearchViewModel
 
     public SearchCriteria Criteria { get; set; } = new();
     public DiscoveryResult? Result { get; set; }
+
+    /// <summary>Sonuctaki firmalardan kullanicinin favorisinde olanlar.</summary>
+    public HashSet<int> FavoriteIds { get; set; } = new();
     public string? Error { get; set; }
 
     /// <summary>Hangi butonla gonderildi: temel arama, gelismis arama, gelismis + profil kaydet.</summary>
@@ -95,6 +98,11 @@ public class CompanyListViewModel
 
     /// <summary>"Tum firmalar" secenegindeki sayi: kullanicinin gorebildigi firmalar.</summary>
     public int AllCount { get; set; }
+
+    /// <summary>Bu sayfadaki firmalardan kullanicinin favorisinde olanlar; Favorites = yalnizca favoriler suzgeci.</summary>
+    public HashSet<int> FavoriteIds { get; set; } = new();
+    public bool Favorites { get; set; }
+    public int FavoriteCount { get; set; }
     public SearchRun? SelectedRun { get; set; }
 
     /// <summary>Bu sayfadaki firmalardan secili aramada yeni eklenenler ("yeni" etiketi).</summary>
@@ -269,6 +277,9 @@ public static class CompanyStage
 public class CompanyDetailViewModel
 {
     public Company Company { get; set; } = null!;
+
+    /// <summary>Firma, bakan kullanicinin favori listesinde mi?</summary>
+    public bool IsFavorite { get; set; }
     public CompanyAnalysis? Analysis { get; set; }
     public ScoreBreakdownViewModel? Breakdown { get; set; }
     /// <summary>Bu firmada acilmis tum lead'ler (kisi bazli), en yeni ustte.</summary>
@@ -563,4 +574,14 @@ public class SettingsViewModel
     public decimal GeminiCostToday => Math.Round(GeminiCallsToday * GeminiCostPerCallTry, 2);
     public decimal GeminiCostThisWeek => Math.Round(GeminiCallsThisWeek * GeminiCostPerCallTry, 2);
     public decimal GeminiCostThisMonth => Math.Round(GeminiCallsThisMonth * GeminiCostPerCallTry, 2);
+}
+
+/// <summary>Favoriler ekrani: liste secici + secili listenin firmalari.</summary>
+public class FavoritesViewModel
+{
+    public List<EgebisLeadFinder.Services.FavoriteListInfo> Lists { get; set; } = new();
+    public EgebisLeadFinder.Services.FavoriteListInfo? Selected { get; set; }
+    public bool IsOwn { get; set; }
+    public List<FavoriteCompany> Entries { get; set; } = new();
+    public HashSet<int> MyFavoriteIds { get; set; } = new();
 }

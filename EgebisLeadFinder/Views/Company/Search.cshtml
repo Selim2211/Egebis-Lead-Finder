@@ -304,8 +304,9 @@
                                             }
                                         </div>
                                     </td>
-                                    <td class="text-end">
-                                        <a class="btn btn-sm btn-outline-primary"
+                                    <td class="text-end text-nowrap">
+                                        <partial name="_FavoriteStar" model="new FavoriteStar(company.Id, Model.FavoriteIds.Contains(company.Id))" />
+                                        <a class="btn btn-sm btn-outline-primary ms-1"
                                            asp-action="Details" asp-route-id="@company.Id">İncele</a>
                                     </td>
                                 </tr>

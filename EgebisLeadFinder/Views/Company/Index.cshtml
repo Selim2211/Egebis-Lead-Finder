@@ -35,6 +35,7 @@
     var chips = new List<(string Label, string Url)>();
     if (!string.IsNullOrWhiteSpace(Model.Search)) chips.Add(($"“{Model.Search}”", QueryUrl.Without(req, "search")));
     if (Model.NotEvaluated) chips.Add(("İncelenemeyenler", QueryUrl.Without(req, "notEvaluated")));
+    if (Model.Favorites) chips.Add(("Favorilerim", QueryUrl.Without(req, "fav")));
 
     // Arama secicisi: secili aramanin etiketi ve baska aramaya gecis adresi (diger filtreler korunur).
     var nowUtc = DateTime.UtcNow;
@@ -257,6 +258,12 @@
             @Icons.Target(13) @seg.Key <span class="stage-chip-count">@seg.Value</span>
         </a>
     }
+    <a class="stage-chip chip-fav @(Model.Favorites ? "is-active" : "")"
+       href="@(Model.Favorites ? QueryUrl.Without(req, "fav") : QueryUrl.With(req, "fav", "true"))"
+       title="Favori listenizdeki firmalar">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" /></svg>
+        Favorilerim <span class="stage-chip-count">@Model.FavoriteCount</span>
+    </a>
     <a class="stage-chip" asp-controller="Icp" asp-action="Index" title="İdeal müşteri profilini düzenle">ICP ayarla</a>
 </nav>
 
@@ -269,6 +276,10 @@
         }
         @* Filtreler secili aramanin icinde calisir. *@
         <input type="hidden" name="run" value="@(Model.RunId?.ToString() ?? "all")" />
+        @if (Model.Favorites)
+        {
+            <input type="hidden" name="fav" value="true" />
+        }
 
         <div class="fd-head">
             <span class="fd-head-icon">
@@ -426,6 +437,7 @@ else
             };
 
             <article class="company-card @(company.ProjectStartedAt is not null ? "is-project" : "")" data-company-id="@company.Id">
+                <div class="company-card-fav"><partial name="_FavoriteStar" model="new FavoriteStar(company.Id, Model.FavoriteIds.Contains(company.Id))" /></div>
                 <a class="company-card-main" asp-action="Details" asp-route-id="@company.Id">
                     <div class="company-card-top">
                         <span class="company-logo avatar-hue-@PersonDisplay.Hue(company.Name)">@PersonDisplay.Initials(company.Name)</span>

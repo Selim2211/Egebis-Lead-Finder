@@ -1,0 +1,154 @@
+@model FavoritesViewModel
+@{
+    ViewData["Title"] = "Favoriler";
+    var selected = Model.Selected;
+    var ownList = Model.IsOwn ? selected : null;
+}
+
+<div class="page-head">
+    <div>
+        <h1>Favoriler</h1>
+        <div class="page-sub">
+            @if (Model.IsOwn)
+            {
+                <span>Yıldızladığınız firmalar. Firmalar, Firma Ara sonuçları ve firma detayındaki yıldızla ekleyin.</span>
+            }
+            else
+            {
+                <span>@selected?.OwnerName kullanıcısının paylaştığı liste (yalnızca görüntüleme).</span>
+            }
+        </div>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        @if (Model.Entries.Count > 0)
+        {
+            <a class="btn btn-outline-secondary" asp-action="Export" asp-route-user="@(Model.IsOwn ? null : selected?.UserId)">Excel'e aktar</a>
+        }
+        @if (Model.IsOwn && ownList is not null)
+        {
+            <form method="post" asp-action="Visibility" class="m-0">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="isPublic" value="@(ownList.IsPublic ? "false" : "true")" />
+                <button type="submit" class="btn @(ownList.IsPublic ? "btn-outline-secondary" : "btn-accent")"
+                        title="@(ownList.IsPublic ? "Listeniz şu an tüm kullanıcılara açık" : "Listeniz şu an yalnızca size özel")">
+                    @(ownList.IsPublic ? "Kişiye özel yap" : "Herkese aç")
+                </button>
+            </form>
+        }
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(TempData["SettingsSaved"] as string))
+{
+    <div class="alert alert-success" data-flash="success">@TempData["SettingsSaved"]</div>
+}
+@if (!string.IsNullOrWhiteSpace(TempData["SettingsError"] as string))
+{
+    <div class="alert alert-danger" data-flash="error">@TempData["SettingsError"]</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-3">
+        <div class="card">
+            <div class="card-header">Listeler</div>
+            <div class="card-body p-2">
+                @foreach (var list in Model.Lists)
+                {
+                    <a class="fav-list-item @(list.UserId == selected?.UserId ? "is-active" : "")"
+                       asp-action="Index" asp-route-user="@list.UserId">
+                        <span>
+                            @(list == Model.Lists.First() ? "Favorilerim" : list.OwnerName)
+                            <span class="d-block small text-muted-2 fw-normal">
+                                @(list == Model.Lists.First() ? (list.IsPublic ? "Herkese açık" : "Size özel") : "Paylaşılan liste")
+                            </span>
+                        </span>
+                        <span class="tag tag-muted">@list.Count</span>
+                    </a>
+                }
+                @if (Model.Lists.Count <= 1)
+                {
+                    <div class="small text-muted-2 px-2 pt-2">Paylaşılan başka liste yok. Bir kullanıcı listesini herkese açtığında burada görünür.</div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-9">
+        @if (Model.Entries.Count == 0)
+        {
+            <div class="card">
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" />
+                        </svg>
+                    </div>
+                    <div class="empty-title">Liste boş</div>
+                    <div>
+                        @if (Model.IsOwn)
+                        {
+                            <span>Firmalar ekranında veya arama sonucunda bir firmanın yıldızına tıklayın.</span>
+                        }
+                        else
+                        {
+                            <span>Bu listede henüz firma yok.</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width:6rem">Skor</th>
+                                <th>Firma</th>
+                                <th>Şehir</th>
+                                <th>Uygunluk</th>
+                                <th>Eklenme</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var e in Model.Entries)
+                            {
+                                var c = e.Company;
+                                <tr>
+                                    <td><partial name="_CompanyScore" model="c" /></td>
+                                    <td>
+                                        <a class="cell-title d-block" asp-controller="Company" asp-action="Details" asp-route-id="@c.Id">@c.Name</a>
+                                        <div class="cell-sub">
+                                            @c.Domain
+                                            @if (!string.IsNullOrWhiteSpace(c.Industry))
+                                            {
+                                                <span>· @c.Industry</span>
+                                            }
+                                        </div>
+                                    </td>
+                                    <td>@c.City</td>
+                                    <td>
+                                        @if (c.FitScore is int fit)
+                                        {
+                                            <span class="meta-chip fit-chip @FitDisplay.Css(fit)">%@fit</span>
+                                        }
+                                        @if (c.FitSegment is not null)
+                                        {
+                                            <div class="small text-muted-2">@c.FitSegment</div>
+                                        }
+                                    </td>
+                                    <td class="small text-muted-2 text-nowrap">@e.AddedAt.ToLocalTime().ToString("dd.MM.yyyy")</td>
+                                    <td class="text-end text-nowrap">
+                                        <partial name="_FavoriteStar" model="new FavoriteStar(c.Id, Model.MyFavoriteIds.Contains(c.Id))" />
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </div>
+</div>

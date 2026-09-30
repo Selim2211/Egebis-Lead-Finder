@@ -36,6 +36,7 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<UsageService>();
 builder.Services.AddScoped<SearchRunService>();
+builder.Services.AddScoped<FavoriteService>();
 builder.Services.AddSingleton<IAuditLogger, AuditLogger>();
 builder.Services.AddScoped<AuditActionFilter>();
 builder.Services.AddHostedService<AuditCleanupWorker>();

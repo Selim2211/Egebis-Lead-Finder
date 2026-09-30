@@ -212,6 +212,8 @@ public class CompanyController : Controller
                 model.Result.ProfileName = profile.Name;
             }
             await runs.CompleteAsync(run.Id, model.Result, ct);
+            model.FavoriteIds = await HttpContext.RequestServices.GetRequiredService<FavoriteService>()
+                .FavoriteIdsAsync(User.UserId(), model.Result.Companies.Select(c => c.Id), ct);
         }
         catch (Exception ex)
         {
@@ -446,6 +448,8 @@ public class CompanyController : Controller
 
         var model = new CompanySearchViewModel { Result = result };
         await FillSearchPageAsync(model, ct);
+        model.FavoriteIds = await HttpContext.RequestServices.GetRequiredService<FavoriteService>()
+            .FavoriteIdsAsync(User.UserId(), result.Companies.Select(c => c.Id), ct);
         return View(nameof(Search), model);
     }
 
@@ -526,16 +530,17 @@ public class CompanyController : Controller
         int? profileId = null, string? stage = null, string? signal = null, string? sort = null,
         [FromQuery(Name = "region")] string[]? regions = null, [FromQuery(Name = "city")] string[]? cities = null,
         [FromQuery(Name = "country")] string[]? countries = null, string? nace = null, bool icp = false,
-        int page = 1, string? run = null, bool notEvaluated = false, string? segment = null, CancellationToken ct = default)
+        int page = 1, string? run = null, bool notEvaluated = false, string? segment = null, bool fav = false,
+        CancellationToken ct = default)
     {
         var geo = GeoFilter.From(regions, cities, countries);
         if (signal is not ("guclu" or "incelenmeli" or "riskli" or "none")) signal = null;
         sort = CompanySort.Options.Any(o => o.Key == sort) ? sort! : CompanySort.Default;
         nace = NaceCatalog.DivisionCode(nace);
         segment = string.IsNullOrWhiteSpace(segment) ? null : segment.Trim();
-        var runId = await ResolveRunAsync(run, profileId, ct);
+        var runId = await ResolveRunAsync(fav ? run ?? "all" : run, profileId, ct);
         var query = await FilterCompaniesAsync(search, minScore, onlyWithoutLead, profileId, stage, signal, geo, nace, icp, ct,
-            runId, notEvaluated, segment);
+            runId, notEvaluated, segment, fav);
         var ordered = OrderCompanies(query, sort);
 
         var total = await query.CountAsync(ct);
@@ -600,6 +605,13 @@ public class CompanyController : Controller
                 .ToListAsync(ct)
         };
 
+        var favorites = HttpContext.RequestServices.GetRequiredService<FavoriteService>();
+        model.Favorites = fav;
+        model.FavoriteIds = await favorites.FavoriteIdsAsync(User.UserId(), model.Companies.Select(c => c.Id), ct);
+        var me = User.UserId();
+        model.FavoriteCount = await ScopeToRun(_db.Companies.AsNoTracking(), runId)
+            .CountAsync(c => _db.FavoriteCompanies.Any(f => f.UserId == me && f.CompanyId == c.Id), ct);
+
         if (runId is int rid)
         {
             model.SelectedRun = model.Runs.FirstOrDefault(r => r.Id == rid)
@@ -641,16 +653,16 @@ public class CompanyController : Controller
         int? profileId = null, string? stage = null, string? signal = null, string? sort = null,
         [FromQuery(Name = "region")] string[]? regions = null, [FromQuery(Name = "city")] string[]? cities = null,
         [FromQuery(Name = "country")] string[]? countries = null, string? nace = null, bool icp = false,
-        string? run = null, bool notEvaluated = false, string? segment = null, CancellationToken ct = default)
+        string? run = null, bool notEvaluated = false, string? segment = null, bool fav = false, CancellationToken ct = default)
     {
         var geo = GeoFilter.From(regions, cities, countries);
-        var runId = await ResolveRunAsync(run, profileId, ct);
+        var runId = await ResolveRunAsync(fav ? run ?? "all" : run, profileId, ct);
         segment = string.IsNullOrWhiteSpace(segment) ? null : segment.Trim();
         if (signal is not ("guclu" or "incelenmeli" or "riskli" or "none")) signal = null;
         sort = CompanySort.Options.Any(o => o.Key == sort) ? sort! : CompanySort.Default;
 
         var query = await FilterCompaniesAsync(search, minScore, onlyWithoutLead, profileId, stage, signal, geo,
-            NaceCatalog.DivisionCode(nace), icp, ct, runId, notEvaluated, segment);
+            NaceCatalog.DivisionCode(nace), icp, ct, runId, notEvaluated, segment, fav);
         var companies = await OrderCompanies(query, sort).ThenBy(c => c.Id)
             .Take(ExportService.MaxRows)
             .Include(c => c.Contacts)
@@ -702,9 +714,15 @@ public class CompanyController : Controller
     /// <summary>Firmalar listesi ve disa aktarim ayni suzgeci kullanir: ekranda ne varsa o iner.</summary>
     private async Task<IQueryable<Company>> FilterCompaniesAsync(string? search, int minScore, bool onlyWithoutLead,
         int? profileId, string? stage, string? signal, GeoFilter geo, string? nace, bool icp, CancellationToken ct,
-        int? runId = null, bool notEvaluated = false, string? segment = null)
+        int? runId = null, bool notEvaluated = false, string? segment = null, bool favorites = false)
     {
         var query = ScopeToRun(_db.Companies.AsNoTracking(), runId).Where(c => c.Score >= minScore);
+
+        if (favorites)
+        {
+            var me = User.UserId();
+            query = query.Where(c => _db.FavoriteCompanies.Any(f => f.UserId == me && f.CompanyId == c.Id));
+        }
 
         if (segment is not null) query = query.Where(c => c.FitSegment == segment);
 
@@ -1002,7 +1020,10 @@ public class CompanyController : Controller
     public async Task<IActionResult> Details(int id, CancellationToken ct)
     {
         var model = await BuildDetailAsync(id, ct);
-        return model is null ? NotFound() : View(model);
+        if (model is null) return NotFound();
+        model.IsFavorite = await HttpContext.RequestServices.GetRequiredService<FavoriteService>()
+            .IsFavoriteAsync(User.UserId(), id, ct);
+        return View(model);
     }
 
     /// <summary>Detay ve rapor ekranlarinin ortak modeli.</summary>
