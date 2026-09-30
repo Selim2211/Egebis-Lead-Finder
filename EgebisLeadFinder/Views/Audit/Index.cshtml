@@ -3,7 +3,7 @@
 @{
     ViewData["Title"] = "Audit log";
     var req = Context.Request;
-    string ExportUrl() => "/Audit/Export" + req.QueryString;
+    string ExportUrl(string format) => QueryUrl.WithPath(req, "/Audit/Export", "format", format);
 }
 
 <div class="page-head">
@@ -12,7 +12,8 @@
         <div class="page-sub">Girişler, çıkışlar ve uygulamadaki tüm işlemler. Şifre ve API anahtarı gibi gizli değerler kaydedilmez.</div>
     </div>
     <div class="d-flex gap-2">
-        <a class="btn btn-outline-secondary" href="@ExportUrl()">CSV indir</a>
+        <a class="btn btn-accent" href="@ExportUrl("xlsx")" title="Filtredeki kayıtlar; kullanıcı/işlem özeti ve filtre sayfasıyla">Excel'e aktar</a>
+        <a class="btn btn-outline-secondary" href="@ExportUrl("csv")">CSV</a>
         <a class="btn btn-outline-secondary" asp-controller="Users" asp-action="Index">Kullanıcılar</a>
     </div>
 </div>

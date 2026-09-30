@@ -57,23 +57,69 @@ public class AuditController : Controller
         return View(model);
     }
 
+    /// <summary>
+    /// Filtredeki kayitlari indirir: Excel (varsayilan; kayitlar + ozet + filtre sayfasi) veya CSV.
+    /// </summary>
     [HttpGet]
     public async Task<IActionResult> Export(DateTime? from, DateTime? to, int? userId, string? op, string? q,
-        bool onlyFailed = false, CancellationToken ct = default)
+        bool onlyFailed = false, string? format = null, CancellationToken ct = default)
     {
-        var rows = await Filter(from, to, userId, op, q, onlyFailed)
-            .OrderByDescending(a => a.At).Take(ExportService.MaxRows).ToListAsync(ct);
+        var query = Filter(from, to, userId, op, q, onlyFailed);
+        var total = await query.CountAsync(ct);
+        var rows = await query.OrderByDescending(a => a.At).Take(ExportService.MaxRows).ToListAsync(ct);
+        var table = LogTable(rows);
+        var stamp = DateTime.Now.ToString("yyyy-MM-dd-HHmm");
 
-        var table = new ExportTable("Audit",
-            new[] { "Tarih", "Kullanıcı", "İşlem", "Özet", "Kayıt", "Sonuç", "IP", "Tarayıcı" },
-            rows.Select(a => new object?[]
+        if (string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase))
+            return File(ExportService.ToCsv(table), "text/csv; charset=utf-8", $"audit-{stamp}.csv");
+
+        string? userName = userId is null ? null
+            : await _db.Users.Where(u => u.Id == userId).Select(u => u.UserName).FirstOrDefaultAsync(ct);
+        var filters = FilterTable(from, to, userName, op, q, onlyFailed, total, rows.Count, User.Identity?.Name);
+
+        return File(ExportService.ToXlsx(new[] { table, SummaryTable(rows), filters }),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"audit-{stamp}.xlsx");
+    }
+
+    public static ExportTable LogTable(IEnumerable<AuditLog> rows) => new("Audit kayıtları",
+        new[] { "Tarih", "Kullanıcı", "İşlem", "İşlem kodu", "Özet", "Kayıt", "Sonuç", "IP", "Tarayıcı" },
+        rows.Select(a => new object?[]
+        {
+            a.At.ToLocalTime(), a.UserName, ActionLabel(a.Action), a.Action, a.Summary,
+            a.EntityType is null ? null : $"{a.EntityType} #{a.EntityId}",
+            a.Success ? "Başarılı" : "Başarısız", a.Ip, a.UserAgent
+        }).ToList());
+
+    /// <summary>Kullanici ve islem bazinda sayim: kim ne kadar, kac basarisiz.</summary>
+    public static ExportTable SummaryTable(IReadOnlyCollection<AuditLog> rows) => new("Özet",
+        new[] { "Kullanıcı", "İşlem", "Toplam", "Başarısız", "İlk", "Son" },
+        rows.GroupBy(a => (a.UserName, a.Action))
+            .OrderBy(g => g.Key.UserName, StringComparer.OrdinalIgnoreCase).ThenByDescending(g => g.Count())
+            .Select(g => new object?[]
             {
-                a.At.ToLocalTime(), a.UserName, ActionLabel(a.Action), a.Summary,
-                a.EntityType is null ? null : $"{a.EntityType} #{a.EntityId}",
-                a.Success ? "Başarılı" : "Başarısız", a.Ip, a.UserAgent
+                g.Key.UserName, ActionLabel(g.Key.Action), g.Count(), g.Count(a => !a.Success),
+                g.Min(a => a.At).ToLocalTime(), g.Max(a => a.At).ToLocalTime()
             }).ToList());
 
-        return File(ExportService.ToCsv(table), "text/csv; charset=utf-8", $"audit-{DateTime.Now:yyyy-MM-dd-HHmm}.csv");
+    public static ExportTable FilterTable(DateTime? from, DateTime? to, string? userName, string? op, string? q,
+        bool onlyFailed, int total, int exported, string? exportedBy)
+    {
+        var rows = new List<object?[]>
+        {
+            new object?[] { "Oluşturma", DateTime.Now },
+            new object?[] { "Oluşturan", exportedBy },
+            new object?[] { "Başlangıç", from?.ToString("dd.MM.yyyy") ?? "—" },
+            new object?[] { "Bitiş", to?.ToString("dd.MM.yyyy") ?? "—" },
+            new object?[] { "Kullanıcı", userName ?? "Tümü" },
+            new object?[] { "İşlem", string.IsNullOrWhiteSpace(op) ? "Tümü" : ActionLabel(op) },
+            new object?[] { "Arama", string.IsNullOrWhiteSpace(q) ? "—" : q },
+            new object?[] { "Yalnızca başarısızlar", onlyFailed ? "Evet" : "Hayır" },
+            new object?[] { "Filtredeki kayıt", total },
+            new object?[] { "Dosyadaki kayıt", exported }
+        };
+        if (total > exported)
+            rows.Add(new object?[] { "Not", $"Dosyaya en yeni {exported} kayıt alındı; daha eskiler için tarih aralığını daraltın." });
+        return new ExportTable("Filtre", new[] { "Alan", "Değer" }, rows);
     }
 
     private IQueryable<AuditLog> Filter(DateTime? from, DateTime? to, int? userId, string? op, string? q, bool onlyFailed)
