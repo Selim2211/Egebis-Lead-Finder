@@ -109,7 +109,7 @@
                             <div class="fit-bar" role="img" aria-label="Uygunluk yüzde @fitScore"><span style="width:@(fitScore)%"></span></div>
                             @if (Model.Company.FitSegment is not null)
                             {
-                                <div class="fit-box-segment">🎯 Segment: <strong>@Model.Company.FitSegment</strong></div>
+                                <div class="fit-box-segment">@Icons.Target(13) Segment: <strong>@Model.Company.FitSegment</strong></div>
                             }
                         </div>
                     }
@@ -451,7 +451,7 @@
             var label = copy.querySelector('span');
             var done = function (text) { label.textContent = text; setTimeout(function () { label.textContent = 'Adresi kopyala'; }, 1800); };
             if (!navigator.clipboard) { done('Kopyalanamadı'); return; }
-            navigator.clipboard.writeText(copy.getAttribute('data-copy')).then(function () { done('Kopyalandı ✓'); }, function () { done('Kopyalanamadı'); });
+            navigator.clipboard.writeText(copy.getAttribute('data-copy')).then(function () { done('Kopyalandı'); }, function () { done('Kopyalanamadı'); });
         });
     })();
 </script>

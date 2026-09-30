@@ -75,7 +75,11 @@
         })();
     </script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/theme-modern.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/EgebisLeadFinder.styles.css" asp-append-version="true" />
 </head>
 <body>
@@ -131,7 +135,7 @@
                         <a class="nav-target @(controller == "BusinessProfile" ? "active" : "")"
                            asp-controller="BusinessProfile" asp-action="Index"
                            title="@(profileConfigured ? "Biz ne arıyoruz? — şirket profili ve hedef segmentler" : "Şirket profili tanımlı değil — yapay zekâ varsayılan tanımla çalışıyor")">
-                            <span class="nav-target-icon" aria-hidden="true">🎯</span>
+                            <span class="nav-target-icon">@Icons.Target(15)</span>
                             <span class="nav-target-label">Biz ne arıyoruz?</span>
                             @if (!profileConfigured)
                             {

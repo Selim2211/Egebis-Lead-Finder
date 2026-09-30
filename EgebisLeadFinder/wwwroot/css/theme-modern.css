@@ -1,0 +1,193 @@
+/* ==========================================================================
+   Egebis Lead Finder — "Premium" tasarim katmani
+   site.css'ten SONRA yuklenir. Marka renkleri (lacivert + amber) ve eski canli
+   dokunuslar korunur; ustune modern duzen eklenir: Inter yazi tipi, tutarli hap
+   rozetler, duzenli bosluklar, cizgi ikonlar, yumusak derinlik.
+   ========================================================================== */
+
+:root {
+    /* Yuzey ve metin: hafif mavi tonlu zemin (premium, gri degil) */
+    --eg-bg: #eef2f8;
+    --eg-surface: #ffffff;
+    --eg-surface-alt: #f7f9fc;
+    --eg-border: #e3e8f0;
+    --eg-border-strong: #cdd5e1;
+    --eg-text: #13213a;
+    --eg-text-muted: #607089;
+
+    --eg-info-bg: #ecfeff;
+
+    --eg-ink: var(--eg-navy-700);
+    --eg-ink-hover: var(--eg-navy-800);
+    --eg-ink-text: #ffffff;
+    --eg-soft: #eef3fb;
+    --eg-soft-text: #1d4276;
+    --eg-brand-soft: #fef3c7;
+    --eg-brand-soft-text: #92400e;
+    --eg-brand-soft-border: #fcd34d;
+    --eg-navy-soft: #eaf1fc;
+    --eg-navy-soft-text: #16325c;
+    --eg-focus: 0 0 0 4px rgba(43, 90, 155, .16);
+    --eg-check: var(--eg-navy-600);
+    --eg-amber-grad: linear-gradient(135deg, #fcd34d 0%, #f59e0b 55%, #ea8a0c 100%);
+    --eg-navy-grad: linear-gradient(135deg, #0b1c33 0%, #16325c 60%, #1d4276 100%);
+
+    --eg-radius: 16px;
+    --eg-radius-sm: 10px;
+    --eg-shadow-sm: 0 1px 2px rgba(16, 37, 66, .05), 0 2px 6px rgba(16, 37, 66, .04);
+    --eg-shadow: 0 6px 18px rgba(16, 37, 66, .09), 0 2px 4px rgba(16, 37, 66, .04);
+    --eg-shadow-lg: 0 18px 40px rgba(16, 37, 66, .16), 0 4px 10px rgba(16, 37, 66, .06);
+
+    --eg-font: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+}
+
+:root[data-theme="dark"] {
+    --eg-info-bg: #0b2536;
+    --eg-ink: #3b6fc4;
+    --eg-ink-hover: #4a7fd6;
+    --eg-soft: #1d2942;
+    --eg-soft-text: #bfd3f2;
+    --eg-brand-soft: #2d2308;
+    --eg-brand-soft-text: #fcd34d;
+    --eg-brand-soft-border: #5a4512;
+    --eg-navy-soft: #1a2744;
+    --eg-navy-soft-text: #bfd3f2;
+    --eg-focus: 0 0 0 4px rgba(96, 165, 250, .18);
+    --eg-check: #3b82f6;
+}
+
+/* ---------- Tipografi ve zemin ---------- */
+body {
+    font-family: var(--eg-font);
+    font-feature-settings: "cv11", "ss01";
+    letter-spacing: -.011em;
+    background:
+        radial-gradient(1100px 420px at 85% -160px, rgba(245, 158, 11, .09), transparent 70%),
+        radial-gradient(900px 380px at 0% -120px, rgba(43, 90, 155, .12), transparent 70%),
+        var(--eg-bg);
+    background-attachment: fixed;
+}
+
+h1, h2, h3, h4, h5, h6 { font-weight: 650; letter-spacing: -.022em; }
+.page-head h1 { font-size: 1.6rem; }
+.stat-value, .score, .stage-chip-count, .nav-badge, .fit-box-value { font-variant-numeric: tabular-nums; }
+
+/* ---------- Ust menu: lacivert gradyan ---------- */
+.eg-navbar {
+    background: var(--eg-navy-grad);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, .06) inset, 0 8px 24px rgba(11, 28, 51, .22);
+}
+.eg-navbar .nav-link { border-radius: 999px; padding: .42rem .9rem; }
+.eg-navbar .nav-link.active { box-shadow: 0 2px 8px rgba(0, 0, 0, .18); }
+.theme-toggle { border-radius: 999px; }
+
+/* "Biz ne arıyoruz?": parlak amber hap */
+.nav-target {
+    color: #1f1300;
+    background: var(--eg-amber-grad);
+    box-shadow: 0 4px 14px rgba(245, 158, 11, .35), inset 0 1px 0 rgba(255, 255, 255, .45);
+    font-weight: 650;
+}
+.nav-target:hover, .nav-target:focus-visible {
+    color: #1f1300;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(245, 158, 11, .45), inset 0 1px 0 rgba(255, 255, 255, .45);
+}
+.nav-target.active { box-shadow: 0 0 0 2px rgba(255, 255, 255, .9), 0 4px 14px rgba(245, 158, 11, .35); }
+.nav-target .nav-alert-dot { box-shadow: 0 0 0 2px var(--eg-navy-900); background: #ef4444; }
+
+/* ---------- Kartlar: yumusak derinlik ---------- */
+.card { border-radius: var(--eg-radius); box-shadow: var(--eg-shadow-sm); border-color: var(--eg-border); }
+.card-header { font-weight: 650; font-size: .96rem; padding: 1rem 1.25rem; background: transparent; }
+.card-body { padding: 1.25rem; }
+
+.stat-card { border-radius: var(--eg-radius); padding: 1.2rem 1.3rem; }
+.stat-card::before { width: 5px; }
+.stat-card::after {
+    content: ""; position: absolute; right: -40px; top: -40px; width: 130px; height: 130px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(43, 90, 155, .12), transparent 70%); pointer-events: none;
+}
+.stat-card.is-success::after { background: radial-gradient(circle, rgba(5, 150, 105, .14), transparent 70%); }
+.stat-card.is-amber::after   { background: radial-gradient(circle, rgba(245, 158, 11, .18), transparent 70%); }
+.stat-card.is-info::after    { background: radial-gradient(circle, rgba(8, 145, 178, .14), transparent 70%); }
+.stat-label { text-transform: none; letter-spacing: 0; font-size: .82rem; font-weight: 600; }
+.stat-value { font-weight: 750; letter-spacing: -.03em; }
+
+.table > thead th { text-transform: none; letter-spacing: 0; font-size: .78rem; font-weight: 600; }
+
+/* ---------- Rozetler: tutarli hap, renkli ton ---------- */
+.tag { border: 0; font-weight: 600; padding: .24rem .65rem; font-size: .76rem; }
+.tag-muted { background: var(--eg-soft); color: var(--eg-soft-text); }
+.score { border: 0; font-weight: 700; }
+.score-hot  { background: linear-gradient(135deg, #d1fae5, #a7f3d0); color: #065f46; }
+.score-warm { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #92400e; }
+:root[data-theme="dark"] .score-hot  { background: #0f3a2a; color: #6ee7b7; }
+:root[data-theme="dark"] .score-warm { background: #3a2a08; color: #fcd34d; }
+
+.meta-chip { border-radius: 999px; padding: .18rem .6rem; }
+.meta-chip-segment, :root[data-theme="dark"] .meta-chip-segment { background: var(--eg-brand-soft); color: var(--eg-brand-soft-text); }
+
+.fit-chip { border: 0; }
+.fit-chip.fit-high { background: var(--eg-success-bg); color: var(--eg-success); }
+.fit-chip.fit-good { background: var(--eg-info-bg); color: var(--eg-info); }
+.fit-chip.fit-mid  { background: var(--eg-warning-bg); color: var(--eg-warning); }
+.fit-chip.fit-low  { background: var(--eg-danger-bg); color: var(--eg-danger); }
+
+/* ---------- Dugmeler ---------- */
+.btn { --bs-btn-border-radius: var(--eg-radius-sm); }
+.btn-accent {
+    background-image: var(--eg-amber-grad);
+    border-color: transparent;
+    box-shadow: 0 4px 14px rgba(245, 158, 11, .32), inset 0 1px 0 rgba(255, 255, 255, .4);
+}
+.btn-accent:hover { box-shadow: 0 8px 20px rgba(245, 158, 11, .42), inset 0 1px 0 rgba(255, 255, 255, .4); transform: translateY(-1px); }
+.btn-primary { background-image: linear-gradient(135deg, var(--eg-navy-700), var(--eg-navy-600)); border-color: transparent; box-shadow: 0 4px 12px rgba(22, 50, 92, .25); }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(22, 50, 92, .32); }
+:root[data-theme="dark"] .btn-primary { background-image: linear-gradient(135deg, #2b5a9b, #3b6fc4); }
+
+/* ---------- Formlar ---------- */
+.form-control, .form-select { border-radius: var(--eg-radius-sm); }
+.form-control:focus, .form-select:focus, .form-check-input:focus, .btn:focus-visible { box-shadow: var(--eg-focus); }
+.form-check-input:checked { background-color: var(--eg-check); border-color: var(--eg-check); }
+
+/* ---------- Uyarilar ve menuler ---------- */
+.alert { border-radius: 12px; }
+.dropdown-menu { border-radius: 14px; box-shadow: var(--eg-shadow-lg); padding: .4rem; border-color: var(--eg-border); }
+.dropdown-item { border-radius: 8px; padding: .45rem .7rem; }
+
+/* ---------- Firma karti: ustten renkli serit (hover) ---------- */
+.company-card { border-radius: var(--eg-radius); position: relative; }
+.company-card::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; z-index: 1;
+    background: linear-gradient(90deg, var(--eg-navy-500), #7c3aed, var(--eg-amber-500));
+    opacity: 0; transition: opacity .2s ease;
+}
+.company-card:hover::before { opacity: 1; }
+.company-logo { border-radius: 13px; box-shadow: 0 4px 12px rgba(16, 37, 66, .18); }
+.company-card-name { font-weight: 650; }
+
+/* ---------- Asama cipleri ---------- */
+.stage-chip { box-shadow: var(--eg-shadow-sm); }
+.stage-chip.chip-all.is-active { background: var(--eg-navy-grad); }
+.stage-chip.chip-segment.is-active { background: var(--eg-amber-grad); border-color: transparent; color: #1f1300; }
+.stage-chip.chip-segment.is-active .stage-chip-count { background: rgba(255, 255, 255, .4); color: #1f1300; }
+
+/* ---------- Biz ne arıyoruz? ve akilli arama ---------- */
+.bp-autofill { background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1px solid var(--eg-brand-soft-border); }
+:root[data-theme="dark"] .bp-autofill { background: var(--eg-brand-soft); }
+.bp-autofill .fw-semibold { color: var(--eg-brand-soft-text); }
+.smart-toggle { background: linear-gradient(135deg, var(--eg-surface-alt), var(--eg-brand-soft)); border: 1px solid var(--eg-brand-soft-border); }
+.segment-chip:hover { border-color: var(--eg-brand-soft-border); background: var(--eg-brand-soft); }
+.segment-chip.is-active { background: var(--eg-amber-grad); border-color: transparent; color: #1f1300; }
+
+/* ---------- Konum ---------- */
+.loc-map-cta { box-shadow: var(--eg-shadow); }
+
+/* ---------- Ikonlar (emoji yerine) ---------- */
+.eg-icon { flex-shrink: 0; vertical-align: -2px; }
+.nav-target-icon .eg-icon { vertical-align: -3px; }
+.meta-chip .eg-icon, .stage-chip .eg-icon { vertical-align: -1px; }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; }
+}

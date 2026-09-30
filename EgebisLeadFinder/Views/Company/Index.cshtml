@@ -230,7 +230,7 @@
         <a class="stage-chip chip-segment @(Model.Segment == seg.Key ? "is-active" : "")"
            href="@(Model.Segment == seg.Key ? QueryUrl.Without(req, "segment") : QueryUrl.With(req, "segment", seg.Key))"
            title="Bu segmente uyan firmalar (Biz ne arıyoruz?)">
-            🎯 @seg.Key <span class="stage-chip-count">@seg.Value</span>
+            @Icons.Target(13) @seg.Key <span class="stage-chip-count">@seg.Value</span>
         </a>
     }
     <a class="stage-chip" asp-controller="Icp" asp-action="Index" title="İdeal müşteri profilini düzenle">ICP ayarla</a>
@@ -450,7 +450,7 @@ else
                         }
                         @if (company.FitSegment is not null)
                         {
-                            <span class="meta-chip meta-chip-segment" title="Uyduğu hedef segment">🎯 @company.FitSegment</span>
+                            <span class="meta-chip meta-chip-segment" title="Uyduğu hedef segment">@Icons.Target(12) @company.FitSegment</span>
                         }
                         @if (company.FitScore is int fit)
                         {

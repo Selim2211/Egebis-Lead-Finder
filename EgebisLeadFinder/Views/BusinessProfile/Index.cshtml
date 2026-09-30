@@ -24,7 +24,7 @@
 
 <div class="page-head">
     <div>
-        <h1>🎯 Biz ne arıyoruz?</h1>
+        <h1 class="d-flex align-items-center gap-2">@Icons.Target(24, "text-muted-2") Biz ne arıyoruz?</h1>
         <div class="page-sub">Şirketinizi ve hedef müşterinizi tanıtın; yapay zekâ bulduğu firmaları bu tanıma göre değerlendirir, mailleri buna göre yazar</div>
     </div>
     @if (Model.UpdatedAt is DateTime updated)
@@ -64,7 +64,7 @@
         <div class="card-body">
             <div class="bp-autofill-row">
                 <div class="bp-autofill-text">
-                    <div class="fw-semibold">✨ Sitemizden otomatik doldur</div>
+                    <div class="fw-semibold d-flex align-items-center gap-2">@Icons.Sparkles(16) Sitemizden otomatik doldur</div>
                     <div class="small text-muted-2">Yapay zekâ sitenizi okur; ne sattığınızı, ideal müşterinizi, segmentleri ve hedef unvanları taslak olarak doldurur. Kaydetmeden önce düzeltebilirsiniz.</div>
                 </div>
                 <form class="bp-autofill-form" id="draftForm" asp-action="Draft" method="post">
@@ -180,7 +180,7 @@
                                 <input class="form-control fw-semibold" data-field="Name" value="@s.Name" placeholder="Segment adı" maxlength="100" required />
                                 @if (isAdmin)
                                 {
-                                    <button type="button" class="btn btn-sm btn-link text-danger bp-remove" title="Segmenti kaldır" aria-label="Segmenti kaldır">✕</button>
+                                    <button type="button" class="btn btn-sm btn-link text-danger bp-remove" title="Segmenti kaldır" aria-label="Segmenti kaldır">@Icons.X(16)</button>
                                 }
                             </div>
                             <textarea class="form-control form-control-sm mt-2" data-field="Description" rows="2" maxlength="1000"
@@ -238,7 +238,7 @@
             <input type="hidden" data-field="Id" value="" />
             <div class="bp-segment-head">
                 <input class="form-control fw-semibold" data-field="Name" placeholder="Segment adı" maxlength="100" required />
-                <button type="button" class="btn btn-sm btn-link text-danger bp-remove" title="Segmenti kaldır" aria-label="Segmenti kaldır">✕</button>
+                <button type="button" class="btn btn-sm btn-link text-danger bp-remove" title="Segmenti kaldır" aria-label="Segmenti kaldır">@Icons.X(16)</button>
             </div>
             <textarea class="form-control form-control-sm mt-2" data-field="Description" rows="2" maxlength="1000"
                       placeholder="Bu segmentte kime, neyi, neden satıyoruz?"></textarea>

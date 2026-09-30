@@ -98,7 +98,7 @@
                     <div class="mb-3">
                         <div class="d-flex justify-content-between align-items-baseline gap-2 mb-1">
                             <span class="form-label mb-0">Hedef segmentlerimiz</span>
-                            <a class="small" asp-controller="BusinessProfile" asp-action="Index">@(segments.Count == 0 ? "🎯 Segment tanımla" : "Düzenle")</a>
+                            <a class="small" asp-controller="BusinessProfile" asp-action="Index">@if (segments.Count == 0) { <span class="d-inline-flex align-items-center gap-1">@Icons.Target(13) Segment tanımla</span> } else { <span>Düzenle</span> }</a>
                         </div>
                         @if (segments.Count > 0)
                         {
