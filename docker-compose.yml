@@ -12,6 +12,12 @@
 # Ilk acilista yonetici hesabi kurulum ekraninda olusturulur.
 # API anahtarlari (Serper, Gemini, Apollo), SMTP ve Salesforce ayarlari uygulamadaki
 # Ayarlar ekranindan girilir ve veritabaninda saklanir.
+#
+# Kritik veriler (kisi e-posta/telefonu, kullanici bilgileri, API anahtarlari) veritabaninda sifreli
+# saklanir. Sifreleme anahtari ilk acilista /app/keys/field-encryption.key olarak uretilir
+# (appkeys volume). ANAHTAR KAYBOLURSA SIFRELI VERI OKUNAMAZ: appkeys volume'unu veritabani
+# yedegiyle birlikte yedekleyin. Mevcut yerel veriyi tasiyorsaniz yerel anahtari .env icine
+# ENCRYPTION_KEY olarak yazin (bkz. README).
 
 services:
   db:

@@ -17,3 +17,6 @@ icon/
 Dockerfile
 docker-compose*.yml
 README.md
+# Yerel sifreleme anahtari imaja girmez
+**/App_Data/
+**/*.key
