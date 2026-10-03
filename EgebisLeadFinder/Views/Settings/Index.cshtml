@@ -43,6 +43,11 @@
     @Html.AntiForgeryToken()
 </form>
 
+@* Ic ice form kullanilamaz (tarayici dis formu kapatir, alttaki alanlar ve Kaydet calismaz): form= ile bagli. *@
+<form id="salesforceDisconnectForm" method="post" asp-controller="Salesforce" asp-action="Disconnect" class="d-none">
+    @Html.AntiForgeryToken()
+</form>
+
 <form id="salesforceSchemaForm" method="post" asp-controller="Salesforce" asp-action="SetupSchema" class="d-none">
     @Html.AntiForgeryToken()
 </form>
@@ -294,10 +299,7 @@
                                 title="Aktarımın ihtiyaç duyduğu Egebis_* alanlarını Salesforce'ta oluşturur/kontrol eder">
                             Alanları kur / kontrol et
                         </button>
-                        <form method="post" asp-controller="Salesforce" asp-action="Disconnect" class="d-inline">
-                            @Html.AntiForgeryToken()
-                            <button class="btn btn-outline-danger btn-sm" type="submit">Bağlantıyı kaldır</button>
-                        </form>
+                        <button class="btn btn-outline-danger btn-sm" type="submit" form="salesforceDisconnectForm">Bağlantıyı kaldır</button>
                     }
                     else
                     {

@@ -12,7 +12,7 @@ namespace EgebisLeadFinder.Controllers;
 [Authorize(Roles = nameof(UserRole.Admin))]
 public class AuditController : Controller
 {
-    private const int PageSize = 50;
+    private const int PageSize = 30;
     private readonly ApplicationDbContext _db;
 
     public AuditController(ApplicationDbContext db) => _db = db;
