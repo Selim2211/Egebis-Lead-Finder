@@ -13,11 +13,13 @@ public class BusinessProfileController : Controller
 {
     private readonly BusinessProfileService _profiles;
     private readonly ISettingsService _settings;
+    private readonly ProfileTemplateService _templates;
 
-    public BusinessProfileController(BusinessProfileService profiles, ISettingsService settings)
+    public BusinessProfileController(BusinessProfileService profiles, ISettingsService settings, ProfileTemplateService templates)
     {
         _profiles = profiles;
         _settings = settings;
+        _templates = templates;
     }
 
     [HttpGet]
@@ -48,6 +50,14 @@ public class BusinessProfileController : Controller
             var added = await _profiles.ApplySegmentsToIcpAsync(profile, ct);
             message += added > 0 ? $" ICP'ye {added} yeni kriter eklendi." : " ICP zaten güncel.";
         }
+
+        // E-posta taslaklari profile gore otomatik hazirlanir (yalnizca eksikler; duzenlenenlere dokunulmaz).
+        // Basarisiz olursa (anahtar yok, kota) profil yine kaydedilmistir; kullanici Taslak Duzenleyici'den yeniden dener.
+        var provision = await _templates.ProvisionAsync(await _profiles.GetAsync(ct), onlyMissing: true, deactivateAll: false, ct);
+        if (provision.Created > 0)
+            message += $" Profilinize göre {provision.Created} e-posta taslağı otomatik hazırlandı (Taslak Düzenleyici); göndermeden önce kontrol edin.";
+        else if (!provision.Success)
+            message += $" E-posta taslakları şimdi hazırlanamadı ({provision.Error}); Taslak Düzenleyici'den “Profilime göre oluştur”a basarak yeniden deneyebilirsiniz.";
 
         AuditActionFilter.SetAuditSummary(HttpContext,
             $"Şirket profili kaydedildi: {profile.DisplayName}, {profile.Segments.Count} segment" + (form.ApplyToIcp ? ", ICP'ye aktarıldı" : ""));

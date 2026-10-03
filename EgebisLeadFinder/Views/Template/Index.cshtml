@@ -41,7 +41,7 @@
                 <div class="fw-semibold d-flex align-items-center gap-2">@Icons.Sparkles(16) @profile.DisplayName için taslak oluştur</div>
                 <div class="small text-muted-2">
                     Yapay zekâ “Biz ne arıyoruz?” tanımınızdan genel tanıtım@(profile.Segments.Count > 0 ? $", her hedef segment ({profile.Segments.Count})" : "")
-                    ve takip maili taslaklarını yazar.@(profile.Segments.Count > 0 ? " Segment taslakları o segmentteki firmalara otomatik önerilir." : "")
+                    ve takip maili taslaklarını yazar. Profili her kaydettiğinizde eksik taslaklar (ör. yeni segment) <strong>otomatik</strong> hazırlanır; elle yazdığınız taslaklara dokunulmaz.@(profile.Segments.Count > 0 ? " Segment taslakları o segmentteki firmalara otomatik önerilir." : "")
                 </div>
             </div>
             <form method="post" asp-action="GenerateFromProfile" class="d-flex flex-wrap align-items-center gap-3 m-0">

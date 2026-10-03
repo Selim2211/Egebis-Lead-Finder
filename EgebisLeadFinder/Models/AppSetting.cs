@@ -140,6 +140,9 @@ public static class SettingKeys
     /// <summary>Audit log kac gun saklansin (varsayilan 365, en az 30).</summary>
     public const string AuditRetentionDays = "Audit:RetentionDays";
 
+    /// <summary>Profilden otomatik uretilen e-posta taslaklarinin kimlikleri (virgullu).</summary>
+    public const string GeneratedTemplateIds = "Templates:GeneratedIds";
+
     public const int DefaultSearchMaxCompanies = 100;
     public const int SearchMaxCompaniesUpperLimit = 200;
     public const string DefaultSearchCountry = "Türkiye";
@@ -153,7 +156,8 @@ public static class SettingKeys
         SalesforceConsumerKey, SalesforceConsumerSecret, SalesforceUsername, SalesforcePassword,
         SalesforceSecurityToken, SalesforceLoginUrl, SalesforceRefreshToken, SalesforceInstanceUrl,
         SalesforcePublicBaseUrl, SequenceDailyCap, ImapHost, ImapPort, ImapUsername, ImapPassword,
-        ImapCursor, ImapLastCheck, ImapLastError, AuditRetentionDays, GeminiMonthlyLimit, ApolloCreditLimit
+        ImapCursor, ImapLastCheck, ImapLastError, AuditRetentionDays, GeminiMonthlyLimit, ApolloCreditLimit,
+        GeneratedTemplateIds
     };
 
     /// <summary>Deger gizlenmeli mi? API anahtarlari ve e-posta sifresi ekranda maskeli gosterilir.</summary>

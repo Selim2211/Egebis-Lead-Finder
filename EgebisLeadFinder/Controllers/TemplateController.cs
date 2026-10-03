@@ -100,48 +100,24 @@ public class TemplateController : Controller
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> GenerateFromProfile(bool deactivateOthers, [FromServices] ITemplateWriterAi ai,
+    public async Task<IActionResult> GenerateFromProfile(bool deactivateOthers, [FromServices] ProfileTemplateService provisioning,
         CancellationToken ct)
     {
         var profile = await _profiles.GetAsync(ct);
-        var result = await ai.DraftTemplatesAsync(profile, ct);
-        if (result.Error is not null)
+        var result = await provisioning.ProvisionAsync(profile, onlyMissing: false, deactivateAll: deactivateOthers, ct);
+        if (!result.Success)
         {
             EgebisLeadFinder.Services.Auth.AuditActionFilter.MarkFailed(HttpContext);
             TempData["TemplateError"] = result.Error;
             return RedirectToAction(nameof(Index));
         }
 
-        if (deactivateOthers)
-            foreach (var old in await _db.EmailTemplates.Where(t => t.Active).ToListAsync(ct))
-                old.Active = false;
-
-        var nextId = (await _db.EmailTemplates.MaxAsync(t => (int?)t.Id, ct) ?? 0) + 1;
-        var created = new List<EmailTemplate>();
-        foreach (var draft in result.Templates)
-        {
-            var template = new EmailTemplate
-            {
-                Id = nextId++,
-                Name = draft.Name,
-                Subject = draft.Subject,
-                Body = draft.Body,
-                Key = EmailTemplate.IsKnownKey(draft.Key, profile) ? draft.Key : null,
-                Active = true,
-                UpdatedAt = DateTime.UtcNow
-            };
-            StringLengthGuard.Apply(template);
-            created.Add(template);
-        }
-        _db.EmailTemplates.AddRange(created);
-        await _db.SaveChangesAsync(ct);
-
         EgebisLeadFinder.Services.Auth.AuditActionFilter.SetAuditSummary(HttpContext,
-            $"Profilden {created.Count} e-posta taslağı oluşturuldu" + (deactivateOthers ? ", eski taslaklar pasife alındı" : ""));
-        TempData["TemplateSaved"] = $"Profilinize göre {created.Count} taslak oluşturuldu"
-            + (deactivateOthers ? "; önceki taslaklar pasife alındı (silinmedi, istediğinizi yeniden aktif yapabilirsiniz)." : ".")
+            $"Profilden {result.Created} e-posta taslağı oluşturuldu" + (deactivateOthers ? ", eski taslaklar pasife alındı" : ""));
+        TempData["TemplateSaved"] = $"Profilinize göre {result.Created} taslak oluşturuldu"
+            + (result.Deactivated > 0 ? $"; {result.Deactivated} eski taslak pasife alındı (silinmedi, istediğinizi yeniden aktif yapabilirsiniz)." : ".")
             + " Göndermeden önce metinleri kontrol edin.";
-        return RedirectToAction(nameof(Index), new { id = created[0].Id });
+        return RedirectToAction(nameof(Index));
     }
 
     [HttpPost]

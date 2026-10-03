@@ -7,7 +7,8 @@ namespace EgebisLeadFinder.Services;
 /// <summary>"Biz ne arıyoruz?" profilinden e-posta taslaklari yazar (genel tanitim, segment basina, takip).</summary>
 public interface ITemplateWriterAi
 {
-    Task<TemplateDraftResult> DraftTemplatesAsync(BusinessProfile profile, CancellationToken ct = default);
+    /// <param name="onlyKeys">Verilirse yalnizca bu anahtarlarin taslaklari yazilir (bos = hepsi).</param>
+    Task<TemplateDraftResult> DraftTemplatesAsync(BusinessProfile profile, IReadOnlyCollection<string>? onlyKeys = null, CancellationToken ct = default);
 }
 
 public class TemplateDraft
@@ -29,12 +30,15 @@ public partial class GeminiAiService : ITemplateWriterAi
     /// <summary>Tek cagrida yazilacak en fazla segment taslagi (yanit uzunlugu ve kota icin).</summary>
     public const int MaxSegmentTemplates = 6;
 
-    public async Task<TemplateDraftResult> DraftTemplatesAsync(BusinessProfile profile, CancellationToken ct = default)
+    public async Task<TemplateDraftResult> DraftTemplatesAsync(BusinessProfile profile, IReadOnlyCollection<string>? onlyKeys = null, CancellationToken ct = default)
     {
         if (!profile.IsConfigured)
             return new TemplateDraftResult { Error = "Önce “Biz ne arıyoruz?” ekranında şirket profilinizi doldurun." };
 
         var keys = TemplateKeysFor(profile);
+        if (onlyKeys is { Count: > 0 })
+            keys = keys.Where(k => onlyKeys.Contains(k.Key, StringComparer.OrdinalIgnoreCase)).ToList();
+        if (keys.Count == 0) return new TemplateDraftResult { Error = "Yazılacak taslak yok." };
         var schema = new
         {
             type = "object",
