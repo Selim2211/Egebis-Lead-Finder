@@ -131,9 +131,13 @@ public class CompanyComparisonService
             Number("Çalışan sayısı (tahmini)", Employees(analysisA), Employees(analysisB),
                 analysisA?.EmployeeSizeHint, analysisB?.EmployeeSizeHint),
             Flag("Üretici firma", analysisA?.Manufacturer, analysisB?.Manufacturer),
-            new("Ürünler / hizmetler", Join(analysisA?.Products), Join(analysisB?.Products)),
-            new("ERP / SAP durumu", SapLabel(analysisA), SapLabel(analysisB))
+            new("Ürünler / hizmetler", Join(analysisA?.Products), Join(analysisB?.Products))
         };
+        // SAP satiri yalnizca SAP ile ilgili satis yapan sirket (ya da profil yokken) icin anlamli.
+        if (!profile.IsConfigured || profile.MentionsSap)
+            general.Add(new("ERP / SAP durumu", SapLabel(analysisA), SapLabel(analysisB)));
+        if (!string.IsNullOrWhiteSpace(a.FitSegment) || !string.IsNullOrWhiteSpace(b.FitSegment))
+            general.Insert(0, new("Hedef segmentimiz", a.FitSegment ?? "—", b.FitSegment ?? "—"));
         result.Sections.Add(new CompareSection("Firma profili", "Firma sitesinin yapay zekâ analizinden", general));
 
         // ---- 4. Genel durum (internet on arastirmasi) ----

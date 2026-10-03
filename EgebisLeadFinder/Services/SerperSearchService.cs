@@ -248,8 +248,10 @@ public class SerperSearchService : ISearchService
                         if (found.ContainsKey(domain)) continue;
 
                         // Tamirci, galeri, lastikci gibi hedef disi isletmeleri
-                        // site okumaya ve AI'a gitmeden ele.
-                        if (!PlaceCategoryFilter.IsRelevant(place.Category))
+                        // site okumaya ve AI'a gitmeden ele. Her tur firma aranirken kategori aranan
+                        // terimle eslesiyorsa ("restoran" ararken "Restoran") elenmez.
+                        if (!PlaceCategoryFilter.IsRelevant(place.Category,
+                                criteria.ManufacturerQueries ? null : criteria.SearchTerms.Prepend(criteria.Industry)))
                         {
                             _logger.LogDebug(
                                 "Kategori nedeniyle elendi: {Title} ({Category})", place.Title, place.Category);

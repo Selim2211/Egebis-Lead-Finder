@@ -10,10 +10,12 @@ namespace EgebisLeadFinder.Controllers;
 public class TemplateController : Controller
 {
     private readonly ApplicationDbContext _db;
+    private readonly BusinessProfileService _profiles;
 
-    public TemplateController(ApplicationDbContext db)
+    public TemplateController(ApplicationDbContext db, BusinessProfileService profiles)
     {
         _db = db;
+        _profiles = profiles;
     }
 
     [HttpGet]
@@ -22,11 +24,12 @@ public class TemplateController : Controller
         EmailTemplate current;
         if (create)
         {
+            var profile = await _profiles.GetAsync(ct);
             current = new EmailTemplate
             {
                 Name = "Yeni taslak",
                 Subject = "",
-                Body = "Sayın {CONTACT_NAME},\n\n\n\nSaygılarımızla,\nEgebis Bilişim"
+                Body = $"Sayın {{CONTACT_NAME}},\n\n\n\nSaygılarımızla,\n{(profile.IsConfigured ? profile.DisplayName : "Egebis Bilişim")}"
             };
         }
         else
@@ -53,7 +56,7 @@ public class TemplateController : Controller
 
         template.Name = (name ?? string.Empty).Trim();
         template.Subject = (subject ?? string.Empty).Trim();
-        template.Key = EmailTemplate.AiKeys.Any(k => k.Key == key) ? key : null;
+        template.Key = EmailTemplate.IsKnownKey(key, await _profiles.GetAsync(ct)) ? key : null;
         template.Body = plain;
         template.BodyHtml = string.IsNullOrEmpty(html) ? null : html;
         template.Active = active;
@@ -88,6 +91,57 @@ public class TemplateController : Controller
 
         TempData["TemplateSaved"] = id == 0 ? "Yeni taslak oluşturuldu." : "Taslak kaydedildi.";
         return RedirectToAction(nameof(Index), new { id = template.Id });
+    }
+
+    /// <summary>
+    /// "Biz ne arıyoruz?" profilinden yapay zeka ile taslak yazar: genel tanitim, her hedef segment ve
+    /// takip maili; segment taslaklari o segmentteki firmalara otomatik onerilir. Mevcut taslaklar
+    /// istenirse pasife alinir (silinmez).
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GenerateFromProfile(bool deactivateOthers, [FromServices] ITemplateWriterAi ai,
+        CancellationToken ct)
+    {
+        var profile = await _profiles.GetAsync(ct);
+        var result = await ai.DraftTemplatesAsync(profile, ct);
+        if (result.Error is not null)
+        {
+            EgebisLeadFinder.Services.Auth.AuditActionFilter.MarkFailed(HttpContext);
+            TempData["TemplateError"] = result.Error;
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (deactivateOthers)
+            foreach (var old in await _db.EmailTemplates.Where(t => t.Active).ToListAsync(ct))
+                old.Active = false;
+
+        var nextId = (await _db.EmailTemplates.MaxAsync(t => (int?)t.Id, ct) ?? 0) + 1;
+        var created = new List<EmailTemplate>();
+        foreach (var draft in result.Templates)
+        {
+            var template = new EmailTemplate
+            {
+                Id = nextId++,
+                Name = draft.Name,
+                Subject = draft.Subject,
+                Body = draft.Body,
+                Key = EmailTemplate.IsKnownKey(draft.Key, profile) ? draft.Key : null,
+                Active = true,
+                UpdatedAt = DateTime.UtcNow
+            };
+            StringLengthGuard.Apply(template);
+            created.Add(template);
+        }
+        _db.EmailTemplates.AddRange(created);
+        await _db.SaveChangesAsync(ct);
+
+        EgebisLeadFinder.Services.Auth.AuditActionFilter.SetAuditSummary(HttpContext,
+            $"Profilden {created.Count} e-posta taslağı oluşturuldu" + (deactivateOthers ? ", eski taslaklar pasife alındı" : ""));
+        TempData["TemplateSaved"] = $"Profilinize göre {created.Count} taslak oluşturuldu"
+            + (deactivateOthers ? "; önceki taslaklar pasife alındı (silinmedi, istediğinizi yeniden aktif yapabilirsiniz)." : ".")
+            + " Göndermeden önce metinleri kontrol edin.";
+        return RedirectToAction(nameof(Index), new { id = created[0].Id });
     }
 
     [HttpPost]
@@ -163,7 +217,8 @@ public class TemplateController : Controller
                 ? EmailHtml.FromPlainText(current.Body)
                 : EmailHtml.Sanitize(current.BodyHtml),
             SentCounts = sentCounts,
-            Images = images
+            Images = images,
+            Profile = await _profiles.GetAsync(ct)
         };
     }
 }

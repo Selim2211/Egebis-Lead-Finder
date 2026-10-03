@@ -14,6 +14,11 @@ public class BusinessProfileForm
     public string? Competitors { get; set; }
     public string? ExampleCustomers { get; set; }
 
+    /// <summary>"", "manufacturer" veya "any" (bkz. BusinessProfile.CustomerKind).</summary>
+    public string? CustomerKind { get; set; }
+
+    public string? BuyingSignals { get; set; }
+
     /// <summary>Ayarlar'daki lead unvanlari (Apollo ve site aramasinda kullanilir).</summary>
     public string? TargetTitles { get; set; }
 
@@ -36,6 +41,8 @@ public class BusinessProfileForm
         NotCustomers = p.NotCustomers,
         Competitors = p.Competitors,
         ExampleCustomers = string.Join(", ", p.ExampleCustomers),
+        CustomerKind = p.CustomerKind,
+        BuyingSignals = string.Join(", ", p.BuyingSignals),
         TargetTitles = string.Join(", ", titles),
         Segments = p.Segments.Select(s => new SegmentForm
         {
@@ -64,6 +71,8 @@ public class BusinessProfileForm
         NotCustomers = NotCustomers,
         Competitors = Competitors,
         ExampleCustomers = IcpController.SplitList(ExampleCustomers),
+        CustomerKind = CustomerKind,
+        BuyingSignals = IcpController.SplitList(BuyingSignals),
         Segments = Segments.Select(s => new TargetSegment
         {
             Id = s.Id ?? string.Empty,

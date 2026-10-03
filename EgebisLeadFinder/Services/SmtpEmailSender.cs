@@ -76,7 +76,10 @@ public class SmtpEmailSender : IEmailSender
 
         return new SmtpSettings(
             FromAddress: from,
-            FromName: await Get(SettingKeys.SmtpFromName) ?? "Egebis Bilişim",
+            // Gonderen adi bossa "Biz ne arıyoruz?" profilindeki sirket adi.
+            FromName: await Get(SettingKeys.SmtpFromName)
+                ?? (BusinessProfileService.Parse(await Get(SettingKeys.BusinessProfile)) is { IsConfigured: true } bp
+                    ? bp.DisplayName : "Egebis Bilişim"),
             Host: await Get(SettingKeys.SmtpHost),
             Port: port,
             Security: security,

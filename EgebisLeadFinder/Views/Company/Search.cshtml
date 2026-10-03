@@ -18,10 +18,30 @@
         : Model.Region;
 
     // "Biz ne arıyoruz?" segmentleri: tek tikla sektor + bolge doldurur.
-    var segments = EgebisLeadFinder.Services.BusinessProfileService
-        .Parse(await SearchSettings.GetAsync(SettingKeys.BusinessProfile)).Segments;
+    var sellerProfile = EgebisLeadFinder.Services.BusinessProfileService
+        .Parse(await SearchSettings.GetAsync(SettingKeys.BusinessProfile));
+    var segments = sellerProfile.Segments;
+    var profileReady = sellerProfile.IsConfigured;
     var me = EgebisLeadFinder.Services.Auth.ClaimsPrincipalExtensions.UserId(User);
     var isAdmin = User.IsInRole(nameof(UserRole.Admin));
+}
+
+@if (!profileReady)
+{
+    <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2">
+        <div class="flex-grow-1">
+            <strong>Şirket profiliniz tanımlı değil.</strong> Firma araması, yapay zekâ analizi ve mail önerileri şu an
+            varsayılan tanımla (SAP/üretim yazılımı) çalışıyor. Kendi işinize göre çalışması için “Biz ne arıyoruz?” ekranını doldurun.
+        </div>
+        @if (User.IsInRole(nameof(UserRole.Admin)))
+        {
+            <a class="btn btn-sm btn-accent" asp-controller="BusinessProfile" asp-action="Index">Biz ne arıyoruz?</a>
+        }
+        else
+        {
+            <span class="small">Yöneticinizden doldurmasını isteyin.</span>
+        }
+    </div>
 }
 
 <div class="page-head">
@@ -146,6 +166,10 @@
                             }
                         </select>
                         <div><span class="search-scope-label">Sonuç</span> en fazla @Model.MaxCompanies firma, skoru en yüksekten sıralı</div>
+                        <div title="“Biz ne arıyoruz?” ekranındaki müşteri türüne göre">
+                            <span class="search-scope-label">Arama</span>
+                            @(!sellerProfile.IsConfigured || sellerProfile.TargetsManufacturers ? "üretici firmalar (“üreticileri”, “fabrikası”)" : "her tür şirket (“firmaları”, “şirketleri”)")
+                        </div>
                         <a class="small" asp-controller="Settings" asp-action="Index">Varsayılanı Ayarlar'dan değiştir</a>
                     </div>
 

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace EgebisLeadFinder.Models;
 
@@ -9,9 +10,15 @@ namespace EgebisLeadFinder.Models;
 /// bu tanimi kullanir; bos ise eski (Egebis'e ozel) sabit tanimlar gecerlidir.
 /// Ayarlar tablosunda JSON olarak tutulur (SettingKeys.BusinessProfile).
 /// </summary>
-public class BusinessProfile
+public partial class BusinessProfile
 {
     public const int MaxSegments = 8;
+
+    /// <summary>Musterilerimiz uretici/fabrika: aramalar "üreticileri", "fabrikası" kaliplariyla yapilir.</summary>
+    public const string KindManufacturer = "manufacturer";
+
+    /// <summary>Musterilerimiz her tur sirket (ticaret, hizmet, insaat...): aramalar "firmaları", "şirketleri" kaliplariyla yapilir.</summary>
+    public const string KindAny = "any";
 
     /// <summary>Sirketin ticari adi ("Egebis Bilişim").</summary>
     [JsonPropertyName("companyName")]
@@ -47,6 +54,20 @@ public class BusinessProfile
     [JsonPropertyName("segments")]
     public List<TargetSegment> Segments { get; set; } = new();
 
+    /// <summary>
+    /// Musteri turu: <see cref="KindManufacturer"/>, <see cref="KindAny"/> ya da bos (tanimdan cikarilir).
+    /// Firma aramasinin sorgu kaliplarini ve harita kategorisi elemesini belirler.
+    /// </summary>
+    [JsonPropertyName("customerKind")]
+    public string? CustomerKind { get; set; }
+
+    /// <summary>
+    /// Bir firmanin bize ihtiyaci oldugunu gosteren isaretler ("yeni fabrika", "tesisat projesi", "ihale").
+    /// On arastirmada bu kelimelerle haber aranir; yapay zeka firsat ararken bunlara bakar.
+    /// </summary>
+    [JsonPropertyName("buyingSignals")]
+    public List<string> BuyingSignals { get; set; } = new();
+
     [JsonPropertyName("updatedAt")]
     public DateTime? UpdatedAt { get; set; }
 
@@ -66,9 +87,34 @@ public class BusinessProfile
         return Segments.FirstOrDefault(s => EgebisLeadFinder.Services.TurkishText.Normalize(s.Name.Trim()) == key);
     }
 
-    /// <summary>Profil SAP'den soz ediyor mu? (Evetse firma ekranlarinda SAP etiketleri gosterilir.)</summary>
+    /// <summary>Profil SAP'den soz ediyor mu? (Evetse SAP tespiti, SAP etiketleri ve "SAP kariyer" aramasi kullanilir.)</summary>
     [JsonIgnore]
-    public bool MentionsSap => ToPromptBlock().Contains("SAP", StringComparison.OrdinalIgnoreCase);
+    public bool MentionsSap => SapWord().IsMatch(ToPromptBlock());
+
+    /// <summary>
+    /// Musterilerimiz uretici/fabrika mi? Secilmediyse ideal musteri ve segment metninden cikarilir
+    /// ("üretici", "fabrika", "imalat" gecerse evet).
+    /// </summary>
+    [JsonIgnore]
+    public bool TargetsManufacturers => CustomerKind switch
+    {
+        KindManufacturer => true,
+        KindAny => false,
+        _ => LooksManufacturing(string.Join(" ", new[] { IdealCustomer }
+            .Concat(Segments.SelectMany(s => new[] { s.Name, s.Description, s.SearchTerm })))),
+    };
+
+    private static readonly string[] ManufacturingWords =
+        { "uretici", "uretim yapan", "fabrika", "imalat", "manufactur", "factory", "hersteller" };
+
+    public static bool LooksManufacturing(string? text)
+    {
+        var normalized = EgebisLeadFinder.Services.TurkishText.Normalize(text ?? string.Empty);
+        return ManufacturingWords.Any(normalized.Contains);
+    }
+
+    [GeneratedRegex(@"\bSAP\b", RegexOptions.IgnoreCase)]
+    private static partial Regex SapWord();
 
     [JsonIgnore]
     public string DisplayName => string.IsNullOrWhiteSpace(CompanyName) ? "Şirketimiz" : CompanyName.Trim();
@@ -88,6 +134,10 @@ public class BusinessProfile
         if (!string.IsNullOrWhiteSpace(NotCustomers)) sb.AppendLine($"MÜŞTERİMİZ OLMAYANLAR: {Line(NotCustomers)}");
         if (!string.IsNullOrWhiteSpace(Competitors)) sb.AppendLine($"RAKİPLERİMİZ (müşteri değil): {Line(Competitors)}");
         if (ExampleCustomers.Count > 0) sb.AppendLine($"ÖRNEK MEVCUT MÜŞTERİLER: {string.Join(", ", ExampleCustomers.Take(10))}");
+        sb.AppendLine(TargetsManufacturers
+            ? "MÜŞTERİ TÜRÜ: üretim yapan firmalar (fabrika, imalat)"
+            : "MÜŞTERİ TÜRÜ: her tür şirket (üretici olması şart değil; ticaret, hizmet, inşaat, kurum vb. olabilir)");
+        if (BuyingSignals.Count > 0) sb.AppendLine($"İHTİYAÇ SİNYALLERİ (bir firmanın bize ihtiyacı olduğunu gösterir): {string.Join(", ", BuyingSignals.Take(15))}");
 
         var segments = Segments.Where(s => !string.IsNullOrWhiteSpace(s.Name)).ToList();
         if (segments.Count > 0)

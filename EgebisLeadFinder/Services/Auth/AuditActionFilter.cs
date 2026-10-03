@@ -75,6 +75,7 @@ public class AuditActionFilter : IAsyncActionFilter
             ["Template.Save"] = ("template.save", "E-posta taslağı kaydedildi"),
             ["Template.Duplicate"] = ("template.duplicate", "E-posta taslağı kopyalandı"),
             ["Template.Delete"] = ("template.delete", "E-posta taslağı silindi"),
+            ["Template.GenerateFromProfile"] = ("template.generate", "Profilden e-posta taslakları oluşturuldu"),
             ["Users.Create"] = ("user.create", "Kullanıcı oluşturuldu"),
             ["Users.Update"] = ("user.update", "Kullanıcı güncellendi"),
             ["Users.ResetPassword"] = ("user.resetpassword", "Kullanıcı şifresi sıfırlandı"),

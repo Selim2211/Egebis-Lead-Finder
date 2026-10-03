@@ -4,8 +4,11 @@ namespace EgebisLeadFinder.Data;
 /// Sorgu kaliplari. {0} = sektor, {1} = konum (sehir/ulke). Her bolge kendi
 /// dilindeki kaliplari kullanir: "makina üreticileri İzmir" ile
 /// "machinery manufacturers Bavaria" ayni sonucu vermez.
+/// Web/Places uretici odakli kaliplardir ("üreticileri", "fabrikası"); GeneralWeb/GeneralPlaces
+/// her tur sirket icin ("firmaları", "şirketleri"): musterisi uretici olmayan kullanicilar
+/// (toptanci, hizmet firmasi, insaat tedarikcisi...) bunlari kullanir.
 /// </summary>
-public record QueryPack(string Code, string[] Web, string[] Places);
+public record QueryPack(string Code, string[] Web, string[] Places, string[] GeneralWeb, string[] GeneralPlaces);
 
 /// <summary>
 /// Arama bolgesi: hangi ulkede, hangi Google ulke/dil kodlariyla ve hangi dildeki
@@ -46,6 +49,21 @@ public static class SearchRegions
             "{0} üretici {1}",
             "{0} sanayi {1}",
             "{1} organize sanayi bölgesi {0}"
+        },
+        GeneralWeb: new[]
+        {
+            "\"{0}\" firmaları {1}",
+            "{0} şirketleri {1}",
+            "{0} firması {1} iletişim",
+            "{0} {1} \"Ltd. Şti.\"",
+            "{0} {1} \"A.Ş.\"",
+            "{0} hizmetleri {1}"
+        },
+        GeneralPlaces: new[]
+        {
+            "{0} {1}",
+            "{0} firmaları {1}",
+            "{0} şirketi {1}"
         });
 
     private static readonly QueryPack English = new("en",
@@ -66,6 +84,19 @@ public static class SearchRegions
             "{0} supplier {1}",
             "{0} industry {1}",
             "{1} industrial park {0}"
+        },
+        GeneralWeb: new[]
+        {
+            "\"{0}\" companies {1}",
+            "{0} company {1} contact",
+            "{0} {1} \"Ltd\"",
+            "{0} services {1}",
+            "{0} firms {1}"
+        },
+        GeneralPlaces: new[]
+        {
+            "{0} {1}",
+            "{0} company {1}"
         });
 
     private static readonly QueryPack German = new("de",
@@ -86,6 +117,18 @@ public static class SearchRegions
             "{0} Zulieferer {1}",
             "{0} Industrie {1}",
             "{1} Industriegebiet {0}"
+        },
+        GeneralWeb: new[]
+        {
+            "{0} Unternehmen {1}",
+            "{0} Firma {1} Kontakt",
+            "{0} {1} \"GmbH\"",
+            "{0} Dienstleister {1}"
+        },
+        GeneralPlaces: new[]
+        {
+            "{0} {1}",
+            "{0} Firma {1}"
         });
 
     private static readonly Dictionary<string, QueryPack> Packs = new(StringComparer.OrdinalIgnoreCase)

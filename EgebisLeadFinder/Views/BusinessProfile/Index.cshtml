@@ -127,6 +127,20 @@
                                 <label class="form-label" for="ExampleCustomers">Örnek mevcut müşteriler</label>
                                 <input class="form-control" asp-for="ExampleCustomers" placeholder="Firma adı veya sitesi, virgülle ayırın" />
                             </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="CustomerKind">Müşterilerimiz ne tür firmalar?</label>
+                                <select class="form-select" asp-for="CustomerKind">
+                                    <option value="">Otomatik (tanıma göre)</option>
+                                    <option value="@BusinessProfile.KindManufacturer">Üretici firmalar</option>
+                                    <option value="@BusinessProfile.KindAny">Her tür şirket</option>
+                                </select>
+                                <div class="form-text">Üretici: fabrika, imalat. Her tür şirket: ticaret, hizmet, inşaat, kurum… Firma araması buna göre “üreticileri / fabrikası” ya da “firmaları / şirketleri” diye yapılır.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="BuyingSignals">İhtiyaç sinyalleri</label>
+                                <input class="form-control" asp-for="BuyingSignals" placeholder="yeni fabrika, kapasite artışı, tesisat projesi, ihale" />
+                                <div class="form-text">Bir firmanın size ihtiyacı olduğunu gösteren ifadeler. Firma araştırmasında haberler bunlarla taranır, fırsatlar bunlara göre önerilir.</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -365,6 +379,8 @@
                         setField('NotCustomers', p.notCustomers);
                         setField('Competitors', p.competitors);
                         setField('ExampleCustomers', p.exampleCustomers);
+                        setField('CustomerKind', p.customerKind || '');
+                        setField('BuyingSignals', p.buyingSignals);
                         setField('TargetTitles', res.titles);
                         if (p.segments && p.segments.length) {
                             segments().forEach(function (s) { s.remove(); });

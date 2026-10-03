@@ -41,7 +41,8 @@ public class BusinessProfileController : Controller
 
         await _profiles.SaveAsync(profile, IcpController.SplitList(form.TargetTitles), User.Identity?.Name, ct);
 
-        var message = $"Şirket profili kaydedildi ({profile.Segments.Count} segment). Yeni analiz edilen firmalar bu tanıma göre değerlendirilecek.";
+        var message = $"Şirket profili kaydedildi ({profile.Segments.Count} segment). Firma araması, yapay zekâ analizi, araştırma ve mail önerileri artık bu tanıma göre çalışır. " +
+                      "Daha önce bulunan firmaları güncellemek için firma detayında “Yeniden Analiz Et” ve “Araştır”ı kullanın; mail taslaklarını Taslak Düzenleyici'den profilinize göre oluşturabilirsiniz.";
         if (form.ApplyToIcp)
         {
             var added = await _profiles.ApplySegmentsToIcpAsync(profile, ct);
@@ -82,6 +83,8 @@ public class BusinessProfileController : Controller
                 p.NotCustomers,
                 p.Competitors,
                 exampleCustomers = string.Join(", ", p.ExampleCustomers),
+                customerKind = p.CustomerKind,
+                buyingSignals = string.Join(", ", p.BuyingSignals),
                 segments = p.Segments.Select(s => new
                 {
                     s.Id,

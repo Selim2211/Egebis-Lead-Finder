@@ -25,6 +25,16 @@ public class HybridContactEnrichmentService : IContactEnrichmentService
     private readonly EnrichmentOptions _options;
     private readonly ILogger<HybridContactEnrichmentService> _logger;
 
+    /// <summary>"Biz ne arıyoruz?" profili tanimli mi (EnrichAsync basinda okunur; servis istek basina olusur).</summary>
+    private bool _profileMode;
+
+    /// <summary>Profil modunda hedef unvan listesinde olmasa da kabul edilen ust yoneticiler.</summary>
+    private static readonly string[] TopExecutiveTitles =
+    {
+        "genel müdür", "ceo", "kurucu", "founder", "co-founder", "owner", "sahibi", "ortak",
+        "managing director", "general manager", "geschäftsführer", "yönetim kurulu başkanı", "president"
+    };
+
     public HybridContactEnrichmentService(
         IPeopleSearchService peopleSearch,
         ISearchService search,
@@ -54,8 +64,9 @@ public class HybridContactEnrichmentService : IContactEnrichmentService
             var keywords = await _settings.GetTitleKeywordsAsync(ct);
 
             // Firma bir "Biz ne arıyoruz?" segmentine uyuyorsa o segmentin unvanlari one alinir.
-            keywords = SegmentTitlesFirst(company,
-                BusinessProfileService.Parse(await _settings.GetAsync(SettingKeys.BusinessProfile, ct)), keywords);
+            var profile = BusinessProfileService.Parse(await _settings.GetAsync(SettingKeys.BusinessProfile, ct));
+            keywords = SegmentTitlesFirst(company, profile, keywords);
+            _profileMode = profile.IsConfigured;
 
             var fromApollo = await SearchWithApolloAsync(company, keywords, ct);
             if (fromApollo.Count > 0)
@@ -209,6 +220,15 @@ public class HybridContactEnrichmentService : IContactEnrichmentService
     private int? ResolveTitleScore(string title, List<string> keywords)
     {
         var score = _scoring.ScoreTitle(title);
+
+        // Profil modunda sabit IT/SAP unvan tablosu degil, sirketin kendi hedef unvanlari belirleyicidir:
+        // listede once gelen (segment unvanlari en basta) daha yuksek puan alir; ust yonetici her zaman kabul.
+        if (_profileMode && keywords.Count > 0)
+        {
+            var index = keywords.FindIndex(k => TurkishText.ContainsWord(title, k));
+            if (index >= 0) return Math.Max(_options.MinTitleScore, 100 - index * 3);
+            return TopExecutiveTitles.Any(t => TurkishText.ContainsWord(title, t)) ? _options.MinTitleScore : null;
+        }
 
         // Unvan listesi bos (tum kisiler): eleme yok, unvan puani yalnizca siralama icindir.
         if (keywords.Count == 0) return score;

@@ -1,6 +1,8 @@
 @model DashboardViewModel
 @inject EgebisLeadFinder.Services.UsageService Usage
+@inject EgebisLeadFinder.Services.BusinessProfileService SellerProfiles
 @{
+    var profileReady = (await SellerProfiles.GetAsync()).IsConfigured;
     ViewData["Title"] = "Panel";
     var tr = new System.Globalization.CultureInfo("tr-TR");
 
@@ -24,6 +26,24 @@
         Firma Ara
     </a>
 </div>
+
+@if (!profileReady)
+{
+    <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2">
+        <div class="flex-grow-1">
+            <strong>Şirket profiliniz tanımlı değil.</strong> Firma araması, yapay zekâ analizi ve mail önerileri şu an
+            varsayılan tanımla (SAP/üretim yazılımı) çalışıyor. Kendi işinize göre çalışması için “Biz ne arıyoruz?” ekranını doldurun.
+        </div>
+        @if (User.IsInRole(nameof(UserRole.Admin)))
+        {
+            <a class="btn btn-sm btn-accent" asp-controller="BusinessProfile" asp-action="Index">Biz ne arıyoruz?</a>
+        }
+        else
+        {
+            <span class="small">Yöneticinizden doldurmasını isteyin.</span>
+        }
+    </div>
+}
 
 @{
     var usageAlert = await Usage.GetAlertAsync();

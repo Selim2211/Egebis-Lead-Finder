@@ -2,7 +2,11 @@
 @{
     ViewData["Title"] = "Taslak Düzenleyici";
     var c = Model.Current;
-    var aiLabels = EmailTemplate.AiKeys.ToDictionary(k => k.Key, k => k.Label);
+    var profile = Model.Profile;
+    var aiOptions = EmailTemplate.AiKeysFor(profile);
+    // Etiket: once profil secenekleri, sonra eski sabit anahtarlar (kayitli eski eslesmeler de okunur).
+    var aiLabels = aiOptions.Concat(EmailTemplate.AiKeys)
+        .GroupBy(k => k.Key).ToDictionary(g => g.Key, g => g.First().Label);
 }
 
 <div class="page-head">
@@ -27,6 +31,36 @@
 @if (Model.Error is not null)
 {
     <div class="alert alert-danger" data-flash="error">@Model.Error</div>
+}
+
+@if (profile.IsConfigured)
+{
+    <div class="card mb-4">
+        <div class="card-body d-flex flex-wrap align-items-center gap-3">
+            <div class="flex-grow-1" style="min-width:260px">
+                <div class="fw-semibold d-flex align-items-center gap-2">@Icons.Sparkles(16) @profile.DisplayName için taslak oluştur</div>
+                <div class="small text-muted-2">
+                    Yapay zekâ “Biz ne arıyoruz?” tanımınızdan genel tanıtım@(profile.Segments.Count > 0 ? $", her hedef segment ({profile.Segments.Count})" : "")
+                    ve takip maili taslaklarını yazar.@(profile.Segments.Count > 0 ? " Segment taslakları o segmentteki firmalara otomatik önerilir." : "")
+                </div>
+            </div>
+            <form method="post" asp-action="GenerateFromProfile" class="d-flex flex-wrap align-items-center gap-3 m-0">
+                @Html.AntiForgeryToken()
+                <label class="form-check m-0 small">
+                    <input class="form-check-input" type="checkbox" name="deactivateOthers" value="true" checked />
+                    <span class="form-check-label">Mevcut taslakları pasife al (silinmez)</span>
+                </label>
+                <button class="btn btn-accent text-nowrap" type="submit" data-busy-text="Taslaklar yazılıyor…">Profilime göre oluştur</button>
+            </form>
+        </div>
+    </div>
+}
+else
+{
+    <div class="alert alert-warning">
+        Taslakları kendi şirketinize göre otomatik oluşturmak için önce
+        <a asp-controller="BusinessProfile" asp-action="Index">Biz ne arıyoruz?</a> ekranını doldurun.
+    </div>
 }
 
 <div class="tpl-layout">
@@ -124,15 +158,20 @@
                     <div class="col-md-8">
                         <label class="form-label" for="tplSubject">Konu</label>
                         <input class="form-control" name="subject" id="tplSubject" value="@c.Subject" maxlength="300"
-                               placeholder="ör. {COMPANY_NAME} için SAP çözümleri" />
+                               placeholder="ör. {COMPANY_NAME} için çözümlerimiz" />
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="tplKey">Yapay zeka eşlemesi</label>
                         <select class="form-select" name="key" id="tplKey">
                             <option value="">Yok (elle seçilir)</option>
-                            @foreach (var k in EmailTemplate.AiKeys)
+                            @foreach (var k in aiOptions)
                             {
                                 <option value="@k.Key" selected="@(c.Key == k.Key)">@k.Label</option>
+                            }
+                            @if (c.Key is not null && aiOptions.All(k => k.Key != c.Key) && aiLabels.TryGetValue(c.Key, out var oldLabel))
+                            {
+                                @* Profil disi eski eslesme: kaydederken kaybolmasin. *@
+                                <option value="@c.Key" selected>@oldLabel (eski)</option>
                             }
                         </select>
                     </div>

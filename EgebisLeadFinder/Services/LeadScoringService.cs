@@ -98,6 +98,13 @@ public class LeadScoringService
                         breakdown.Add("Hedef sektör (NACE bilinmiyor)", _options.TargetIndustry);
                 }
             }
+            else if (fit is { Active: true })
+            {
+                // Profil modunda "hedef sektor" sabit (uretim) listesinden degil, yapay zekanin
+                // firmayi eslestirdigi "Biz ne arıyoruz?" segmentinden gelir.
+                if (!string.IsNullOrWhiteSpace(analysis.Segment))
+                    breakdown.Add($"Hedef segment: {analysis.Segment.Trim()}", _options.TargetIndustry);
+            }
             else if (IsTargetIndustry(analysis.Industry))
                 breakdown.Add("Hedef sektör", _options.TargetIndustry);
 

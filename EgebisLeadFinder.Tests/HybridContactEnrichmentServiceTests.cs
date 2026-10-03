@@ -40,6 +40,31 @@ public class HybridContactEnrichmentServiceTests
     // ----- Apollo kisi aramasi (birinci yol) -----
 
     [Fact]
+    public async Task Profil_modunda_kisiler_sirketin_kendi_hedef_unvanlarina_gore_secilir()
+    {
+        // Boru toptancisi satin almacilara satar: IT muduru (sabit tabloda yuksek puanli) elenir,
+        // hedef unvan ve ust yonetici kalir; listede once gelen unvan daha yuksek puan alir.
+        var apollo = FakePeopleSearch.Returning(
+            new PersonCandidate { Name = "Ali Bilgi", Title = "IT Müdürü", ApolloId = "1" },
+            new PersonCandidate { Name = "Ayşe Alım", Title = "Satın Alma Müdürü", ApolloId = "2" },
+            new PersonCandidate { Name = "Can Proje", Title = "Proje Müdürü", ApolloId = "3" },
+            new PersonCandidate { Name = "Deniz Genel", Title = "Genel Müdür", ApolloId = "4" });
+        var profile = """{"companyName":"Sey Boru","offering":"Boru ve vana","idealCustomer":"Tesisat firmaları"}""";
+
+        var service = new HybridContactEnrichmentService(apollo, new FakeSearchService(new List<SearchResult>()),
+            new FakeEmailFinder(), CreateScoring(),
+            new FakeSettingsService(new Dictionary<string, string?> { [SettingKeys.BusinessProfile] = profile },
+                titleKeywords: new List<string> { "Satın Alma", "Proje" }),
+            Options.Create(new EnrichmentOptions { Enabled = true, MinTitleScore = 60, MaxCandidatesPerCompany = 3 }),
+            NullLogger<HybridContactEnrichmentService>.Instance);
+
+        var result = await service.EnrichAsync(new Company { Name = "Akme İnşaat", Domain = "akme.com" });
+
+        Assert.Equal(new[] { "Ayşe Alım", "Can Proje", "Deniz Genel" }, result.Contacts.Select(c => c.Name));
+        Assert.DoesNotContain(result.Contacts, c => c.Title == "IT Müdürü");
+    }
+
+    [Fact]
     public async Task Apollo_sonuc_dondurunce_linkedin_hic_aranmaz()
     {
         var apollo = FakePeopleSearch.Returning(new PersonCandidate

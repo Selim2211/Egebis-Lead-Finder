@@ -6,6 +6,17 @@ namespace EgebisLeadFinder.Models;
 public class SearchCriteria
 {
     public string Industry { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Sorgu kaliplari: true = uretici/fabrika ("üreticileri", "fabrikası"), false = her tur firma
+    /// ("firmaları", "şirketleri"). Formdan gelmez; arama oncesi "Biz ne arıyoruz?" profilinden doldurulur.
+    /// </summary>
+    [Microsoft.AspNetCore.Mvc.ModelBinding.BindNever]
+    public bool ManufacturerQueries { get; set; } = true;
+
+    /// <summary>"SAP kariyer" sorgusu eklensin mi? Profil SAP'den soz ediyorsa (ya da profil yoksa) evet.</summary>
+    [Microsoft.AspNetCore.Mvc.ModelBinding.BindNever]
+    public bool SapQueries { get; set; } = true;
     public string Country { get; set; } = "Türkiye";
 
     /// <summary>Arama bolgesi anahtari (bkz. SearchRegions); bos ise Türkiye.</summary>

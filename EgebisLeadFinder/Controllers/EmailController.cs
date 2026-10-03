@@ -22,6 +22,23 @@ public class EmailController : Controller
         _sender = sender;
     }
 
+    /// <summary>
+    /// Onerilen sablon anahtari: profil modunda firmanin segmentine eslenmis taslak ("SEG:{id}") varsa o,
+    /// yoksa genel tanitim; profil yoksa yapay zekanin onerdigi eski anahtar (SAP, MES...).
+    /// </summary>
+    private async Task<string?> RecommendedKeyAsync(Company company, CompanyAnalysis? analysis,
+        IReadOnlyCollection<EmailTemplate> templates, CancellationToken ct)
+    {
+        var profile = await HttpContext.RequestServices.GetRequiredService<BusinessProfileService>().GetAsync(ct);
+        if (!profile.IsConfigured) return analysis?.RecommendedTemplate;
+
+        var segment = profile.FindSegment(company.FitSegment);
+        if (segment is not null && templates.Any(t => t.Key == EmailTemplate.SegmentKey(segment.Id)))
+            return EmailTemplate.SegmentKey(segment.Id);
+
+        return profile.MentionsSap && analysis?.RecommendedTemplate is { } legacy ? legacy : EmailTemplate.GeneralKey;
+    }
+
     [HttpGet]
     public async Task<IActionResult> Compose(int leadId, int? templateId, CancellationToken ct)
     {
@@ -253,7 +270,9 @@ public class EmailController : Controller
                   ? templates.FirstOrDefault(t => t.Id == lead.SelectedTemplateId)
                   : null);
 
-        selected ??= _templates.PickTemplate(templates, analysis?.RecommendedTemplate);
+        // Sirket profili doluysa sablon, firmanin eslestigi hedef segmentin taslagindan secilir.
+        var recommendedKey = await RecommendedKeyAsync(lead.Company, analysis, templates, ct);
+        selected ??= _templates.PickTemplate(templates, recommendedKey);
 
         var (subject, body) = _templates.Render(selected, lead.Company, lead.Contact);
         var sender = await _sender.GetSettingsAsync(ct);
@@ -272,7 +291,7 @@ public class EmailController : Controller
             Contact = lead.Contact,
             Templates = templates,
             SelectedTemplateId = selected.Id,
-            RecommendedTemplateKey = followUp?.Key ?? analysis?.RecommendedTemplate,
+            RecommendedTemplateKey = followUp?.Key ?? recommendedKey,
             IsFollowUp = followUp is not null,
             RecommendationReason = analysis?.Reason,
             Subject = subject,

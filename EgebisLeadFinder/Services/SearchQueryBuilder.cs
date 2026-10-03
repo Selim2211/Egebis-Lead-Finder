@@ -27,7 +27,13 @@ public static class SearchQueryBuilder
             return new List<string>();
 
         var region = SearchRegions.Get(c.RegionKey ?? SearchRegions.ByCountry(c.Country)?.Key);
-        var templates = places ? region.Pack.Places : region.Pack.Web;
+        var pack = region.Pack;
+        var templates = (places
+                ? (c.ManufacturerQueries ? pack.Places : pack.GeneralPlaces)
+                : (c.ManufacturerQueries ? pack.Web : pack.GeneralWeb))
+            // "SAP kariyer" sorgusu yalnizca SAP ile ilgili satis yapan kullanici icin anlamli.
+            .Where(t => c.SapQueries || !t.Contains("SAP", StringComparison.Ordinal))
+            .ToArray();
 
         // Sehir alani virgullu gelebilir: "İzmir, Bursa, Kocaeli"
         var cities = (c.City ?? string.Empty)

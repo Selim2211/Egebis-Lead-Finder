@@ -402,6 +402,9 @@ public record MailEditorModel(
 /// <summary>Taslak Duzenleyici: soldaki liste + sagdaki editor.</summary>
 public class TemplateEditorViewModel
 {
+    /// <summary>"Biz ne arıyoruz?" profili: yapay zeka eslemesi secenekleri ve profilden taslak uretme icin.</summary>
+    public BusinessProfile Profile { get; set; } = new();
+
     public List<EmailTemplate> Templates { get; set; } = new();
 
     /// <summary>Duzenlenen taslak; yeni taslakta Id = 0.</summary>

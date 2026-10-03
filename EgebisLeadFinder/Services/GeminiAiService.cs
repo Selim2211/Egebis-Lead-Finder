@@ -223,7 +223,15 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
     private const string AnalysisIntro = """
         Sana bir firmanın web sitesinden alınan düz metin verilecek.
         Metne dayanarak firmayı değerlendir ve verilen şemaya uygun JSON döndür.
+        """;
 
+    private const string NoSapRule = """
+        sap alanı bu çalışmada kullanılmıyor: "unknown" yaz, sapEvidence alanını boş bırak.
+        manufacturer alanı: firma kendi üretimini yapıyorsa true.
+        Metinde olmayan bilgiyi asla uydurma.
+        """;
+
+    private const string SapRules = """
         SAP tespiti kuralları (sap alanı):
         - "yes": Metinde firmanın SAP kullandığına dair somut kanıt var.
           Örnekler: "SAP ERP kullanıyoruz", "SAP S/4HANA'ya geçtik",
@@ -300,6 +308,9 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         "22.19" biçiminde (bölüm.sınıf). Sınıftan emin değilsen yalnızca bölüm
         kodunu yaz ("22"). Faaliyet belirsizse boş bırak.
 
+        """;
+
+    private const string LegacyTemplateRule = """
         recommendedTemplate alanı şu değerlerden biri olmalı:
         - "SAP_ENTEGRASYON": SAP kullanıyor, entegrasyon ihtiyacı olabilir
         - "SAP": SAP kullanıyor veya geçiş ihtimali var, genel danışmanlık
@@ -310,14 +321,22 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         Tüm metin alanlarını Türkçe yaz.
         """;
 
+    /// <summary>Profil modunda e-posta sablonu firmanin segmentinden secilir; yapay zeka "GENEL" der.</summary>
+    private const string ProfileTemplateRule = """
+        recommendedTemplate alanına "GENEL" yaz (şablon firmanın segmentine göre seçilir).
+
+        Tüm metin alanlarını Türkçe yaz.
+        """;
+
     /// <summary>
     /// Firma analizi talimati. Sirket profili ("Biz ne arıyoruz?") doluysa hedef ve rakip tanimi
     /// profilden gelir; bossa eski Egebis tanimi aynen kullanilir.
     /// </summary>
     public static string AnalysisPrompt(BusinessProfile? profile) =>
         profile is { IsConfigured: true }
-            ? string.Join("\n\n", profile.ToPromptBlock(), AnalysisIntro, ProfileAnalysisTarget, AnalysisTail)
-            : string.Join("\n\n", LegacyAnalysisHeader, AnalysisIntro, LegacyAnalysisTarget, AnalysisTail);
+            ? string.Join("\n\n", profile.ToPromptBlock(), AnalysisIntro, profile.MentionsSap ? SapRules : NoSapRule,
+                ProfileAnalysisTarget, AnalysisTail, ProfileTemplateRule)
+            : string.Join("\n\n", LegacyAnalysisHeader, AnalysisIntro, SapRules, LegacyAnalysisTarget, AnalysisTail, LegacyTemplateRule);
 
     /// <summary>
     /// Gemini responseSchema'si. CompanyAnalysis sinifiyla birebir eslesmelidir.
@@ -549,8 +568,11 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         sb.AppendLine($"FİRMA: {c.Name} ({c.City}{(string.IsNullOrWhiteSpace(c.Country) ? "" : ", " + c.Country)})");
         if (a is not null)
         {
-            sb.AppendLine($"Sektör: {a.Industry}; Üretici: {(a.Manufacturer ? "evet" : "hayır")}; SAP: {a.Sap}");
-            if (!string.IsNullOrWhiteSpace(a.SapEvidence)) sb.AppendLine($"SAP kanıtı: {a.SapEvidence}");
+            var sapRelevant = profile is not { IsConfigured: true } || profile.MentionsSap;
+            sb.AppendLine($"Sektör: {a.Industry}; Üretici: {(a.Manufacturer ? "evet" : "hayır")}" + (sapRelevant ? $"; SAP: {a.Sap}" : ""));
+            if (sapRelevant && !string.IsNullOrWhiteSpace(a.SapEvidence)) sb.AppendLine($"SAP kanıtı: {a.SapEvidence}");
+            if (!string.IsNullOrWhiteSpace(c.FitSegment)) sb.AppendLine($"Uyduğu hedef segmentimiz: {c.FitSegment}");
+            if (!string.IsNullOrWhiteSpace(a.Reason)) sb.AppendLine($"Neden uygun: {a.Reason}");
             if (a.Products.Count > 0) sb.AppendLine($"Ürünler: {string.Join(", ", a.Products.Take(6))}");
         }
 
@@ -681,6 +703,8 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
                         notCustomers = new { type = "string", description = "Müşterimiz olmayan firma türleri" },
                         competitors = new { type = "string", description = "Rakip tanımı" },
                         exampleCustomers = StringArray,
+                        customerKind = new { type = "string", @enum = new[] { "manufacturer", "any" } },
+                        buyingSignals = StringArray,
                         segments = new { type = "array", items = segment },
                         targetTitles = StringArray
                     },
@@ -743,6 +767,12 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
           haber sitesi, çok küçük işletmeler) — şirketin işine göre düşün.
         - competitors: rakip tanımı: aynı ürün/hizmeti satan firma türleri.
         - exampleCustomers: sitede referans/müşteri olarak adı geçen firmalar; yoksa boş dizi.
+        - customerKind: müşterileri ağırlıklı olarak üretim yapan firmalar (fabrika, imalat)
+          ise "manufacturer"; ticaret, hizmet, inşaat, perakende, kurum gibi her tür şirket
+          olabiliyorsa "any".
+        - buyingSignals: bir firmanın bu ürüne/hizmete ihtiyacı olduğunu gösteren 4-10 kısa
+          işaret; haberlerde ve sitelerde geçebilecek ifadeler olsun (ör. "yeni fabrika",
+          "kapasite artışı", "tesisat projesi", "ihale", "ERP geçişi", "yeni şube").
         - segments: 2-5 hedef segment. Her biri farklı bir müşteri sektörü veya ürün grubu.
           name kısa ad; description bu segmentte neyi neden sattığımız; searchTerm firma
           aramasında kullanılacak kısa sektör terimi (Türkçe, ör. "Otomotiv yan sanayi");
@@ -817,18 +847,20 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
     private const string SearchTermsSystemPrompt = """
         Google ve Google Haritalar'da potansiyel müşteri firmaları bulmak için kısa arama
         terimleri üretiyorsun. Terimler hazır sorgu kalıplarına yerleştirilecek; kalıplar
-        zaten "üretici", "fabrika", "firma" ve şehir/ülke ekliyor.
+        zaten firma türünü ("üreticileri", "fabrikası" ya da "firmaları", "şirketleri") ve
+        şehir/ülkeyi ekliyor.
 
         Kurallar:
         - Her terim 1-4 kelime; bir sektör, ürün grubu veya firma türü adı olsun.
         - Kullanıcının yazdığı sektörün eş anlamlılarını, alt dallarını ve bu sektörde
           bizim ideal müşterimize uyan firma türlerini bul (ör. "Otomotiv" için
-          "otomotiv yan sanayi", "metal pres parça", "plastik enjeksiyon").
+          "otomotiv yan sanayi", "metal pres parça"; "Tesisat" için "mekanik tesisat",
+          "doğalgaz tesisatı", "sıhhi tesisat"). Yukarıdaki MÜŞTERİ TÜRÜ'ne uy: müşterimiz
+          üretici değilse üretim ağırlıklı terim üretme.
         - Terimleri istenen dilde yaz (Almanca için ör. "Kunststoffspritzguss",
           "Automobilzulieferer"). Kullanıcının yazdığı terimi aynen tekrar etme.
         - Şehir, ülke, "üretici", "fabrika", "firma", "şirket" gibi kelimeleri ekleme.
-        - Müşterimiz olmayan firma türlerini (bayi, servis, perakende, rakip) getirecek
-          terim üretme.
+        - Müşterimiz olmayan firma türlerini ve rakipleri getirecek terim üretme.
         - En alakalı olan en başta olsun.
         """;
 
@@ -911,9 +943,10 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
 
         Her aday için keep alanını doldur:
         - keep=false yalnızca şu durumlarda: haber/gazete/blog sitesi; firma rehberi,
-          dizin veya pazaryeri; iş ilanı sitesi; dernek, oda, vakıf, kamu kurumu, okul;
-          bayi, perakende mağaza, servis/tamirci; bizim rakibimiz; ya da aranan sektör
-          ve hedef müşteri tanımımızla hiç ilgisi olmayan bir iş.
+          dizin veya pazaryeri; iş ilanı sitesi; bizim rakibimiz; "müşterimiz olmayanlar"
+          tanımına uyan firma; ya da aranan sektör ve hedef müşteri tanımımızla hiç ilgisi
+          olmayan bir iş. Dernek, kamu kurumu, okul, bayi, perakende mağaza, servis gibi
+          işletmeleri yalnızca şirket tanımımız onları hedef olarak saymıyorsa ele.
         - Emin değilsen keep=true. Bilgi azsa keep=true. Gerçek bir hedef firmayı yanlışlıkla
           elemek, fazladan bir siteyi okumaktan çok daha kötüdür.
         - keep=false ise reason alanına 2-6 kelimelik Türkçe neden yaz ("haber sitesi",
@@ -996,7 +1029,9 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         "Egebis için somut satış fırsatları (ör. SAP'ye geçiş, yeni fabrika = yeni sistem ihtiyacı, IT ilanı, entegrasyon ihtiyacı) ve nedeni.";
 
     private const string ProfileRatingOpportunities =
-        "bizim sattığımız ürün/hizmet için somut satış fırsatları (ör. yeni yatırım, büyüme, ilgili iş ilanı, teknoloji değişikliği) ve nedeni.";
+        "bizim sattığımız ürün/hizmet için somut satış fırsatları ve nedeni. Şirket tanımındaki İHTİYAÇ SİNYALLERİ'ne " +
+        "ve hedef segmentlere uyan gelişmelere (ör. yeni yatırım, yeni tesis/şube, büyüme, ihale, ilgili iş ilanı) bak; " +
+        "her fırsatta hangi ürün/hizmetimizle ilgili olduğunu yaz. Tanımda olmayan ürün/hizmet önerme.";
 
     /// <summary>Arastirma raporu talimati: sirket profili doluysa "biz kimiz" profilden gelir.</summary>
     public static string RatingPrompt(BusinessProfile? profile)
@@ -1036,12 +1071,14 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
             - groupCompanies: bağlı olduğu holding/grup ve iştirakler.
             - technology: kullandığı ERP (SAP, Logo, Netsis, Microsoft Dynamics, Oracle...)
               ve dayanağı (erpEvidence), diğer yazılımlar, dijital dönüşüm projeleri,
-              IT/yazılım iş ilanları. Kanıt yoksa erp = "bilinmiyor".
+              IT/yazılım iş ilanları. Kanıt yoksa erp = "bilinmiyor".{(configured
+                  ? "\n  Bu alanı kısa tut; asıl odak, bizim sattığımız ürün/hizmetle ilgili bilgilerdir."
+                  : "")}
             - newsTimeline: önemli haberler, en yeni önce, en fazla 12; tarih kaynakta
               varsa yaz. kind: risk | buyume | finansal | yonetim | teknoloji | genel.
             - opportunities: {opportunities}
             - salesApproach: 2-4 cümle; kime (rol/isim), hangi açıdan, hangi zamanlamayla
-              yaklaşılmalı.
+              yaklaşılmalı{(configured ? " ve hangi ürün/hizmetimizle" : "")}.
             - signal alanı senin ÖNERİN: net risk yoksa ve firma köklü/aktif görünüyorsa
               "guclu"; veri az veya karışıksa "incelenmeli"; doğrulanmış ciddi risk
               varsa "riskli". Nihai kararı sistem verecek.

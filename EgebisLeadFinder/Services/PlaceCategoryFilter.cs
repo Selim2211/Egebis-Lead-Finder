@@ -2,9 +2,11 @@ namespace EgebisLeadFinder.Services;
 
 /// <summary>
 /// Google Haritalar sonuclarini isletme kategorisine gore eler.
-/// Haritalar aramasi fabrikalarin yani sira ayni bolgedeki tamirci, galeri,
-/// lastikci gibi kucuk isletmeleri de dondurur; bunlar Egebis icin hedef degil
-/// ve her biri bosuna site okuma + AI analizi maliyeti demek.
+/// Haritalar aramasi hedef firmalarin yani sira ayni bolgedeki tamirci, galeri,
+/// lastikci gibi kucuk isletmeleri de dondurur; bunlar cogu zaman hedef degil
+/// ve her biri bosuna site okuma + AI analizi maliyeti demek. Kullanici bu tur
+/// isletmeleri bilerek ariyorsa (ör. "oto servis" yazdiysa) kategori aranan terimle
+/// eslestigi icin elenmez.
 /// </summary>
 public static class PlaceCategoryFilter
 {
@@ -43,6 +45,16 @@ public static class PlaceCategoryFilter
         "industrial", "production"
     };
 
+    /// <summary>Aranan terimlerin anlamli bir kelimesi (4+ harf) kategoride geciyor mu?</summary>
+    public static bool MatchesSearchTerm(string category, IEnumerable<string> searchTerms)
+    {
+        var normalized = TurkishText.Normalize(category);
+        return searchTerms
+            .SelectMany(t => TurkishText.Normalize(t ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            .Where(w => w.Length >= 4)
+            .Any(w => normalized.Contains(w.Length > 6 ? w[..6] : w));
+    }
+
     /// <summary>Kategori uretim/sanayi belirtiyor mu?</summary>
     public static bool IsManufacturerCategory(string? category) =>
         !string.IsNullOrWhiteSpace(category)
@@ -53,9 +65,12 @@ public static class PlaceCategoryFilter
     /// Kategori bos ise elenmez: Haritalar her kayda kategori yazmiyor ve
     /// gercek bir fabrikayi kategori eksikligi yuzunden kaybetmek istemiyoruz.
     /// </summary>
-    public static bool IsRelevant(string? category)
+    public static bool IsRelevant(string? category, IEnumerable<string>? searchTerms = null)
     {
         if (string.IsNullOrWhiteSpace(category)) return true;
+
+        // Kategori aranan sektoru iceriyorsa ("restoran" ararken "Restoran") hedef budur.
+        if (searchTerms is not null && MatchesSearchTerm(category, searchTerms)) return true;
 
         // Uretici isareti eleme listesini gecersiz kilar: "Otomobil Parcasi
         // Ureticisi" kategorisi "parca satis" ifadesini de icerebilir ama

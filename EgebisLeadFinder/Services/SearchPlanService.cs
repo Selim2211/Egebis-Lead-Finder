@@ -93,6 +93,7 @@ public class SearchPlanService
         if (criteria.IsNameSearch || string.IsNullOrWhiteSpace(criteria.Industry)) return plan;
 
         plan.Profile = BusinessProfileService.Parse(await _settings.GetAsync(SettingKeys.BusinessProfile, ct));
+        ApplyProfile(criteria, plan.Profile);
         plan.Segment = string.IsNullOrWhiteSpace(criteria.SegmentId)
             ? null
             : plan.Profile.Segments.FirstOrDefault(s => s.Id == criteria.SegmentId);
@@ -135,6 +136,18 @@ public class SearchPlanService
 
         criteria.SearchTerms = plan.Terms.Skip(1).ToList();
         return plan;
+    }
+
+    /// <summary>
+    /// Sorgu kaliplarini sirket profiline gore secer: musterisi uretici olmayan bir kullanici
+    /// "üreticileri / fabrikası" yerine "firmaları / şirketleri" ile arar; SAP'den soz etmeyen
+    /// bir kullanicida "SAP kariyer" sorgusu yapilmaz. Profil yoksa eski (uretici + SAP) davranis.
+    /// </summary>
+    public static void ApplyProfile(SearchCriteria criteria, BusinessProfile profile)
+    {
+        if (!profile.IsConfigured) return;
+        criteria.ManufacturerQueries = profile.TargetsManufacturers;
+        criteria.SapQueries = profile.MentionsSap;
     }
 
     /// <summary>On eleme payi: elenenlerin yerine aday kalsin diye %50 fazla (en az 5, en fazla 50) toplanir.</summary>

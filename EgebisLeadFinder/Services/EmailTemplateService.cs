@@ -55,8 +55,11 @@ public class EmailTemplateService
     {
         if (!string.IsNullOrWhiteSpace(recommendedKey))
         {
-            var match = templates.FirstOrDefault(t =>
-                string.Equals(t.Key, recommendedKey, StringComparison.OrdinalIgnoreCase));
+            // Ayni anahtarli birden fazla taslak varsa en son duzenlenen (ya da en yeni) kazanir.
+            var match = templates
+                .Where(t => string.Equals(t.Key, recommendedKey, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(t => t.UpdatedAt ?? DateTime.MinValue).ThenByDescending(t => t.Id)
+                .FirstOrDefault();
 
             if (match is not null) return match;
         }

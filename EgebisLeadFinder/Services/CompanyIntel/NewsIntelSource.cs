@@ -24,16 +24,20 @@ public class NewsIntelSource : ICompanyIntelSource
         "youtube.com", "kariyer.net", "tiktok.com"
     };
 
+    private readonly ISettingsService? _settings;
+
     public NewsIntelSource(
         ISearchService search,
         IOptions<ResearchOptions> options,
         ILogger<NewsIntelSource> logger,
-        IWebScraperService? scraper = null)
+        IWebScraperService? scraper = null,
+        ISettingsService? settings = null)
     {
         _search = search;
         _options = options.Value;
         _logger = logger;
         _scraper = scraper;
+        _settings = settings;
     }
 
     public string Name => "Haber ve web araması";
@@ -42,7 +46,15 @@ public class NewsIntelSource : ICompanyIntelSource
     {
         var intel = new SourceIntel { SourceName = Name };
 
-        var queries = CompanyResearchQueryBuilder.Build(company, _options);
+        // Sorgular "Biz ne arıyoruz?" profiline gore: ihtiyac sinyalleri ve sirketin hedef unvanlari.
+        BusinessProfile? profile = null;
+        IReadOnlyList<string>? titles = null;
+        if (_settings is not null)
+        {
+            profile = BusinessProfileService.Parse(await _settings.GetAsync(SettingKeys.BusinessProfile, ct));
+            if (profile.IsConfigured) titles = await _settings.GetTitleKeywordsAsync(ct);
+        }
+        var queries = CompanyResearchQueryBuilder.Build(company, _options, profile, titles);
         if (queries.Count == 0)
         {
             intel.Error = "Firma adı yok, arama yapılamadı.";
