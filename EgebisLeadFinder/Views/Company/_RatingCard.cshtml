@@ -1,5 +1,11 @@
 @model RatingViewModel
+@inject BusinessProfileService SellerProfiles
 @{
+    var seller = await SellerProfiles.GetAsync();
+    var profileMode = seller.IsConfigured;
+    var sellerName = profileMode ? seller.DisplayName : "Egebis";
+    var showSap = !profileMode || seller.MentionsSap;
+
     // Faz-II: firma on arastirma / rating karti. Model null ise firma henuz arastirilmadi.
     var companyId = (int)(ViewData["CompanyId"] ?? 0);
     const string progressTitle = "Firma derin analizi";
@@ -41,9 +47,17 @@
             <div class="empty-title">Bu firma henüz araştırılmadı</div>
             <div class="mb-3">
                 Firmanın web sitesi, haberler, KAP ve resmi kayıtlar taranır; finans ve büyüklük,
-                yönetim, teknoloji altyapısı, haberler, riskler ve Egebis için satış fırsatları
+                yönetim, teknoloji altyapısı, haberler, riskler ve @sellerName için satış fırsatları
                 tek raporda derlenir. Lead puanından bağımsızdır.
             </div>
+            @if (!profileMode)
+            {
+                <div class="alert alert-warning small">
+                    Şirket profili tanımlı değil; rapor varsayılan <strong>Egebis (SAP/MES)</strong> tanımına göre hazırlanır.
+                    Kendi şirketinize göre hazırlanması için <a asp-controller="BusinessProfile" asp-action="Index">Biz ne arıyoruz?</a>
+                    ekranını doldurun.
+                </div>
+            }
             <form method="post" asp-action="Research" asp-route-id="@companyId" class="research-form"
                   data-progress-start="@Url.Action("StartResearch", new { id = companyId })"
                   data-progress-title="@progressTitle"
@@ -98,7 +112,7 @@
             @if (hasOpportunity)
             {
                 <details class="rating-section" open>
-                    <summary>Egebis için fırsatlar ve satış önerisi</summary>
+                    <summary>@sellerName için fırsatlar ve satış önerisi</summary>
                     @if (Has(r.SalesApproach))
                     {
                         <div class="rating-callout mb-2">@r.SalesApproach</div>

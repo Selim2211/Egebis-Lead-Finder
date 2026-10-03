@@ -63,8 +63,8 @@ public class BusinessProfileService
         if (targetTitles is not null)
         {
             var titles = CleanList(targetTitles);
-            // Bos birakilirsa varsayilan unvanlara donulur (SettingsService.GetTitleKeywordsAsync).
-            values[SettingKeys.LeadTitleKeywords] = titles.Count == 0 ? null : string.Join(", ", titles);
+            // Bos birakilirsa unvan filtresi uygulanmaz: firmadaki tum kisiler listelenir.
+            values[SettingKeys.LeadTitleKeywords] = titles.Count == 0 ? SettingsService.AllPeopleMarker : string.Join(", ", titles);
         }
 
         await _settings.SetManyAsync(values, ct);

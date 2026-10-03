@@ -338,7 +338,9 @@ public class SerperSearchService : ISearchService
         var keywords = await _settings.GetTitleKeywordsAsync(ct);
         var titleFilter = string.Join(" OR ", keywords.Select(k => $"\"{k}\""));
 
-        var query = $"site:linkedin.com/in/ \"{companyName}\" ({titleFilter})";
+        var query = keywords.Count == 0
+            ? $"site:linkedin.com/in/ \"{companyName}\""
+            : $"site:linkedin.com/in/ \"{companyName}\" ({titleFilter})";
 
         try
         {

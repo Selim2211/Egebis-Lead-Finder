@@ -64,8 +64,9 @@
                 <textarea class="form-control" asp-for="LeadTitleKeywords" rows="3"
                           placeholder="IT, Bilgi İşlem, SAP, ERP, CIO"></textarea>
                 <div class="form-text">
-                    "Lead'leri Bul" çalıştığında LinkedIn'de bu ünvanlar aranır.
-                    Boş bırakırsanız varsayılanlar kullanılır:
+                    "Lead'leri Bul" çalıştığında Apollo'da (ve yedek olarak LinkedIn'de) bu ünvanlardaki kişiler aranır.
+                    <strong>Boş bırakırsanız unvan filtresi uygulanmaz:</strong> Apollo'dan ilgili firmadaki
+                    <strong>tüm kişiler</strong> getirilir. Önerilen ünvanlar:
                     <code>@string.Join(", ", SettingsService.DefaultTitleKeywords)</code>
                 </div>
             </div>

@@ -138,6 +138,12 @@ public class LeadScoringService
             if (contactList.Any(c => fit.TargetTitles.Any(t => TurkishText.ContainsWord(c.Title, t))))
                 breakdown.Add("Hedef unvanda kişi bulundu", _options.ItManagerFound);
         }
+        else if (fit is { Active: true })
+        {
+            // Profil modunda unvan filtresi yok (tum kisiler): firmada ulasilacak kisi bulunmasi yeterli.
+            if (contactList.Count > 0)
+                breakdown.Add("Firmada kişi bulundu", _options.ItManagerFound);
+        }
         // IT/SAP tarafinda muhatap bulmak dogrudan satis avantajidir.
         else if (contactList.Any(c => c.TitleScore >= 80))
             breakdown.Add("IT/SAP yöneticisi bulundu", _options.ItManagerFound);

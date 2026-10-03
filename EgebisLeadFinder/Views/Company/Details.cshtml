@@ -1,5 +1,11 @@
 @model CompanyDetailViewModel
+@inject BusinessProfileService SellerProfiles
 @{
+    var seller = await SellerProfiles.GetAsync();
+    var profileMode = seller.IsConfigured;
+    var sellerName = profileMode ? seller.DisplayName : "Egebis";
+    var showSap = !profileMode || seller.MentionsSap;
+
     ViewData["Title"] = Model.Company.Name;
     var analysis = Model.Analysis;
 
@@ -124,14 +130,17 @@
                     }
 
                     <div class="d-flex flex-wrap gap-2 mb-3">
-                        <span class="tag @sapCss">@sapLabel</span>
+                        @if (showSap)
+                        {
+                            <span class="tag @sapCss">@sapLabel</span>
+                        }
                         @if (analysis.Manufacturer)
                         {
                             <span class="tag tag-navy">Üretici</span>
                         }
                         @if (analysis.SapVendor)
                         {
-                            <span class="tag tag-danger">SAP satıcısı (rakip)</span>
+                            <span class="tag tag-danger">@(showSap ? "SAP satıcısı (rakip)" : "Rakip firma")</span>
                         }
                         @if (!analysis.Potential)
                         {
@@ -139,7 +148,7 @@
                         }
                     </div>
 
-                    @if (!string.IsNullOrWhiteSpace(analysis.SapEvidence))
+                    @if (showSap && !string.IsNullOrWhiteSpace(analysis.SapEvidence))
                     {
                         <div class="mb-3">
                             <div class="stat-label mb-2">SAP kanıtı</div>

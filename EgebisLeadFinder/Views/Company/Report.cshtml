@@ -1,5 +1,11 @@
 @model CompanyDetailViewModel
+@inject BusinessProfileService SellerProfiles
 @{
+    var seller = await SellerProfiles.GetAsync();
+    var profileMode = seller.IsConfigured;
+    var sellerName = profileMode ? seller.DisplayName : "Egebis";
+    var showSap = !profileMode || seller.MentionsSap;
+
     ViewData["Title"] = $"{Model.Company.Name} — rapor";
     var c = Model.Company;
     var a = Model.Analysis;
@@ -76,14 +82,17 @@
         else
         {
             <div class="report-tags">
-                <span class="tag tag-muted">@(a.Sap switch { "yes" => "SAP kullanıyor", "likely" => "SAP ihtimali yüksek", "no" => "SAP kullanmıyor", _ => "SAP durumu bilinmiyor" })</span>
+                @if (showSap)
+                {
+                    <span class="tag tag-muted">@(a.Sap switch { "yes" => "SAP kullanıyor", "likely" => "SAP ihtimali yüksek", "no" => "SAP kullanmıyor", _ => "SAP durumu bilinmiyor" })</span>
+                }
                 @if (a.Manufacturer)
                 {
                     <span class="tag tag-muted">Üretici</span>
                 }
                 @if (a.SapVendor)
                 {
-                    <span class="tag tag-muted">SAP satıcısı (rakip)</span>
+                    <span class="tag tag-muted">@(showSap ? "SAP satıcısı (rakip)" : "Rakip firma")</span>
                 }
             </div>
             @if (!string.IsNullOrWhiteSpace(a.Reason))
@@ -131,7 +140,7 @@
             }
             @if (!string.IsNullOrWhiteSpace(rr.SalesApproach) || rr.Opportunities.Count > 0)
             {
-                <h3 class="report-sub">Egebis için fırsatlar</h3>
+                <h3 class="report-sub">@sellerName için fırsatlar</h3>
                 @if (!string.IsNullOrWhiteSpace(rr.SalesApproach))
                 {
                     <p>@rr.SalesApproach</p>

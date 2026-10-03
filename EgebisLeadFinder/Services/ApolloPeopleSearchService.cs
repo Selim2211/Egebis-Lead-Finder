@@ -149,7 +149,8 @@ public class ApolloPeopleSearchService : IPeopleSearchService
             // Kidem filtresi unvan metninden bagimsizdir (bkz. ApolloOptions.Seniorities
             // dokumantasyonu): "Bilgi İşlem Müdürü" ile "IT Manager" ayni kideme
             // sinifllanir. person_titles ile OR mantiginda calisir, aramayi daraltmaz.
-            if (_options.Seniorities.Count > 0)
+            // Unvan listesi bos ise (tum kisiler istendi) kidem filtresi de uygulanmaz.
+            if (titles.Count > 0 && _options.Seniorities.Count > 0)
                 payload["person_seniorities"] = _options.Seniorities.ToArray();
 
             using var request = new HttpRequestMessage(HttpMethod.Post, _options.SearchEndpoint);

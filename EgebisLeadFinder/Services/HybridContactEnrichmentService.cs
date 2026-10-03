@@ -80,6 +80,9 @@ public class HybridContactEnrichmentService : IContactEnrichmentService
 
     public static List<string> SegmentTitlesFirst(Company company, BusinessProfile profile, List<string> general)
     {
+        // Ayarlarda unvan bos birakildi: tum kisiler istenir, segment unvani da filtre koymaz.
+        if (general.Count == 0) return general;
+
         var segment = profile.IsConfigured ? profile.FindSegment(company.FitSegment) : null;
         if (segment is null || segment.TargetTitles.Count == 0) return general;
         return segment.TargetTitles.Concat(general).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -111,9 +114,12 @@ public class HybridContactEnrichmentService : IContactEnrichmentService
         if (result.Error is not null)
             _logger.LogWarning("Apollo kişi araması hata verdi: {Error}", result.Error);
 
+        // Unvan listesi bos: filtre yok, firmadaki herkes (unvani olmayanlar dahil) listelenir.
+        var everyone = keywords.Count == 0;
+
         var contacts = result.People
-            .Where(p => !string.IsNullOrWhiteSpace(p.Title))
-            .Select(p => (Person: p, Score: ResolveTitleScore(p.Title!, keywords)))
+            .Where(p => everyone || !string.IsNullOrWhiteSpace(p.Title))
+            .Select(p => (Person: p, Score: ResolveTitleScore(p.Title ?? string.Empty, keywords)))
             .Where(x => x.Score is not null)
             .OrderByDescending(x => x.Score)
             .Select(x => new Contact
@@ -203,6 +209,10 @@ public class HybridContactEnrichmentService : IContactEnrichmentService
     private int? ResolveTitleScore(string title, List<string> keywords)
     {
         var score = _scoring.ScoreTitle(title);
+
+        // Unvan listesi bos (tum kisiler): eleme yok, unvan puani yalnizca siralama icindir.
+        if (keywords.Count == 0) return score;
+
         if (score >= _options.MinTitleScore) return score;
 
         return keywords.Any(k => TurkishText.ContainsWord(title, k))

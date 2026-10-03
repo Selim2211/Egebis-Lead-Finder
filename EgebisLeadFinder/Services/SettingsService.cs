@@ -40,6 +40,9 @@ public class SettingsService : ISettingsService
     private readonly ILogger<SettingsService> _logger;
 
     /// <summary>Ayarlar ekrani bos birakilirsa kullanilacak varsayilan unvanlar.</summary>
+    /// <summary>Unvan ayari bilerek bos birakildiginda saklanan deger: "tum kisileri getir".</summary>
+    public const string AllPeopleMarker = "*";
+
     public static readonly string[] DefaultTitleKeywords =
     {
         "IT", "Bilgi İşlem", "Bilgi Teknolojileri", "SAP", "ERP", "CIO", "CTO"
@@ -145,6 +148,10 @@ public class SettingsService : ISettingsService
 
         if (string.IsNullOrWhiteSpace(raw))
             return DefaultTitleKeywords.ToList();
+
+        // Ayarlar'da unvan bilerek bos birakildi: unvan filtresi yok, firmadaki tum kisiler listelenir.
+        if (raw.Trim() == AllPeopleMarker)
+            return new List<string>();
 
         var keywords = raw
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

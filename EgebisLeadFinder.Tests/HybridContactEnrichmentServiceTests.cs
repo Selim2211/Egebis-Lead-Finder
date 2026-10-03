@@ -392,6 +392,28 @@ public class HybridContactEnrichmentServiceTests
 
     // ----- Sahteler -----
 
+    [Fact]
+    public async Task Bos_unvan_listesinde_apollo_adaylarinin_hepsi_unvansizlar_dahil_listelenir()
+    {
+        var apollo = FakePeopleSearch.Returning(
+            new PersonCandidate { Name = "Ali Yılmaz", Title = "Satın Alma Müdürü", ApolloId = "a1" },
+            new PersonCandidate { Name = "Ayşe Kaya", Title = "Muhasebe Uzmanı", ApolloId = "a2" },
+            new PersonCandidate { Name = "Mehmet Demir", Title = null, ApolloId = "a3" });
+
+        var service = new HybridContactEnrichmentService(apollo, new FakeSearchService(new List<SearchResult>()),
+            new FakeEmailFinder(),
+            CreateScoring(),
+            new FakeSettingsService(titleKeywords: new List<string>()),
+            Options.Create(new EnrichmentOptions { Enabled = true, MinTitleScore = 60, MaxCandidatesPerCompany = 3 }),
+            NullLogger<HybridContactEnrichmentService>.Instance);
+
+        var result = await service.EnrichAsync(new Company { Name = "Sey Boru", Domain = "seyboru.com" });
+
+        Assert.Equal(3, result.Contacts.Count);
+        Assert.Contains(result.Contacts, c => c.Name == "Mehmet Demir");
+    }
+
+    
     private class FakePeopleSearch : IPeopleSearchService
     {
         private readonly PeopleSearchResult _result;

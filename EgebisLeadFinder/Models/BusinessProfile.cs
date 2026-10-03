@@ -66,6 +66,10 @@ public class BusinessProfile
         return Segments.FirstOrDefault(s => EgebisLeadFinder.Services.TurkishText.Normalize(s.Name.Trim()) == key);
     }
 
+    /// <summary>Profil SAP'den soz ediyor mu? (Evetse firma ekranlarinda SAP etiketleri gosterilir.)</summary>
+    [JsonIgnore]
+    public bool MentionsSap => ToPromptBlock().Contains("SAP", StringComparison.OrdinalIgnoreCase);
+
     [JsonIgnore]
     public string DisplayName => string.IsNullOrWhiteSpace(CompanyName) ? "Şirketimiz" : CompanyName.Trim();
 

@@ -50,7 +50,10 @@ public class SettingsController : Controller
     {
         var values = new Dictionary<string, string?>
         {
-            [SettingKeys.LeadTitleKeywords] = form.LeadTitleKeywords?.Trim(),
+            // Bos birakilirsa "tum kisiler" (unvan filtresi yok); hic kaydedilmemisse varsayilan unvanlar gecerlidir.
+            [SettingKeys.LeadTitleKeywords] = string.IsNullOrWhiteSpace(form.LeadTitleKeywords)
+                ? SettingsService.AllPeopleMarker
+                : form.LeadTitleKeywords.Trim(),
             [SettingKeys.SerperApiKey] = form.SerperApiKey?.Trim(),
             [SettingKeys.GeminiApiKey] = form.GeminiApiKey?.Trim(),
             // Bos veya varsayilanla ayni secim kaydedilmez: appsettings varsayilani gecerli kalir.
@@ -254,8 +257,9 @@ public class SettingsController : Controller
             SalesforceCallbackIsLocal = SalesforceController.NormalizeBaseUrl(Stored(SettingKeys.SalesforcePublicBaseUrl)) is null
                 && (Request.Host.Host is "localhost" or "127.0.0.1" or "::1"),
 
-            LeadTitleKeywords = Stored(SettingKeys.LeadTitleKeywords)
-                ?? string.Join(", ", SettingsService.DefaultTitleKeywords),
+            LeadTitleKeywords = Stored(SettingKeys.LeadTitleKeywords) is { } storedTitles
+                ? (storedTitles.Trim() == SettingsService.AllPeopleMarker ? string.Empty : storedTitles)
+                : string.Join(", ", SettingsService.DefaultTitleKeywords),
             SerperApiKey = Stored(SettingKeys.SerperApiKey),
             GeminiApiKey = Stored(SettingKeys.GeminiApiKey),
             ApolloApiKey = Stored(SettingKeys.ApolloApiKey),
