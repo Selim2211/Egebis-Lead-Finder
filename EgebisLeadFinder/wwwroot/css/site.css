@@ -4594,10 +4594,30 @@ a.pager-btn:hover { border-color: var(--eg-mailed-border); background: var(--eg-
 /* Mail çeviri çubuğu */
 .translate-bar { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem .75rem; }
 
-/* İngilizce menü etiketleri daha uzun: orta genişliklerde de sıkıştırılır, menü taşmasın. */
+/* Dil seçici + uzun etiketler: orta genişliklerde (ör. %125 yakınlaştırılmış 1920px ekran) menü taşmasın. */
 @media (min-width: 992px) and (max-width: 1750px) {
-    html[lang="en"] .eg-navbar .nav-settings-label, html[lang="en"] .eg-navbar .nav-target-label { display: none; }
-    html[lang="en"] .eg-navbar .navbar-nav .nav-link { padding: .4rem .55rem; font-size: .88rem; }
-    html[lang="en"] .eg-navbar .nav-target { padding-left: .6rem; padding-right: .6rem; }
-    html[lang="en"] .eg-navbar .navbar-brand { margin-right: .5rem; }
+    .eg-navbar .nav-settings-label, .eg-navbar .nav-target-label { display: none; }
+    .eg-navbar .navbar-nav .nav-link { padding: .4rem .55rem; font-size: .88rem; }
+    .eg-navbar .nav-target { padding-left: .6rem; padding-right: .6rem; }
+    .eg-navbar .navbar-brand { margin-right: .5rem; }
+    .eg-navbar .navbar-nav { gap: .15rem; }
+}
+@media (min-width: 992px) and (max-width: 1420px) {
+    .eg-navbar .eg-brand-sub { display: none; }
+    .eg-navbar .navbar-nav .nav-link { padding: .35rem .42rem; font-size: .84rem; }
+    .eg-navbar .navbar-nav { gap: .05rem; }
+    .eg-navbar .lang-switch a { min-width: 1.7rem; padding: 0 .4rem; }
+}
+@media (min-width: 992px) and (max-width: 1500px) {
+    .eg-navbar > .container { max-width: 100%; padding-left: .75rem; padding-right: .75rem; }
+}
+@media (min-width: 992px) and (max-width: 1260px) {
+    .eg-navbar .navbar-nav .nav-link { padding: .3rem .32rem; font-size: .8rem; }
+    .eg-navbar .navbar-brand > span:last-child { font-size: .95rem; }
+    .eg-navbar .theme-toggle, .eg-navbar .lang-switch { height: 2rem; }
+    .eg-navbar .theme-toggle { width: 2rem; }
+    .eg-navbar .navbar-nav.align-items-lg-center { gap: .1rem !important; }
+}
+@media (min-width: 992px) and (max-width: 1260px) {
+    html[lang="en"] .eg-navbar .navbar-nav .nav-link { padding: .3rem .24rem; font-size: .78rem; }
 }
