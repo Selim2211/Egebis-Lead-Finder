@@ -1,0 +1,17 @@
+{
+  "Çevir": "Translate",
+  "Çevriliyor...": "Translating...",
+  "↶ Çeviriyi geri al": "↶ Undo translation",
+  "Konuyu ve metni seçtiğiniz dile çevirir": "Translates the subject and text into the language you choose",
+  "Konu ve metin, görseller ve {DEĞİŞKENLER} korunarak seçtiğiniz dile çevrilir. Göndermeden önce kontrol edin.": "The subject and text are translated into the language you choose; images and {VARIABLES} are preserved. Check it before sending.",
+  "Çevrilecek metin yok.": "There is no text to translate.",
+  "Çeviri yapılamadı.": "The translation could not be done.",
+  "Çeviri yapılamadı: ": "The translation could not be done: ",
+  "Çeviri hazır. Göndermeden önce gözden geçirin.": "Translation ready. Review it before sending.",
+  "Desteklenmeyen dil.": "Unsupported language.",
+  "Metin çeviri için çok uzun.": "The text is too long to translate.",
+  "Çeviri boş döndü.": "The translation came back empty.",
+  "Çeviri yanıtı okunamadı.": "The translation response could not be read.",
+  "E-posta metni çevrildi": "Email text translated",
+  "E-posta metni çevrildi: {0}": "Email text translated: {0}"
+}

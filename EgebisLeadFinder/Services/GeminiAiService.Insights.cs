@@ -10,14 +10,14 @@ public partial class GeminiAiService : IInsightAi
 {
     /// <summary>Semali JSON istegi atar; yanit metnini (JSON) veya hata mesajini doner.</summary>
     private async Task<(string? Json, string? Error)> AskJsonAsync(string systemPrompt, string userText, object schema,
-        double temperature, CancellationToken ct)
+        double temperature, CancellationToken ct, bool localize = true)
     {
         var apiKey = await _settings.GetAsync(SettingKeys.GeminiApiKey, ct);
         if (string.IsNullOrWhiteSpace(apiKey)) return (null, new MissingApiKeyException("Gemini").Message);
 
         var payload = new
         {
-            system_instruction = new { parts = new[] { new { text = Loc.Prompt(systemPrompt) } } },
+            system_instruction = new { parts = new[] { new { text = localize ? Loc.Prompt(systemPrompt) : systemPrompt } } },
             contents = new[] { new { role = "user", parts = new[] { new { text = userText } } } },
             generationConfig = new { temperature, responseMimeType = "application/json", responseSchema = schema }
         };

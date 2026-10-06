@@ -42,6 +42,7 @@ public class AuditActionFilter : IAsyncActionFilter
             ["Email.Send"] = ("email.send", "E-posta gönderildi"),
             ["Email.MarkSent"] = ("email.marksent", "E-posta gönderildi olarak işaretlendi"),
             ["Email.Draft"] = ("email.aidraft", "AI ile e-posta taslağı yazıldı"),
+            ["Email.Translate"] = ("email.translate", "E-posta metni çevrildi"),
             ["Email.UploadImage"] = ("email.image", "E-posta görseli yüklendi"),
             ["Email.RemoveFromLibrary"] = ("email.image.delete", "E-posta görseli kaldırıldı"),
             ["Lead.UpdateStatus"] = ("lead.status", "Lead durumu değişti"),

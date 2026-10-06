@@ -168,6 +168,26 @@
                         </span>
                     </div>
 
+                    <div class="translate-bar mb-3">
+                        <div class="dropdown">
+                            <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" id="translateButton"
+                                    data-bs-toggle="dropdown" aria-expanded="false" data-url="@Url.Action("Translate")"
+                                    title="Konuyu ve metni seçtiğiniz dile çevirir">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1" aria-hidden="true"><path d="m5 8 6 6" /><path d="m4 14 6-6 2-3" /><path d="M2 5h12" /><path d="M7 2h1" /><path d="m22 22-5-10-5 10" /><path d="M14 18h6" /></svg>
+                                <span data-translate-label>Çevir</span>
+                            </button>
+                            <ul class="dropdown-menu" translate="no">
+                                <li><button type="button" class="dropdown-item" data-lang="en">English</button></li>
+                                <li><button type="button" class="dropdown-item" data-lang="de">Deutsch</button></li>
+                                <li><button type="button" class="dropdown-item" data-lang="tr">Türkçe</button></li>
+                                <li><button type="button" class="dropdown-item" data-lang="fr">Français</button></li>
+                                <li><button type="button" class="dropdown-item" data-lang="es">Español</button></li>
+                            </ul>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-link" id="translateUndo" hidden>↶ Çeviriyi geri al</button>
+                        <span class="small text-muted-2">Konu ve metin, görseller ve {DEĞİŞKENLER} korunarak seçtiğiniz dile çevrilir. Göndermeden önce kontrol edin.</span>
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label">Konu</label>
                         <input class="form-control" name="subject" id="subject" value="@Model.Subject" />
@@ -274,6 +294,54 @@
                 btn.disabled = false;
                 btn.innerHTML = btn.dataset.used ? '↻ Yeniden yaz' : original;
             }
+        });
+    })();
+
+    (function () {
+        var btn = document.getElementById('translateButton');
+        if (!btn) return;
+        var undo = document.getElementById('translateUndo');
+        var label = btn.querySelector('[data-translate-label]');
+        var token = document.querySelector('#sendForm input[name="__RequestVerificationToken"]').value;
+        var before = null;
+
+        document.querySelectorAll('[data-lang]').forEach(function (item) {
+            item.addEventListener('click', async function () {
+                var editor = document.getElementById('bodyEditor');
+                var subject = document.getElementById('subject');
+                if (!editor.innerText.trim()) { egToast.error('Çevrilecek metin yok.'); return; }
+                var snapshot = { subject: subject.value, html: editor.innerHTML };
+                var original = label.textContent;
+                btn.disabled = true;
+                label.textContent = 'Çevriliyor...';
+                try {
+                    var body = new URLSearchParams({ subject: subject.value, bodyHtml: editor.innerHTML, target: item.dataset.lang, __RequestVerificationToken: token });
+                    var res = await fetch(btn.dataset.url, { method: 'POST', body: body, headers: { 'Accept': 'application/json' } });
+                    var data = await res.json();
+                    if (!data.success) { egToast.error(data.error || 'Çeviri yapılamadı.'); return; }
+                    before = snapshot;
+                    subject.value = data.subject;
+                    editor.innerHTML = data.bodyHtml;
+                    editor.dispatchEvent(new Event('input', { bubbles: true }));
+                    undo.hidden = false;
+                    egToast.success('Çeviri hazır. Göndermeden önce gözden geçirin.');
+                } catch (e) {
+                    egToast.error('Çeviri yapılamadı: ' + e.message);
+                } finally {
+                    btn.disabled = false;
+                    label.textContent = original;
+                }
+            });
+        });
+
+        undo.addEventListener('click', function () {
+            if (!before) return;
+            document.getElementById('subject').value = before.subject;
+            var editor = document.getElementById('bodyEditor');
+            editor.innerHTML = before.html;
+            editor.dispatchEvent(new Event('input', { bubbles: true }));
+            before = null;
+            undo.hidden = true;
         });
     })();
 

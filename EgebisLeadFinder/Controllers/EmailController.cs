@@ -80,6 +80,26 @@ public class EmailController : Controller
         });
     }
 
+    /// <summary>"Çevir": editördeki konu ve metni seçilen dile çevirir (en, de, tr, fr, es); gönderilmez.</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Translate(string? subject, string? bodyHtml, string? target,
+        [FromServices] IMailTranslatorAi translator, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(bodyHtml)) return Json(new { success = false, error = "Çevrilecek metin yok." });
+        if (!MailLanguages.Targets.ContainsKey(target ?? string.Empty)) return Json(new { success = false, error = "Desteklenmeyen dil." });
+
+        var clean = EmailHtml.Sanitize(bodyHtml);
+        if (clean.Length + (subject?.Length ?? 0) > MailLanguages.MaxLength)
+            return Json(new { success = false, error = "Metin çeviri için çok uzun." });
+
+        var result = await translator.TranslateMailAsync(subject ?? string.Empty, clean, target!, ct);
+        if (!result.Success) return Json(new { success = false, error = result.Error });
+
+        EgebisLeadFinder.Services.Auth.AuditActionFilter.SetAuditSummary(HttpContext, $"E-posta metni çevrildi: {target!.ToLowerInvariant()}");
+        return Json(new { success = true, subject = result.Subject, bodyHtml = EmailHtml.Sanitize(result.BodyHtml) });
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Send(int leadId, int templateId, string subject, string body,

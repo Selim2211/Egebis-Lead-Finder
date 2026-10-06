@@ -4590,3 +4590,6 @@ a.pager-btn:hover { border-color: var(--eg-mailed-border); background: var(--eg-
 .auth-lang .lang-switch { border-color: var(--eg-border-strong, #cbd5e1); background: transparent; }
 .auth-lang .lang-switch a { color: var(--eg-muted, #64748b); }
 .auth-lang .lang-switch a.is-active { background: #0b1c33; color: #fff; }
+
+/* Mail çeviri çubuğu */
+.translate-bar { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem .75rem; }
