@@ -565,18 +565,18 @@ public class SettingsViewModel
     public int GeminiCallsThisWeek { get; set; }
     public int GeminiCallsThisMonth { get; set; }
 
-    /// <summary>Otomatik hesaplanan cagri basina tahmini maliyet (TL). Kullanici girmez.</summary>
-    public decimal GeminiCostPerCallTry { get; set; }
+    /// <summary>Maliyet hesabinda kullanilan USD/TRY kuru (Ayarlar'dan girilir, varsayilan 50).</summary>
+    public decimal UsdTryRate { get; set; } = 50m;
 
-    /// <summary>Maliyet hesabinda kullanilan USD/TRY kuru.</summary>
-    public decimal UsdTryRate { get; set; }
+    /// <summary>Gercek token sayilarindan hesaplanan TL maliyeti.</summary>
+    public decimal GeminiCostToday { get; set; }
+    public decimal GeminiCostThisWeek { get; set; }
+    public decimal GeminiCostThisMonth { get; set; }
 
-    /// <summary>true: kur bu istekte canli cekildi. false: kur cekilemedi, son bilinen/varsayilan deger kullanildi.</summary>
-    public bool UsdTryRateIsLive { get; set; }
-
-    public decimal GeminiCostToday => Math.Round(GeminiCallsToday * GeminiCostPerCallTry, 2);
-    public decimal GeminiCostThisWeek => Math.Round(GeminiCallsThisWeek * GeminiCostPerCallTry, 2);
-    public decimal GeminiCostThisMonth => Math.Round(GeminiCallsThisMonth * GeminiCostPerCallTry, 2);
+    /// <summary>Bu ayki cagrilardan kaci gercek token sayisiyla, kaci (kayit oncesi) tahminle hesaplandi.</summary>
+    public int GeminiCostMeasuredCalls { get; set; }
+    public int GeminiCostEstimatedCalls { get; set; }
+    public string GeminiModelForCost { get; set; } = string.Empty;
 }
 
 /// <summary>Favoriler ekrani: liste secici + secili listenin firmalari.</summary>

@@ -55,6 +55,9 @@ public static class SettingKeys
     /// </summary>
     public const string LastKnownUsdTryRate = "Ai:LastKnownUsdTryRate";
 
+    /// <summary>Gemini maliyetini TL'ye cevirirken kullanilan USD/TRY kuru (elle girilir, varsayilan 50).</summary>
+    public const string UsdTryRate = "Ai:UsdTryRate";
+
     /// <summary>Firma aramasinda islenecek/getirilecek azami firma (skora gore en yukseklerden).</summary>
     public const string SearchMaxCompanies = "Search:MaxCompanies";
 
@@ -151,7 +154,7 @@ public static class SettingKeys
     public static readonly string[] All =
     {
         LeadTitleKeywords, SerperApiKey, GeminiApiKey, GeminiModel, ApolloApiKey, SerperCreditLimit,
-        GeminiCostPerCallTry, LastKnownUsdTryRate, SearchMaxCompanies, SearchDefaultCountry, SearchRegion, FollowUpAfterDays, IcpProfile, BusinessProfile, ExtraBlockedDomains,
+        GeminiCostPerCallTry, LastKnownUsdTryRate, UsdTryRate, SearchMaxCompanies, SearchDefaultCountry, SearchRegion, FollowUpAfterDays, IcpProfile, BusinessProfile, ExtraBlockedDomains,
         SmtpFromAddress, SmtpFromName, SmtpHost, SmtpPort, SmtpUsername, SmtpPassword, SmtpSecurity,
         SalesforceConsumerKey, SalesforceConsumerSecret, SalesforceUsername, SalesforcePassword,
         SalesforceSecurityToken, SalesforceLoginUrl, SalesforceRefreshToken, SalesforceInstanceUrl,

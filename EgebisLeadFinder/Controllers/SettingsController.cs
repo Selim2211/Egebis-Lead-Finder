@@ -18,7 +18,6 @@ public class SettingsController : Controller
     private readonly ISettingsService _settings;
     private readonly IConfiguration _configuration;
     private readonly IApiUsageTracker _usage;
-    private readonly IExchangeRateService _exchangeRates;
     private readonly AiOptions _aiOptions;
     private readonly SearchOptions _searchOptions;
 
@@ -26,14 +25,12 @@ public class SettingsController : Controller
         ISettingsService settings,
         IConfiguration configuration,
         IApiUsageTracker usage,
-        IExchangeRateService exchangeRates,
         IOptions<AiOptions> aiOptions,
         IOptions<SearchOptions> searchOptions)
     {
         _settings = settings;
         _configuration = configuration;
         _usage = usage;
-        _exchangeRates = exchangeRates;
         _aiOptions = aiOptions.Value;
         _searchOptions = searchOptions.Value;
     }
@@ -67,6 +64,7 @@ public class SettingsController : Controller
                 : null,
             [SettingKeys.GeminiMonthlyLimit] = form.GeminiMonthlyLimit > 0 ? form.GeminiMonthlyLimit.ToString() : null,
             [SettingKeys.ApolloCreditLimit] = form.ApolloCreditLimit > 0 ? form.ApolloCreditLimit.ToString() : null,
+            [SettingKeys.UsdTryRate] = form.UsdTryRate > 0 ? form.UsdTryRate.ToString(System.Globalization.CultureInfo.InvariantCulture) : null,
             [SettingKeys.AuditRetentionDays] = form.AuditRetentionDays is >= 30 and <= 3650 ? form.AuditRetentionDays.ToString() : null,
             [SettingKeys.SearchMaxCompanies] = form.SearchMaxCompanies > 0
                 ? Math.Min(form.SearchMaxCompanies, SettingKeys.SearchMaxCompaniesUpperLimit).ToString()
@@ -201,31 +199,18 @@ public class SettingsController : Controller
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(3));
 
-        // Gemini cagri basina TL maliyeti kullaniciya sorulmaz: sabit fiyat
-        // varsayimlari + canli USD/TRY kuruyla otomatik hesaplanir. Kur
-        // alinamazsa son basarili cekimdeki deger (veya makul bir varsayilan) kullanilir.
-        var liveRate = await _exchangeRates.GetUsdTryRateAsync(ct);
-        var rateIsLive = liveRate is > 0;
-
-        decimal usdTryRate;
-        if (rateIsLive)
-        {
-            usdTryRate = liveRate!.Value;
-            await _settings.SetManyAsync(new Dictionary<string, string?>
-            {
-                [SettingKeys.LastKnownUsdTryRate] = usdTryRate.ToString(System.Globalization.CultureInfo.InvariantCulture)
-            }, ct);
-        }
-        else
-        {
-            usdTryRate = decimal.TryParse(
-                Stored(SettingKeys.LastKnownUsdTryRate),
-                System.Globalization.NumberStyles.Any,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out var cached) && cached > 0 ? cached : 41m;
-        }
-
-        var geminiCostPerCall = GeminiCostEstimator.EstimateCostPerCallTry(_aiOptions, usdTryRate);
+        // Gemini maliyeti: yanittaki gercek token sayilari x modelin fiyati x elle girilen USD/TRY kuru (varsayilan 50).
+        var usdTryRate = GeminiPricing.ParseRate(Stored(SettingKeys.UsdTryRate));
+        var currentModel = Stored(SettingKeys.GeminiModel) ?? _aiOptions.GeminiModel;
+        var weekStart = today.AddDays(-6);
+        var monthStart = new DateOnly(today.Year, today.Month, 1);
+        var tokenRows = await _usage.GetGeminiTokensAsync(monthStart < weekStart ? monthStart : weekStart, today, ct);
+        var callsToday = await _usage.GetRangeCountAsync(GeminiAiService.UsageProvider, today, today, ct);
+        var callsWeek = await _usage.GetRangeCountAsync(GeminiAiService.UsageProvider, weekStart, today, ct);
+        var callsMonth = await _usage.GetRangeCountAsync(GeminiAiService.UsageProvider, monthStart, today, ct);
+        var costToday = GeminiCostCalculator.Compute(tokenRows.Where(r => r.Date == today), callsToday, usdTryRate, _aiOptions, currentModel, today);
+        var costWeek = GeminiCostCalculator.Compute(tokenRows.Where(r => r.Date >= weekStart), callsWeek, usdTryRate, _aiOptions, currentModel, today);
+        var costMonth = GeminiCostCalculator.Compute(tokenRows.Where(r => r.Date >= monthStart), callsMonth, usdTryRate, _aiOptions, currentModel, today);
 
         var catalog = HttpContext.RequestServices.GetRequiredService<IGeminiModelCatalog>();
         var (geminiModels, geminiModelsError) = await catalog.ListAsync(ct);
@@ -297,9 +282,13 @@ public class SettingsController : Controller
                 GeminiAiService.UsageProvider, today.AddDays(-6), today, ct),
             GeminiCallsThisMonth = await _usage.GetRangeCountAsync(
                 GeminiAiService.UsageProvider, new DateOnly(today.Year, today.Month, 1), today, ct),
-            GeminiCostPerCallTry = geminiCostPerCall,
+            GeminiCostToday = costToday.Try,
+            GeminiCostThisWeek = costWeek.Try,
+            GeminiCostThisMonth = costMonth.Try,
+            GeminiCostMeasuredCalls = costMonth.MeasuredCalls,
+            GeminiCostEstimatedCalls = costMonth.EstimatedCalls,
+            GeminiModelForCost = currentModel,
             UsdTryRate = usdTryRate,
-            UsdTryRateIsLive = rateIsLive,
 
             StatusMessage = TempData["SettingsSaved"] as string
         };

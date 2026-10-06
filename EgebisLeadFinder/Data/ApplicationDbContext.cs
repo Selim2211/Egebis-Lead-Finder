@@ -23,6 +23,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<ApiUsage> ApiUsages => Set<ApiUsage>();
     public DbSet<ApiUsageDaily> ApiUsageDailies => Set<ApiUsageDaily>();
+    public DbSet<GeminiTokenDaily> GeminiTokenDailies => Set<GeminiTokenDaily>();
     public DbSet<SearchProfile> SearchProfiles => Set<SearchProfile>();
     public DbSet<CompanySearchProfile> CompanySearchProfiles => Set<CompanySearchProfile>();
     public DbSet<SentEmail> SentEmails => Set<SentEmail>();
@@ -150,6 +151,7 @@ public class ApplicationDbContext : DbContext
 
         // Saglayici + gun basina tek satir.
         b.Entity<ApiUsageDaily>().HasIndex(x => new { x.Provider, x.Date }).IsUnique();
+        b.Entity<GeminiTokenDaily>().HasIndex(x => new { x.Date, x.Model }).IsUnique();
 
         b.Entity<Company>(e =>
         {

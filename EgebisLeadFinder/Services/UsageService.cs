@@ -42,6 +42,9 @@ public class ProviderUsage
     public string? LiveInfo { get; init; }
     public string? Note { get; init; }
     public decimal? EstimatedCostTry { get; init; }
+
+    /// <summary>Maliyetin nasil hesaplandigi (kur, gercek/tahmini cagri, model).</summary>
+    public string? CostNote { get; init; }
 }
 
 /// <summary>Apollo'nun canli kredi durumu (credit_usage_stats).</summary>
@@ -132,9 +135,10 @@ public class UsageService
         // --- Gemini: aylik cagri limiti (Ayarlar'dan); ucretsiz katmanda gunluk kota da vardir.
         var gemini = await Counts(GeminiAiService.UsageProvider);
         var geminiLimit = Setting(await _settings.GetAsync(SettingKeys.GeminiMonthlyLimit, ct), 0);
-        var usdTry = decimal.TryParse(await _settings.GetAsync(SettingKeys.LastKnownUsdTryRate, ct),
-            System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var rate) && rate > 0 ? rate : 41m;
-        var costPerCall = GeminiCostEstimator.EstimateCostPerCallTry(_aiOptions, usdTry);
+        var usdTry = GeminiPricing.ParseRate(await _settings.GetAsync(SettingKeys.UsdTryRate, ct));
+        var currentModel = await _settings.GetAsync(SettingKeys.GeminiModel, ct) ?? _aiOptions.GeminiModel;
+        var monthCost = GeminiCostCalculator.Compute(await _usage.GetGeminiTokensAsync(monthStart, today, ct), gemini.Month, usdTry,
+            _aiOptions, currentModel, today);
         var geminiItem = new ProviderUsage
         {
             Key = "gemini",
@@ -147,7 +151,10 @@ public class UsageService
             Level = Combine(Evaluate(gemini.Month, geminiLimit), gemini.Row.LastErrorAt, now),
             LastErrorAt = gemini.Row.LastErrorAt, LastError = gemini.Row.LastError,
             Last30Days = gemini.Series,
-            EstimatedCostTry = costPerCall > 0 ? Math.Round(gemini.Month * costPerCall, 2) : null,
+            EstimatedCostTry = monthCost.Try,
+            CostNote = $"1 USD = {usdTry:0.##} TL · {monthCost.MeasuredCalls} çağrı gerçek token sayısıyla (girdi {monthCost.InputTokens:N0}, çıktı {monthCost.OutputTokens:N0})"
+                + (monthCost.EstimatedCalls > 0 ? $", {monthCost.EstimatedCalls} çağrı (token kaydı öncesi) tahmini" : string.Empty)
+                + $" · model: {currentModel}",
             Note = geminiLimit == 0
                 ? "Aylık limit tanımlı değil; Ayarlar'dan girerseniz yüzde ve uyarı gösterilir. Google bakiye sorgulama API'si sunmuyor."
                 : "Google bakiye sorgulama API'si sunmuyor; sayaç uygulamanın yaptığı çağrılardan hesaplanır."

@@ -121,6 +121,32 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         }
     }
 
+    /// <summary>Yanittaki usageMetadata'dan gercek token sayilarini kaydeder (maliyet hesabi icin).</summary>
+    private async Task RecordTokensAsync(string url, string body, CancellationToken ct)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (!doc.RootElement.TryGetProperty("usageMetadata", out var meta)) return;
+
+            long Read(string name) => meta.TryGetProperty(name, out var v) && v.TryGetInt64(out var n) ? n : 0;
+            var input = Read("promptTokenCount");
+            // Dusunme (thinking) tokenleri de cikti fiyatiyla faturalanir.
+            var output = Read("candidatesTokenCount") + Read("thoughtsTokenCount");
+
+            var model = url;
+            var colon = model.LastIndexOf(':');
+            if (colon > 0) model = model[..colon];
+            model = model[(model.LastIndexOf('/') + 1)..];
+
+            await _usage.RecordGeminiTokensAsync(model, input, output, ct);
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+        {
+            _logger.LogDebug(ex, "Gemini usageMetadata okunamadı.");
+        }
+    }
+
     /// <summary>
     /// Gemini'nin ucretsiz katmani dakikalik istek limiti uygular ve limit asilinca
     /// 429 doner. Bu gecici bir durumdur, artan bekleme ile tekrar denenir.
@@ -160,6 +186,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
             if (response.IsSuccessStatusCode)
             {
                 await _usage.IncrementAsync(UsageProvider, ct);
+                await RecordTokensAsync(url, body, ct);
                 return (body, null);
             }
 

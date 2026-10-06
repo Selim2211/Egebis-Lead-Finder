@@ -21,6 +21,12 @@ public interface IApiUsageTracker
     /// <summary>Kota doldu / anahtar gecersiz gibi hatayi kaydeder (API Kullanimi ekrani).</summary>
     Task RecordErrorAsync(string provider, string message, CancellationToken ct = default) => Task.CompletedTask;
 
+    /// <summary>Bir Gemini cagrisinin gercek token sayilarini (gun + model bazinda) toplar.</summary>
+    Task RecordGeminiTokensAsync(string model, long inputTokens, long outputTokens, CancellationToken ct = default) => Task.CompletedTask;
+
+    /// <summary>Tarih araligindaki (dahil) Gemini token kayitlari.</summary>
+    Task<List<GeminiTokenDaily>> GetGeminiTokensAsync(DateOnly from, DateOnly to, CancellationToken ct = default) => Task.FromResult(new List<GeminiTokenDaily>());
+
     /// <summary>Son 'days' gunun gunluk sayilari (bugun dahil, eskiden yeniye).</summary>
     Task<int[]> GetDailySeriesAsync(string provider, int days, CancellationToken ct = default) => Task.FromResult(new int[days]);
 }
@@ -105,6 +111,52 @@ public class ApiUsageTracker : IApiUsageTracker
             // Sayac kritik degil; API cagrisinin kendisini engellememeli.
             _logger.LogWarning(ex, "API kullanım sayacı güncellenemedi: {Provider}", provider);
         }
+    }
+
+    public async Task RecordGeminiTokensAsync(string model, long inputTokens, long outputTokens, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var today = TurkeyToday;
+            model = model.Length > 100 ? model[..100] : model;
+
+            var updated = await db.GeminiTokenDailies
+                .Where(x => x.Date == today && x.Model == model)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(x => x.Calls, x => x.Calls + 1)
+                    .SetProperty(x => x.InputTokens, x => x.InputTokens + inputTokens)
+                    .SetProperty(x => x.OutputTokens, x => x.OutputTokens + outputTokens)
+                    .SetProperty(x => x.UpdatedAt, DateTime.UtcNow), ct);
+
+            if (updated == 0)
+            {
+                try
+                {
+                    db.GeminiTokenDailies.Add(new GeminiTokenDaily
+                    {
+                        Date = today, Model = model, Calls = 1, InputTokens = inputTokens, OutputTokens = outputTokens
+                    });
+                    await db.SaveChangesAsync(ct);
+                }
+                catch (DbUpdateException)
+                {
+                    // Cakisma: ayni anda baska bir istek satiri olusturdu; bu cagri sayilmaz (kritik degil).
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Gemini token kaydı yazılamadı.");
+        }
+    }
+
+    public async Task<List<GeminiTokenDaily>> GetGeminiTokensAsync(DateOnly from, DateOnly to, CancellationToken ct = default)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await db.GeminiTokenDailies.AsNoTracking().Where(x => x.Date >= from && x.Date <= to).ToListAsync(ct);
     }
 
     public async Task<int> GetRangeCountAsync(string provider, DateOnly from, DateOnly to, CancellationToken ct = default)

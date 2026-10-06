@@ -409,6 +409,11 @@
                         <input class="form-control" type="number" min="0" asp-for="ApolloCreditLimit" />
                     </div>
                     <div class="col-sm-4">
+                        <label class="form-label">USD / TL kuru</label>
+                        <input class="form-control" type="number" min="1" step="0.01" asp-for="UsdTryRate" />
+                        <div class="form-text">Gemini maliyetini TL'ye çevirmek için (varsayılan 50).</div>
+                    </div>
+                    <div class="col-sm-4">
                         <label class="form-label">Audit log saklama (gün)</label>
                         <input class="form-control" type="number" min="30" max="3650" asp-for="AuditRetentionDays" />
                     </div>
@@ -563,24 +568,12 @@
                 </div>
 
                 <div class="cell-sub">
-                    Kur: 1 USD = @Model.UsdTryRate.ToString("0.00") TL
-                    @if (Model.UsdTryRateIsLive)
-                    {
-                        <span class="tag tag-success ms-1">canlı</span>
-                    }
-                    else
-                    {
-                        <span class="tag tag-muted ms-1">kur alınamadı, son bilinen değer</span>
-                    }
+                    Kur: 1 USD = @Model.UsdTryRate.ToString("0.00") TL · model: @Model.GeminiModelForCost
+                </div>
+                <div class="cell-sub">
+                    Maliyet, Gemini'nin bildirdiği gerçek token sayılarından hesaplanır (@Model.GeminiCostMeasuredCalls çağrı)@(Model.GeminiCostEstimatedCalls > 0 ? $"; token kaydından önceki {Model.GeminiCostEstimatedCalls} çağrı tahmini" : "").
                 </div>
                 <div class="cell-sub">Maliyet tahmini, gerçek fatura değildir.</div>
-                @if (Model.GeminiCurrentModel != Model.GeminiDefaultModel)
-                {
-                    <div class="cell-sub text-warning">
-                        Tahmin @Model.GeminiDefaultModel fiyatıyla hesaplanıyor; seçili model (@Model.GeminiCurrentModel)
-                        farklı fiyatlandırılabilir.
-                    </div>
-                }
             </div>
         </div>
     </div>

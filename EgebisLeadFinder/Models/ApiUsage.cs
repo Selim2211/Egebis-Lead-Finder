@@ -47,3 +47,25 @@ public class ApiUsageDaily
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
+
+/// <summary>
+/// Gemini'nin yanitindaki gercek token sayilari (usageMetadata), gun ve model bazinda. Maliyet bunlardan hesaplanir.
+/// Cikti tokeni = yanit + dusunme (thinking) tokenleri; ikisi de cikti fiyatiyla faturalanir.
+/// </summary>
+public class GeminiTokenDaily
+{
+    public int Id { get; set; }
+
+    public DateOnly Date { get; set; }
+
+    [Required, MaxLength(100)]
+    public string Model { get; set; } = string.Empty;
+
+    public int Calls { get; set; }
+
+    public long InputTokens { get; set; }
+
+    public long OutputTokens { get; set; }
+
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}

@@ -119,6 +119,10 @@
                     @if (p.EstimatedCostTry is decimal cost)
                     {
                         <div class="small mt-2">Bu ayın tahmini maliyeti: <strong>≈ @cost.ToString("0.00") TL</strong></div>
+                        @if (!string.IsNullOrEmpty(p.CostNote))
+                        {
+                            <div class="small text-muted-2">@p.CostNote</div>
+                        }
                     }
                     @if (p.ResetAt is not null)
                     {

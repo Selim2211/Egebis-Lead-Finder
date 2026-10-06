@@ -1,0 +1,10 @@
+{
+  "USD / TL kuru": "USD / TRY rate",
+  "Gemini maliyetini TL'ye çevirmek için (varsayılan 50).": "Used to convert the Gemini cost to TRY (default 50).",
+  "Kur: 1 USD = {0} TL · model: {1}": "Rate: 1 USD = {0} TL · model: {1}",
+  "Maliyet, Gemini'nin bildirdiği gerçek token sayılarından hesaplanır ({0} çağrı).": "The cost is calculated from the real token counts reported by Gemini ({0} calls).",
+  "Maliyet, Gemini'nin bildirdiği gerçek token sayılarından hesaplanır ({0} çağrı); token kaydından önceki {1} çağrı tahmini.": "The cost is calculated from the real token counts reported by Gemini ({0} calls); {1} calls from before token tracking are estimated.",
+  "Maliyet tahmini, gerçek fatura değildir.": "The cost estimate is not an actual invoice.",
+  "1 USD = {0} TL · {1} çağrı gerçek token sayısıyla (girdi {2}, çıktı {3}) · model: {4}": "1 USD = {0} TL · {1} calls with real token counts (input {2}, output {3}) · model: {4}",
+  "1 USD = {0} TL · {1} çağrı gerçek token sayısıyla (girdi {2}, çıktı {3}), {4} çağrı (token kaydı öncesi) tahmini · model: {5}": "1 USD = {0} TL · {1} calls with real token counts (input {2}, output {3}), {4} calls (before token tracking) estimated · model: {5}"
+}

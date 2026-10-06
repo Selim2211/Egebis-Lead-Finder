@@ -55,16 +55,16 @@ public class AiOptions
     // degistirirse buradan guncellenir.
 
     /// <summary>Gemini Flash girdi fiyati, 1 milyon token basina USD.</summary>
-    public decimal InputPricePerMillionTokensUsd { get; set; } = 0.10m;
+    public decimal InputPricePerMillionTokensUsd { get; set; } = 0.75m;
 
     /// <summary>Gemini Flash cikti fiyati, 1 milyon token basina USD.</summary>
-    public decimal OutputPricePerMillionTokensUsd { get; set; } = 0.40m;
+    public decimal OutputPricePerMillionTokensUsd { get; set; } = 3.75m;
 
-    /// <summary>Ortalama girdi karakteri (tum site metni degil; MaxInputChars ust siniridir).</summary>
-    public int EstimatedInputCharsPerCall { get; set; } = 4000;
+    /// <summary>Token kaydi olmayan eski cagrilar icin ortalama girdi tokeni (ucret tahmini).</summary>
+    public int EstimatedInputTokensPerCall { get; set; } = 5000;
 
-    /// <summary>responseSchema JSON ciktisinin ortalama token sayisi tahmini.</summary>
-    public int EstimatedOutputTokensPerCall { get; set; } = 400;
+    /// <summary>Token kaydi olmayan eski cagrilar icin ortalama cikti (yanit + dusunme) tokeni.</summary>
+    public int EstimatedOutputTokensPerCall { get; set; } = 1500;
 }
 
 public class ScraperOptions
