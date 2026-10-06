@@ -1,5 +1,6 @@
 using EgebisLeadFinder.Configuration;
 using EgebisLeadFinder.Data;
+using EgebisLeadFinder.Localization;
 using EgebisLeadFinder.Models;
 using EgebisLeadFinder.Services;
 using EgebisLeadFinder.Services.Auth;
@@ -13,6 +14,9 @@ using Microsoft.EntityFrameworkCore;
 using Polly;
 using Polly.Extensions.Http;
 using Serilog;
+
+// Arka plan işleri (mail dizisi vb.) istek dışında çalışır: arayüz dili varsayılan olarak Türkçe kalır.
+System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = new System.Globalization.CultureInfo("tr-TR");
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -283,6 +287,9 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+// Arayüz dili (cookie); İngilizce'de HTML/JSON/JS çıktısını sözlükten çevirir.
+Loc.TrackMissing = app.Environment.IsDevelopment();
+app.UseMiddleware<LocalizationMiddleware>();
 app.UseRouting();
 app.UseSession();
 app.UseAuthentication();
@@ -321,6 +328,8 @@ app.UseAuthorization();
 app.MapStaticAssets();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+if (app.Environment.IsDevelopment())
+    app.MapGet("/_i18n/missing", () => Results.Text(string.Join("\n", Loc.MissingTexts), "text/plain; charset=utf-8")).AllowAnonymous();
 
 app.MapControllerRoute(
     name: "default",

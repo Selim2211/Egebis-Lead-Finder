@@ -1,0 +1,9 @@
+@using EgebisLeadFinder.Localization
+@{
+    var back = Context.Request.Path + Context.Request.QueryString;
+    var english = Loc.IsEnglish;
+}
+<div class="lang-switch" role="group" aria-label="Language" translate="no">
+    <a class="@(english ? "" : "is-active")" href="@Url.Action("Set", "Language", new { lang = "tr", returnUrl = back })" title="Türkçe" hreflang="tr">TR</a>
+    <a class="@(english ? "is-active" : "")" href="@Url.Action("Set", "Language", new { lang = "en", returnUrl = back })" title="English" hreflang="en">EN</a>
+</div>

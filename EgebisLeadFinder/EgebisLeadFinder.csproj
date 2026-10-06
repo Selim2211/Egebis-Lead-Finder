@@ -12,6 +12,8 @@
     <Content Update="Data\reference\company-lists.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Update="Data\reference\nace-rev2-tr.json" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Data\reference\*.txt" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Arayüz dili sözlüğü (Türkçe -> İngilizce). -->
+    <Content Update="Resources\i18n\*.en.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

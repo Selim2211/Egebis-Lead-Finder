@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using ClosedXML.Excel;
+using EgebisLeadFinder.Localization;
 using EgebisLeadFinder.Models;
 
 namespace EgebisLeadFinder.Services;
@@ -81,10 +82,10 @@ public static class ExportService
 
         foreach (var table in tables)
         {
-            var sheet = workbook.Worksheets.Add(table.Name);
+            var sheet = workbook.Worksheets.Add(Loc.T(table.Name));
 
             for (var c = 0; c < table.Headers.Length; c++)
-                sheet.Cell(1, c + 1).Value = table.Headers[c];
+                sheet.Cell(1, c + 1).Value = Loc.T(table.Headers[c]);
 
             for (var r = 0; r < table.Rows.Count; r++)
             {
@@ -98,7 +99,7 @@ public static class ExportService
                         case int i: cell.Value = i; break;
                         case DateTime d: cell.Value = d; cell.Style.DateFormat.Format = "dd.MM.yyyy HH:mm"; break;
                         // Metin her zaman metin olarak yazilir: "=..." ile baslayan deger formul olmaz.
-                        default: cell.Value = Clean(row[c]!.ToString()); break;
+                        default: cell.Value = Clean(Loc.T(row[c]!.ToString() ?? string.Empty)); break;
                     }
                 }
             }
@@ -120,9 +121,9 @@ public static class ExportService
     public static byte[] ToCsv(ExportTable table)
     {
         var sb = new StringBuilder();
-        sb.AppendLine(string.Join(';', table.Headers.Select(Escape)));
+        sb.AppendLine(string.Join(';', table.Headers.Select(h => Escape(Loc.T(h)))));
         foreach (var row in table.Rows)
-            sb.AppendLine(string.Join(';', row.Select(v => Escape(Format(v)))));
+            sb.AppendLine(string.Join(';', row.Select(v => Escape(Loc.T(Format(v))))));
 
         return Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
     }

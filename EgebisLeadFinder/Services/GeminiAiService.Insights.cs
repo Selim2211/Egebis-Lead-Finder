@@ -1,5 +1,6 @@
 using System.Text.Json;
 using EgebisLeadFinder.Configuration;
+using EgebisLeadFinder.Localization;
 using EgebisLeadFinder.Models;
 
 namespace EgebisLeadFinder.Services;
@@ -16,7 +17,7 @@ public partial class GeminiAiService : IInsightAi
 
         var payload = new
         {
-            system_instruction = new { parts = new[] { new { text = systemPrompt } } },
+            system_instruction = new { parts = new[] { new { text = Loc.Prompt(systemPrompt) } } },
             contents = new[] { new { role = "user", parts = new[] { new { text = userText } } } },
             generationConfig = new { temperature, responseMimeType = "application/json", responseSchema = schema }
         };

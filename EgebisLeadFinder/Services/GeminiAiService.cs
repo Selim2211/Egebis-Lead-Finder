@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using EgebisLeadFinder.Configuration;
+using EgebisLeadFinder.Localization;
 using EgebisLeadFinder.Models;
 using EgebisLeadFinder.Services.CompanyIntel;
 using Microsoft.Extensions.Options;
@@ -72,7 +73,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         {
             system_instruction = new
             {
-                parts = new[] { new { text = AnalysisPrompt(await ProfileAsync(ct)) } }
+                parts = new[] { new { text = Loc.Prompt(AnalysisPrompt(await ProfileAsync(ct))) } }
             },
             contents = new[]
             {
@@ -414,7 +415,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
 
         var payload = new
         {
-            system_instruction = new { parts = new[] { new { text = RatingPrompt(await ProfileAsync(ct)) } } },
+            system_instruction = new { parts = new[] { new { text = Loc.Prompt(RatingPrompt(await ProfileAsync(ct))) } } },
             contents = new[]
             {
                 new { role = "user", parts = new[] { new { text = userText } } }
@@ -685,7 +686,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
 
         var payload = new
         {
-            system_instruction = new { parts = new[] { new { text = BusinessProfileSystemPrompt } } },
+            system_instruction = new { parts = new[] { new { text = Loc.Prompt(BusinessProfileSystemPrompt) } } },
             contents = new[] { new { role = "user", parts = new[] { new { text = userText } } } },
             generationConfig = new
             {

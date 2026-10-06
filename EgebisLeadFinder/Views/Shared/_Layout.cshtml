@@ -54,7 +54,7 @@
     }
 }
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="@EgebisLeadFinder.Localization.Loc.Code">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -182,6 +182,7 @@
                             <li><a class="dropdown-item" asp-controller="Help" asp-action="Index">Kullanıcı kılavuzu</a></li>
                         </ul>
                     </li>
+                    <li class="nav-item"><partial name="_LanguageSwitch" /></li>
                     <li class="nav-item">
                         <button type="button" class="theme-toggle" id="themeToggle"
                                 title="Açık / koyu tema" aria-label="Açık / koyu tema">
@@ -230,6 +231,12 @@
                             </li>
                         </ul>
                     </li>
+                </ul>
+                }
+                else
+                {
+                <ul class="navbar-nav ms-auto mt-2 mt-lg-0 align-items-lg-center">
+                    <li class="nav-item"><partial name="_LanguageSwitch" /></li>
                 </ul>
                 }
             </div>

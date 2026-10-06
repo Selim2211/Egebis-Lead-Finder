@@ -144,8 +144,8 @@ public class SettingsController : Controller
         }
 
         var result = await sender.SendAsync(s.FromAddress!,
-            "Egebis Lead Finder — test e-postası",
-            "Bu bir deneme e-postasıdır. Bu mesajı görüyorsanız lead'lere e-posta bu adresten gönderilecek.",
+            EgebisLeadFinder.Localization.Loc.T("Egebis Lead Finder — test e-postası"),
+            EgebisLeadFinder.Localization.Loc.T("Bu bir deneme e-postasıdır. Bu mesajı görüyorsanız lead'lere e-posta bu adresten gönderilecek."),
             ct: ct);
 
         if (result.Sent)
