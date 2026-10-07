@@ -141,6 +141,21 @@
                                 <input class="form-control" asp-for="BuyingSignals" placeholder="yeni fabrika, kapasite artışı, tesisat projesi, ihale" />
                                 <div class="form-text">Bir firmanın size ihtiyacı olduğunu gösteren ifadeler. Firma araştırmasında haberler bunlarla taranır, fırsatlar bunlara göre önerilir.</div>
                             </div>
+                            <div class="col-12">
+                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                    <label class="form-label mb-0" for="ScoringSignals">Puanlama anahtar kelimeleri</label>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="suggestSignals" data-url="@Url.Action("SuggestSignals")">
+                                        Yapay zekâ ile öner
+                                    </button>
+                                </div>
+                                <textarea class="form-control mt-1" asp-for="ScoringSignals" rows="6" spellcheck="false"
+                                          placeholder="Üretim yapıyor | fabrika, imalat, üretim tesisi | 15"></textarea>
+                                <div class="form-text">
+                                    Her satır bir ölçüttür: <code>Ad | kelime, kelime | puan</code>. Firma bu ölçüte uyuyorsa puan alır ve puan dökümünde
+                                    “Anahtar kelime: Ad” olarak görünür (en fazla 25 puan). Boş bırakırsanız yapay zekâ tanımınızdan üretir.
+                                </div>
+                                <div class="small mt-1" id="signalsStatus"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -381,6 +396,7 @@
                         setField('ExampleCustomers', p.exampleCustomers);
                         setField('CustomerKind', p.customerKind || '');
                         setField('BuyingSignals', p.buyingSignals);
+                        setField('ScoringSignals', p.scoringSignals);
                         setField('TargetTitles', res.titles);
                         if (p.segments && p.segments.length) {
                             segments().forEach(function (s) { s.remove(); });
@@ -396,6 +412,36 @@
                     .finally(function () {
                         draftBtn.disabled = false;
                         draftBtn.textContent = label;
+                    });
+            });
+
+            // Puanlama anahtar kelimeleri: formdaki tanima gore yapay zeka onerir, kaydetmez.
+            var signalsBtn = document.getElementById('suggestSignals');
+            var signalsStatus = document.getElementById('signalsStatus');
+            if (signalsBtn) signalsBtn.addEventListener('click', function () {
+                var label = signalsBtn.textContent;
+                var existing = document.getElementById('ScoringSignals');
+                if (existing.value.trim() && !confirm('Mevcut puanlama anahtar kelimeleri yapay zekâ önerisiyle değiştirilecek. Devam edilsin mi?')) return;
+                signalsBtn.disabled = true;
+                signalsBtn.textContent = 'Üretiliyor…';
+                signalsStatus.className = 'small mt-1 text-muted-2';
+                signalsStatus.textContent = 'Yapay zekâ tanımınızdan ölçütler üretiyor; 10-20 saniye sürebilir.';
+                var data = new FormData(document.getElementById('profileForm'));
+                fetch(signalsBtn.dataset.url, { method: 'POST', body: data, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(function (r) { return r.json(); })
+                    .then(function (res) {
+                        if (!res.ok) throw new Error(res.error || 'Öneri alınamadı.');
+                        existing.value = res.lines;
+                        signalsStatus.className = 'small mt-1 text-success';
+                        signalsStatus.textContent = 'Öneri dolduruldu. Kontrol edip düzeltin, ardından Kaydet\'e basın.';
+                    })
+                    .catch(function (err) {
+                        signalsStatus.className = 'small mt-1 text-danger';
+                        signalsStatus.textContent = err.message;
+                    })
+                    .finally(function () {
+                        signalsBtn.disabled = false;
+                        signalsBtn.textContent = label;
                     });
             });
         })();

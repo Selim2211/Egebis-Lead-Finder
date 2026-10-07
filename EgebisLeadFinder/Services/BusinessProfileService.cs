@@ -131,6 +131,7 @@ public class BusinessProfileService
         p.ExampleCustomers = CleanList(p.ExampleCustomers).Take(20).ToList();
         p.CustomerKind = p.CustomerKind is BusinessProfile.KindManufacturer or BusinessProfile.KindAny ? p.CustomerKind : null;
         p.BuyingSignals = CleanList(p.BuyingSignals).Take(20).ToList();
+        p.ScoringSignals = ScoringSignal.Clean(p.ScoringSignals);
 
         p.Segments = p.Segments
             .Where(s => !string.IsNullOrWhiteSpace(s.Name))

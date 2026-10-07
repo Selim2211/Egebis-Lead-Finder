@@ -346,6 +346,10 @@ public class CompanyController : Controller
 
         var profile = await SaveProfileAsync(model.Criteria, ct);
 
+        // Profil tanimli ama puanlama anahtar kelimeleri yoksa (eski profil) yapay zeka bir kez uretir; hata aramayi engellemez.
+        try { await HttpContext.RequestServices.GetRequiredService<ProfileSignalService>().EnsureAsync(User.Identity?.Name, ct); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { _logger.LogWarning(ex, "Puanlama anahtar kelimeleri üretilemedi."); }
+
         var job = _progress.Create();
         var criteria = model.Criteria;
         var resultUrl = Url.Action(nameof(SearchResult), new { jobId = job.Id })!;

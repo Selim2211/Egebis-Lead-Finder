@@ -19,6 +19,9 @@ public class BusinessProfileForm
 
     public string? BuyingSignals { get; set; }
 
+    /// <summary>Puanlama anahtar kelimeleri; satır başına "Ad | kelime, kelime | puan".</summary>
+    public string? ScoringSignals { get; set; }
+
     /// <summary>Ayarlar'daki lead unvanlari (Apollo ve site aramasinda kullanilir).</summary>
     public string? TargetTitles { get; set; }
 
@@ -43,6 +46,7 @@ public class BusinessProfileForm
         ExampleCustomers = string.Join(", ", p.ExampleCustomers),
         CustomerKind = p.CustomerKind,
         BuyingSignals = string.Join(", ", p.BuyingSignals),
+        ScoringSignals = ScoringSignal.FormatLines(p.ScoringSignals),
         TargetTitles = string.Join(", ", titles),
         Segments = p.Segments.Select(s => new SegmentForm
         {
@@ -73,6 +77,7 @@ public class BusinessProfileForm
         ExampleCustomers = IcpController.SplitList(ExampleCustomers),
         CustomerKind = CustomerKind,
         BuyingSignals = IcpController.SplitList(BuyingSignals),
+        ScoringSignals = ScoringSignal.ParseLines(ScoringSignals),
         Segments = Segments.Select(s => new TargetSegment
         {
             Id = s.Id ?? string.Empty,

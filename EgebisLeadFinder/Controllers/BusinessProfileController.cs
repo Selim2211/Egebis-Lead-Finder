@@ -12,12 +12,14 @@ namespace EgebisLeadFinder.Controllers;
 public class BusinessProfileController : Controller
 {
     private readonly BusinessProfileService _profiles;
+    private readonly ProfileSignalService _signals;
     private readonly ISettingsService _settings;
     private readonly ProfileTemplateService _templates;
 
-    public BusinessProfileController(BusinessProfileService profiles, ISettingsService settings, ProfileTemplateService templates)
+    public BusinessProfileController(BusinessProfileService profiles, ISettingsService settings, ProfileTemplateService templates, ProfileSignalService signals)
     {
         _profiles = profiles;
+        _signals = signals;
         _settings = settings;
         _templates = templates;
     }
@@ -51,6 +53,13 @@ public class BusinessProfileController : Controller
             message += added > 0 ? $" ICP'ye {added} yeni kriter eklendi." : " ICP zaten güncel.";
         }
 
+        // Puanlama anahtar kelimeleri bos birakildiysa yapay zeka tanimdan uretir (elle girilenlere dokunulmaz).
+        var generated = await _signals.EnsureAsync(User.Identity?.Name, ct);
+        if (generated.Created > 0)
+            message += $" Yapay zekâ {generated.Created} puanlama anahtar kelimesi üretti (aşağıdan düzenleyebilirsiniz).";
+        else if (generated.Error is not null)
+            message += $" Puanlama anahtar kelimeleri şimdi üretilemedi ({generated.Error}); \"Yapay zekâ ile öner\" ile yeniden deneyebilirsiniz.";
+
         // E-posta taslaklari profile gore otomatik hazirlanir (yalnizca eksikler; duzenlenenlere dokunulmaz).
         // Basarisiz olursa (anahtar yok, kota) profil yine kaydedilmistir; kullanici Taslak Duzenleyici'den yeniden dener.
         var provision = await _templates.ProvisionAsync(await _profiles.GetAsync(ct), onlyMissing: true, deactivateAll: false, ct);
@@ -63,6 +72,27 @@ public class BusinessProfileController : Controller
             $"Şirket profili kaydedildi: {profile.DisplayName}, {profile.Segments.Count} segment" + (form.ApplyToIcp ? ", ICP'ye aktarıldı" : ""));
         TempData["ProfileSaved"] = message;
         return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>Formdaki mevcut tanima gore puanlama anahtar kelimelerini yapay zekaya onerttirir (kaydetmez).</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<IActionResult> SuggestSignals(BusinessProfileForm form, [FromServices] IScoringSignalAi ai, CancellationToken ct)
+    {
+        var profile = form.ToProfile();
+        if (!profile.IsConfigured)
+            return Json(new { ok = false, error = "Önce \"Ne satıyoruz?\" ve \"İdeal müşterimiz\" alanlarını doldurun." });
+
+        var result = await ai.SuggestSignalsAsync(profile, ct);
+        if (!result.Success)
+        {
+            AuditActionFilter.MarkFailed(HttpContext);
+            return Json(new { ok = false, error = result.Error });
+        }
+
+        AuditActionFilter.SetAuditSummary(HttpContext, $"Puanlama anahtar kelimeleri önerildi: {result.Signals.Count}");
+        return Json(new { ok = true, lines = ScoringSignal.FormatLines(result.Signals) });
     }
 
     /// <summary>Sirket sitesinden yapay zeka taslagi (kaydetmez; form doldurulur, kullanici duzeltir).</summary>
@@ -95,6 +125,7 @@ public class BusinessProfileController : Controller
                 exampleCustomers = string.Join(", ", p.ExampleCustomers),
                 customerKind = p.CustomerKind,
                 buyingSignals = string.Join(", ", p.BuyingSignals),
+                scoringSignals = ScoringSignal.FormatLines(p.ScoringSignals),
                 segments = p.Segments.Select(s => new
                 {
                     s.Id,

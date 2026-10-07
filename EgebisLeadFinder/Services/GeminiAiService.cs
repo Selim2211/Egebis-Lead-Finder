@@ -349,6 +349,15 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         Tüm metin alanlarını Türkçe yaz.
         """;
 
+    /// <summary>Puanlama olcutleri varsa analiz istemine eklenir: yapay zeka sitede kaniti olan olcutlerin adini isaretler.</summary>
+    public static string SignalsRule(BusinessProfile profile)
+    {
+        if (profile.ScoringSignals.Count == 0) return string.Empty;
+        var lines = profile.ScoringSignals.Select(s => $"- {s.Name}" + (s.Terms.Count > 0 ? $" (ör. {string.Join(", ", s.Terms.Take(6))})" : string.Empty));
+        return "matchedSignals alanı: aşağıdaki PUANLAMA ÖLÇÜTLERİNDEN sitede somut kanıt bulduklarının adını AYNEN yaz; kanıt yoksa yazma, tahmin etme.\n" +
+               "PUANLAMA ÖLÇÜTLERİ:\n" + string.Join("\n", lines);
+    }
+
     /// <summary>Profil modunda e-posta sablonu firmanin segmentinden secilir; yapay zeka "GENEL" der.</summary>
     private const string ProfileTemplateRule = """
         recommendedTemplate alanına "GENEL" yaz (şablon firmanın segmentine göre seçilir).
@@ -362,8 +371,8 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
     /// </summary>
     public static string AnalysisPrompt(BusinessProfile? profile) =>
         profile is { IsConfigured: true }
-            ? string.Join("\n\n", profile.ToPromptBlock(), AnalysisIntro, profile.MentionsSap ? SapRules : NoSapRule,
-                ProfileAnalysisTarget, AnalysisTail, ProfileTemplateRule)
+            ? string.Join("\n\n", new[] { profile.ToPromptBlock(), AnalysisIntro, profile.MentionsSap ? SapRules : NoSapRule,
+                ProfileAnalysisTarget, SignalsRule(profile), AnalysisTail, ProfileTemplateRule }.Where(x => !string.IsNullOrWhiteSpace(x)))
             : string.Join("\n\n", LegacyAnalysisHeader, AnalysisIntro, SapRules, LegacyAnalysisTarget, AnalysisTail, LegacyTemplateRule);
 
     /// <summary>
@@ -400,7 +409,8 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
                 @enum = new[] { "SAP_ENTEGRASYON", "SAP", "MES", "URETIM_YAZILIMI", "GENEL" }
             },
             fitScore = new { type = "integer", description = "Bizim için müşteri adayı olarak uygunluk, 0-100" },
-            segment = new { type = "string", description = "Uyduğu hedef segmentin adı veya boş" }
+            segment = new { type = "string", description = "Uyduğu hedef segmentin adı veya boş" },
+            matchedSignals = new { type = "array", items = new { type = "string" }, description = "Sitede kanıtı bulunan puanlama ölçütlerinin adları" }
         },
         required = new[]
         {

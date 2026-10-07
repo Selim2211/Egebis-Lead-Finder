@@ -66,7 +66,10 @@ public class LeadScoringService
             if (useFit)
             {
                 var fitScore = Math.Clamp(analysis.FitScore!.Value, 0, 100);
-                breakdown.Add($"Uygunluk (yapay zekâ): %{fitScore}", FitPoints(fitScore));
+                var fitPoints = FitPoints(fitScore);
+                // Anahtar kelimeler varsa toplam puan dengeli kalsin diye uygunluk puaninin agirligi azalir.
+                if (fit!.SignalList.Count > 0) fitPoints = (int)Math.Round(fitPoints * SignalFitWeight);
+                breakdown.Add($"Uygunluk (yapay zekâ): %{fitScore}", fitPoints);
             }
             // SAP puani yalnizca ureticilere verilir: SAP'tan soz eden bir yazilim
             // veya danismanlik sitesi bu puani almamali.
@@ -79,6 +82,9 @@ public class LeadScoringService
 
                 breakdown.Add("Üretici firma", _options.Manufacturer);
             }
+
+            if (fit is { Active: true } && fit.SignalList.Count > 0)
+                AddSignals(breakdown, analysis, company, fit.SignalList);
 
             manufacturerOk = !useIcp || !icp!.RequireManufacturer || analysis.Manufacturer;
 
@@ -161,6 +167,36 @@ public class LeadScoringService
             breakdown.Add("E-posta bulundu", _options.EmailFound);
 
         return breakdown;
+    }
+
+    /// <summary>Anahtar kelimeler varken uygunluk puaninin agirligi (kalan puan anahtar kelimelere ayrilir).</summary>
+    private const double SignalFitWeight = 0.7;
+
+    /// <summary>Anahtar kelimelerden gelen toplam puanin ustu.</summary>
+    public const int SignalCap = 25;
+
+    /// <summary>
+    /// Anahtar kelime puani: yapay zeka analizde olcutun adini isaretlediyse ya da terimlerden biri firmanin
+    /// analiz metninde (ad, sektor, urunler, gerekce, segment) geciyorsa olcut puan verir; toplam <see cref="SignalCap"/> ile sinirlidir.
+    /// </summary>
+    private static void AddSignals(ScoreBreakdown breakdown, CompanyAnalysis analysis, Company? company, IReadOnlyList<ScoringSignal> signals)
+    {
+        var haystack = string.Join(" ", new[] { company?.Name, analysis.CompanyName, analysis.Industry, company?.Industry, analysis.Reason, analysis.Segment, company?.FitReason }
+            .Concat(analysis.Products).Where(s => !string.IsNullOrWhiteSpace(s)));
+        var marked = new HashSet<string>(analysis.MatchedSignals.Select(TurkishText.Normalize));
+
+        var total = 0;
+        foreach (var signal in signals.OrderByDescending(s => s.Points))
+        {
+            if (total >= SignalCap) break;
+            var byAi = marked.Contains(TurkishText.Normalize(signal.Name));
+            var term = byAi ? null : signal.Terms.FirstOrDefault(t => TurkishText.ContainsNormalized(haystack, t));
+            if (!byAi && term is null) continue;
+
+            var points = Math.Min(signal.Points, SignalCap - total);
+            breakdown.Add($"Anahtar kelime: {signal.Name}", points);
+            total += points;
+        }
     }
 
     /// <summary>Uygunluk puaninin karsiligi: eski SAP + uretici puanlarinin toplami kadar agirlik.</summary>
@@ -261,7 +297,9 @@ public class ScoreBreakdown
 /// "Biz ne arıyoruz?" puanlama baglami: profil tanimliysa (Active) uygunluk puani ve hedef unvanlar
 /// kullanilir. Bos/pasifse puanlama eski (Egebis) kurallariyla yapilir.
 /// </summary>
-public record FitContext(bool Active, IReadOnlyList<string> TargetTitles)
+public record FitContext(bool Active, IReadOnlyList<string> TargetTitles, IReadOnlyList<ScoringSignal>? Signals = null)
 {
     public static readonly FitContext Inactive = new(false, Array.Empty<string>());
+
+    public IReadOnlyList<ScoringSignal> SignalList => Signals ?? Array.Empty<ScoringSignal>();
 }

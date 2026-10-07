@@ -132,7 +132,7 @@ public class IcpService
         var fit = profile.IsConfigured
             ? new FitContext(true, (await _settings.GetTitleKeywordsAsync(ct))
                 .Concat(profile.Segments.SelectMany(s => s.TargetTitles))
-                .Distinct(StringComparer.OrdinalIgnoreCase).ToList())
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList(), profile.ScoringSignals)
             : FitContext.Inactive;
         _fitCached = (profile, fit);
         return _fitCached.Value;

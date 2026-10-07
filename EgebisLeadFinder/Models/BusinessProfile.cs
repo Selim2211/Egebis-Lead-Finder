@@ -68,6 +68,13 @@ public partial class BusinessProfile
     [JsonPropertyName("buyingSignals")]
     public List<string> BuyingSignals { get; set; } = new();
 
+    /// <summary>
+    /// Puanlama anahtar kelimeleri: yapay zekânın bu tanımdan ürettiği, puan veren ölçütler (ör. "Üretim yapıyor" +15).
+    /// Firma puanı bunlarla desteklenir ve puan dökümünde görünür.
+    /// </summary>
+    [JsonPropertyName("scoringSignals")]
+    public List<ScoringSignal> ScoringSignals { get; set; } = new();
+
     [JsonPropertyName("updatedAt")]
     public DateTime? UpdatedAt { get; set; }
 

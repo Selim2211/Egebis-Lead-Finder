@@ -58,6 +58,12 @@ public class CompanyAnalysis
     [JsonPropertyName("segment")]
     public string? Segment { get; set; }
 
+    /// <summary>
+    /// Sirket profilindeki puanlama anahtar kelimelerinden (ad olarak) sitede kaniti bulunanlar; profil bossa/anahtar kelime yoksa bos.
+    /// </summary>
+    [JsonPropertyName("matchedSignals")]
+    public List<string> MatchedSignals { get; set; } = new();
+
     /// <summary>EmailTemplate.Key ile eslesir.</summary>
     [JsonPropertyName("recommendedTemplate")]
     public string? RecommendedTemplate { get; set; }
