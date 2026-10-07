@@ -78,6 +78,9 @@ public class CompanySearchViewModel
     /// <summary>Ayarlar'dan gelen azami firma sayisi (bilgi amacli gosterilir).</summary>
     public int MaxCompanies { get; set; } = SettingKeys.DefaultSearchMaxCompanies;
 
+    /// <summary>Bu arama icin ekrandan secilen azami firma sayisi (bossa Ayarlar'daki deger).</summary>
+    public int? MaxCompaniesOverride { get; set; }
+
     public string DefaultCountry { get; set; } = SettingKeys.DefaultSearchCountry;
 
     /// <summary>Ayarlar'da secili arama bolgesi (ulke, dil ve il secimi bundan gelir).</summary>

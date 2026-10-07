@@ -166,7 +166,10 @@ public class CompanyController : Controller
             return "Sektör alanı zorunludur.";
 
         c.Industry = c.Industry.Trim();
-        c.MaxCompanies = maxCompanies;
+        // Ekrandaki "firma sayisi" secimi o aramaya ozeldir; Ayarlar'daki deger varsayilandir.
+        c.MaxCompanies = model.MaxCompaniesOverride is > 0
+            ? Math.Min(model.MaxCompaniesOverride.Value, SettingKeys.SearchMaxCompaniesUpperLimit)
+            : maxCompanies;
 
         switch (model.SubmitMode)
         {

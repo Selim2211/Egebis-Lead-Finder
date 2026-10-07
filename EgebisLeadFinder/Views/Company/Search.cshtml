@@ -17,6 +17,14 @@
         ? SearchRegions.Get(Model.Criteria.RegionKey)
         : Model.Region;
 
+    // Bu aramanin firma sayisi: ekrandan secilen, yoksa Ayarlar'daki. Secenekler sabit liste + mevcut deger.
+    var maxShown = Model.MaxCompaniesOverride is > 0 ? Model.MaxCompaniesOverride.Value : Model.MaxCompanies;
+    var maxOptions = new[] { 5, 10, 20, 50, 100, 200, maxShown }.Where(n => n <= SettingKeys.SearchMaxCompaniesUpperLimit).Distinct().OrderBy(n => n).ToList();
+    // Turkiye disindaki Avrupa ulkelerinde bolge/eyalet listesi (secime gore panel JS ile kurulur).
+    var hasSub = RegionSubdivisions.Has(selRegion.Key);
+    var subJson = System.Text.Json.JsonSerializer.Serialize(
+        RegionSubdivisions.All.ToDictionary(k => k.Key, k => k.Value.Select(g => new { name = g.Name, items = g.Items }).ToList()));
+
     // "Biz ne arıyoruz?" segmentleri: tek tikla sektor + bolge doldurur.
     var sellerProfile = EgebisLeadFinder.Services.BusinessProfileService
         .Parse(await SearchSettings.GetAsync(SettingKeys.BusinessProfile));
@@ -116,6 +124,7 @@
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="SubmitMode" value="@CompanySearchViewModel.ModeBasic" />
                     <input type="hidden" name="Criteria.RegionKey" class="region-sync" value="@selRegion.Key" />
+                    <input type="hidden" name="MaxCompaniesOverride" class="max-sync" value="@maxShown" />
 
                     <div class="mb-3">
                         <div class="d-flex justify-content-between align-items-baseline gap-2 mb-1">
@@ -165,7 +174,20 @@
                                 </optgroup>
                             }
                         </select>
-                        <div><span class="search-scope-label">Sonuç</span> en fazla @Model.MaxCompanies firma, skoru en yüksekten sıralı</div>
+                        <div class="search-scope-row">
+                            <span class="search-scope-label">Sonuç</span>
+                            <span>en fazla <span class="max-name">@maxShown</span> firma, skoru en yüksekten sıralı</span>
+                            <button type="button" class="scope-edit" id="maxEdit" title="Firma sayısını değiştir"
+                                    aria-label="Firma sayısını değiştir" aria-expanded="false" aria-controls="maxSelect">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                            </button>
+                        </div>
+                        <select class="form-select form-select-sm mt-1" id="maxSelect" aria-label="Firma sayısı" hidden>
+                            @foreach (var n in maxOptions)
+                            {
+                                <option value="@n" selected="@(n == maxShown)">@n firma</option>
+                            }
+                        </select>
                         <div title="“Biz ne arıyoruz?” ekranındaki müşteri türüne göre">
                             <span class="search-scope-label">Arama</span>
                             @(!sellerProfile.IsConfigured || sellerProfile.TargetsManufacturers ? "üretici firmalar (“üreticileri”, “fabrikası”)" : "her tür şirket (“firmaları”, “şirketleri”)")
@@ -431,6 +453,7 @@
                         </div>
 
                         <input type="hidden" name="Criteria.ProfileId" id="advProfileId" value="" />
+                        <input type="hidden" name="MaxCompaniesOverride" class="max-sync" value="@maxShown" />
                         <input type="hidden" name="Criteria.SegmentId" class="segment-sync" value="@Model.Criteria.SegmentId" />
                         <input type="hidden" name="Criteria.SmartSearch" class="smart-sync" value="@(Model.Criteria.SmartSearch ? "true" : "false")" />
 
@@ -519,17 +542,37 @@
                         <input type="hidden" name="Criteria.City" id="cityHiddenField" value="@Model.Criteria.City"
                                disabled="@(selRegion.HasProvinces ? null : "disabled")" />
                         <div class="form-text">
-                            Hiç il seçmezseniz Türkiye geneli taranır. En fazla @Model.MaxCompanies firma
-                            getirilir (Ayarlar).
+                            Hiç il seçmezseniz Türkiye geneli taranır. En fazla <span class="max-name">@maxShown</span> firma
+                            getirilir.
                         </div>
                     </div>
 
-                    @* Türkiye dışı bölgelerde il listesi yok: şehir adları elle yazılır. *@
-                    <div class="col-lg-8" id="freePanel" hidden="@(selRegion.HasProvinces ? "hidden" : null)">
+                    @* Avrupa ülkeleri: bölge / eyalet / kanton listesi (ör. Almanya'da Bayern). Panel JS ile kurulur. *@
+                    <div class="col-lg-8" id="subPanel" hidden="@(hasSub ? null : "hidden")">
+                        <div class="d-flex justify-content-between align-items-baseline mb-2">
+                            <span class="form-label mb-0">Bölge / eyalet</span>
+                            <span class="small">
+                                <span class="tag tag-muted" id="subSelectedCount">0 seçili</span>
+                                <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="subClear">Temizle</button>
+                            </span>
+                        </div>
+                        <div class="region-chips mb-2" id="subChips"></div>
+                        <input type="text" class="form-control mb-2" id="subSearchBox" placeholder="Bölge ara" autocomplete="off" />
+                        <div class="city-picker city-picker-lg" id="subGrid"></div>
+                        <input type="hidden" name="Criteria.City" id="subHiddenField" value="@Model.Criteria.City"
+                               disabled="@(hasSub ? null : "disabled")" />
+                        <div class="form-text">
+                            Hiç bölge seçmezseniz <span class="region-name">@selRegion.Name</span> geneli taranır. Birden fazla bölge seçebilirsiniz;
+                            her bölge ayrı aranır. En fazla <span class="max-name">@maxShown</span> firma getirilir.
+                        </div>
+                    </div>
+
+                    @* Bölge listesi olmayan ülkelerde şehir adları elle yazılır. *@
+                    <div class="col-lg-8" id="freePanel" hidden="@(selRegion.HasProvinces || hasSub ? "hidden" : null)">
                         <label class="form-label" for="cityFreeText">Şehir / bölge</label>
                         <input type="text" class="form-control" id="cityFreeText" name="Criteria.City"
                                value="@Model.Criteria.City" placeholder="Bavyera, Stuttgart, Köln" autocomplete="off"
-                               disabled="@(selRegion.HasProvinces ? "disabled" : null)" />
+                               disabled="@(selRegion.HasProvinces || hasSub ? "disabled" : null)" />
                         <div class="form-text">
                             Birden fazla şehri virgülle ayırın. Boş bırakırsanız <span class="region-name">@selRegion.Name</span> geneli taranır.
                             Sorgular seçilen ülkenin dilinde kurulur.
@@ -599,6 +642,13 @@
         var provincePanel = document.getElementById('provincePanel');
         var freePanel = document.getElementById('freePanel');
         var freeText = document.getElementById('cityFreeText');
+        var subPanel = document.getElementById('subPanel');
+        var subHidden = document.getElementById('subHiddenField');
+        var subGrid = document.getElementById('subGrid');
+        var subChips = document.getElementById('subChips');
+        var subCount = document.getElementById('subSelectedCount');
+        var SUBS = @Html.Raw(subJson);
+        var subKey = null;
         var regionNames = {};
         Array.prototype.forEach.call(advRegion.options, function (o) { regionNames[o.value] = o.textContent; });
 
@@ -610,11 +660,93 @@
             advRegion.value = key;
             document.querySelectorAll('.region-name').forEach(function (s) { s.textContent = regionNames[key]; });
             var tr = key === 'TR';
+            var sub = !tr && !!SUBS[key];
             provincePanel.hidden = !tr;
-            freePanel.hidden = tr;
+            subPanel.hidden = !sub;
+            freePanel.hidden = tr || sub;
             hiddenCity.disabled = !tr;
-            freeText.disabled = tr;
+            subHidden.disabled = !sub;
+            freeText.disabled = tr || sub;
+            if (sub) buildSub(key);
         }
+
+        // Avrupa ulkelerinde bolge / eyalet paneli: hizli gruplar + onay kutulari (secim "Criteria.City" olarak gider).
+        function subSelected() {
+            return Array.prototype.slice.call(subGrid.querySelectorAll('input:checked')).map(function (i) { return i.value; });
+        }
+
+        function syncSub() {
+            var selected = subSelected();
+            if (!subHidden.disabled) subHidden.value = selected.join(', ');
+            subCount.textContent = selected.length === 0 ? (regionNames[subKey] || '') + ' geneli' : selected.length + ' seçili';
+            subChips.querySelectorAll('.region-chip').forEach(function (chip) {
+                var items = chip.getAttribute('data-cities').split('|');
+                chip.classList.toggle('is-active', items.every(function (c) { return selected.indexOf(c) !== -1; }));
+            });
+        }
+
+        function buildSub(key, preset) {
+            var keep = preset || (subKey === key ? subSelected() : []);
+            subKey = key;
+            subChips.innerHTML = '';
+            subGrid.innerHTML = '';
+            (SUBS[key] || []).forEach(function (group) {
+                if ((SUBS[key] || []).length > 1) {
+                    var chip = document.createElement('button');
+                    chip.type = 'button';
+                    chip.className = 'region-chip';
+                    chip.setAttribute('data-cities', group.items.join('|'));
+                    chip.appendChild(document.createTextNode(group.name + ' '));
+                    var n = document.createElement('span');
+                    n.className = 'region-chip-count';
+                    n.textContent = group.items.length;
+                    chip.appendChild(n);
+                    chip.addEventListener('click', function () {
+                        var on = !chip.classList.contains('is-active');
+                        subGrid.querySelectorAll('input').forEach(function (i) {
+                            if (group.items.indexOf(i.value) !== -1) i.checked = on;
+                        });
+                        syncSub();
+                    });
+                    subChips.appendChild(chip);
+                }
+                group.items.forEach(function (name) {
+                    var label = document.createElement('label');
+                    label.className = 'city-check';
+                    var input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.value = name;
+                    input.checked = keep.indexOf(name) !== -1;
+                    input.addEventListener('change', syncSub);
+                    var span = document.createElement('span');
+                    span.textContent = name;
+                    label.appendChild(input);
+                    label.appendChild(span);
+                    subGrid.appendChild(label);
+                });
+            });
+            syncSub();
+        }
+
+        document.getElementById('subClear').addEventListener('click', function () { buildSub(subKey, []); });
+        document.getElementById('subSearchBox').addEventListener('input', function () {
+            var term = this.value.trim().toLocaleLowerCase();
+            subGrid.querySelectorAll('.city-check').forEach(function (label) {
+                label.hidden = term !== '' && label.querySelector('span').textContent.toLocaleLowerCase().indexOf(term) === -1;
+            });
+        });
+
+        // Firma sayisi: ekrandan anlik secilir; her iki formdaki gizli alan ve yazilar birlikte guncellenir.
+        var maxSelect = document.getElementById('maxSelect');
+        document.getElementById('maxEdit').addEventListener('click', function () {
+            maxSelect.hidden = !maxSelect.hidden;
+            this.setAttribute('aria-expanded', maxSelect.hidden ? 'false' : 'true');
+            if (!maxSelect.hidden) maxSelect.focus();
+        });
+        maxSelect.addEventListener('change', function () {
+            document.querySelectorAll('.max-sync').forEach(function (i) { i.value = maxSelect.value; });
+            document.querySelectorAll('.max-name').forEach(function (s) { s.textContent = maxSelect.value; });
+        });
 
         document.getElementById('scopeEdit').addEventListener('click', function () {
             basicRegion.hidden = !basicRegion.hidden;
@@ -678,6 +810,7 @@
 
         checkboxes.forEach(function (c) { c.addEventListener('change', syncCities); });
         syncCities();
+        if (!subPanel.hidden) buildSub(advRegion.value, subHidden.value ? subHidden.value.split(',').map(function (x) { return x.trim(); }) : []);
 
         document.getElementById('cityClear').addEventListener('click', function () { setCities([]); });
 
@@ -710,7 +843,9 @@
                 var city = item.getAttribute('data-city') || '';
                 var list = city.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
                 setRegion(item.getAttribute('data-region') || 'TR');
-                if (advRegion.value === 'TR') setCities(list); else { setCities([]); freeText.value = list.join(', '); }
+                if (advRegion.value === 'TR') setCities(list);
+                else if (SUBS[advRegion.value]) { setCities([]); buildSub(advRegion.value, list); }
+                else { setCities([]); freeText.value = list.join(', '); }
                 advProfileId.value = item.getAttribute('data-id') || '';
                 var mine = item.getAttribute('data-mine') === 'true';
                 advPublic.checked = mine && item.getAttribute('data-public') === 'true';
