@@ -4351,7 +4351,9 @@ a.pager-btn:hover { border-color: var(--eg-mailed-border); background: var(--eg-
 }
 
 /* Firma Ara: kapsam yanindaki bolge degistirme dugmesi */
-.search-scope-row { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.search-scope-row { display: flex; align-items: center; gap: .4rem; flex-wrap: nowrap; }
+.search-scope-row > span:nth-child(2) { flex: 1 1 auto; min-width: 0; }
+.search-scope-row > .scope-edit { flex: none; }
 .scope-edit {
     display: inline-flex;
     align-items: center;
