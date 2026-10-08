@@ -111,9 +111,11 @@
                 <li><strong>Hedef segmentler</strong>: her ürün grubu veya müşteri sektörü için bir segment ekleyin (arama terimi, bölge, anahtar kelimeler, NACE, ulaşılacak unvanlar).</li>
                 <li><strong>Müşterilerimiz ne tür firmalar?</strong>: üretici mi, her tür şirket mi? Firma araması buna göre “üreticileri / fabrikası” ya da “firmaları / şirketleri” diye yapılır.</li>
                 <li><strong>İhtiyaç sinyalleri</strong>: bir firmanın size ihtiyacı olduğunu gösteren ifadeler (ör. “yeni şantiye”, “ihale”). Firma araştırması haberleri bunlarla tarar, fırsatları bunlara göre önerir.</li>
+                <li><strong>Puanlama anahtar kelimeleri</strong>: puan veren ölçütler; her satır <code>Ad | kelime, kelime | puan</code>. <em>Yapay zekâ ile öner</em> tanımınızdan üretir; boş bırakırsanız kaydederken kendisi üretir.</li>
                 <li><strong>Kaydet</strong>. Segmentler Firma Ara ekranında tek tıkla arama düğmesi olur. Firma analizi, puan, araştırma raporu, kişi seçimi ve mail önerileri artık bu tanıma göre çalışır.</li>
                 <li>Mail taslaklarını kendi işinize göre hazırlamak için <strong>Taslak Düzenleyici → Profilime göre oluştur</strong>; her segment için ayrı taslak yazılır ve o segmentteki firmalara otomatik önerilir.</li>
             </ol>
+            <figure class="guide-shot"><img src="@Shot("profile-signals")" alt="Puanlama anahtar kelimeleri" loading="lazy" /><figcaption>Müşteri türü, ihtiyaç sinyalleri ve puanlama anahtar kelimeleri. Firma bir ölçüte uyarsa puan alır ve puan dökümünde görünür (en fazla 25 puan).</figcaption></figure>
             <div class="guide-tip"><div>Bu ekranı yalnızca yönetici kaydedebilir; kullanıcılar görüntüler.</div></div>
         </section>
 
@@ -138,17 +140,19 @@
             <ol class="guide-steps">
                 <li><strong>Sektör</strong> kutusuna aradığınız sektörü yazın (ör. “Otomotiv yan sanayi”) veya bir <strong>segment</strong> düğmesine tıklayın.</li>
                 <li><strong>Akıllı arama</strong> açık kalsın: yapay zekâ ek arama terimleri üretir ve bayi, rehber, haber sitesi, rakip gibi hedef dışı adayları siteye girmeden eler.</li>
+                <li><strong>Kapsam</strong> ve <strong>Sonuç</strong> satırlarındaki kalem simgeleriyle bölgeyi ve <strong>firma sayısını</strong> anında değiştirin; sayıyı elle yazarsınız (1-200) ve yalnızca o aramaya uygulanır.</li>
                 <li>Bölgeyi seçip <strong>Firma Ara</strong>'ya basın. İlerleme çubuğu açılır; gerekirse <strong>İptal et</strong> ile durdurun (o ana kadar bulunanlar kaydedilir).</li>
                 <li>Arama bitince sonuç özeti gelir: kaç firma bulundu, kaçı yeni, kaçı ön elemede elendi. Her satırdaki yıldızla favoriye ekleyebilirsiniz.</li>
             </ol>
             <figure class="guide-shot"><img src="@Shot("search-advanced")" alt="Gelişmiş arama" loading="lazy" /><figcaption>Gelişmiş arama: il seçimi ve arama şablonu. “Şablonu tüm kullanıcılarla paylaş” yalnızca kriterleri paylaşır.</figcaption></figure>
             <h3 class="h6 mt-3">Gelişmiş arama ve arama şablonları</h3>
             <ol class="guide-steps">
-                <li><strong>Gelişmiş Arama</strong>'yı açın; il/bölge seçin.</li>
+                <li><strong>Gelişmiş Arama</strong>'yı açın; il/bölge seçin. Türkiye'de iller, Avrupa ülkelerinde (Almanya, Avusturya, İsviçre, Hollanda, Belçika, Fransa, İtalya, İspanya, Birleşik Krallık, Polonya, Çekya, Romanya, Bulgaristan, Yunanistan, İsveç) bölge/eyalet listesi açılır; ör. Almanya'da yalnızca <em>Bayern</em>. Seçtiğiniz her bölge ayrı aranır.</li>
                 <li><strong>Arama profili adı</strong> yazıp <strong>Kaydet ve Ara</strong> derseniz arama şablon olarak saklanır; sonra tek tıkla tekrar çalıştırılır.</li>
                 <li>Şablonlar <strong>size özeldir</strong>. <em>Şablonu tüm kullanıcılarla paylaş</em> işaretlenirse diğer kullanıcılar kriterleri kullanabilir; bulunan firmalar yine kişiye özel kalır.</li>
                 <li>Başkasının paylaştığı şablonu olduğu gibi kullanabilirsiniz; değiştirip kaydederseniz size özel bir kopya oluşur.</li>
             </ol>
+            <figure class="guide-shot"><img src="@Shot("search-regions")" alt="Avrupa bölge seçimi" loading="lazy" /><figcaption>Gelişmiş arama: Almanya için eyalet seçimi, hızlı gruplar (Güney, Batı, Kuzey, Doğu) ve bölge kutuları.</figcaption></figure>
             <div class="guide-tip is-info"><div><strong>Belirli bir firmayı bul</strong>: tanıdığınız bir firmayı adıyla aratıp sisteme ekleyebilirsiniz.</div></div>
             <div class="guide-actions"><a class="btn btn-sm btn-outline-secondary" href="/Company/Search?tour=1">Firma Ara turunu başlat</a></div>
         </section>
@@ -175,12 +179,13 @@
             <p class="guide-lead">Bir firmanın bütün bilgisi: puanın nasıl oluştuğu, yapay zekâ analizi, konum, internet ön araştırması, kişiler ve lead'ler.</p>
             <figure class="guide-shot"><img src="@Shot("details")" alt="Firma detayı" loading="lazy" /><figcaption>Firma detayı: favori, karşılaştır, rapor ve sekmeler.</figcaption></figure>
             <ol class="guide-steps">
-                <li><strong>Özet</strong>: puan dökümü, profilimize uygunluk ve gerekçe, ürünler, konum haritası (tıklayınca Google Haritalar açılır).</li>
+                <li><strong>Özet</strong>: puan dökümü, profilimize uygunluk ve gerekçe, ürünler, konum haritası (tıklayınca Google Haritalar açılır). <strong>Puan Dökümü</strong> puanın her kalemini gösterir; şirketinizin ölçütlerinden uyanlar “Anahtar kelime: …” satırıdır.</li>
                 <li><strong>Firma analizi</strong>: haber, resmî kayıt ve finans bilgilerinden “Güçlü / İncelenmeli / Riskli” sinyali üretir.</li>
                 <li><strong>Kişiler &amp; Lead'ler</strong>: <em>Karar vericileri bul</em> ile hedef unvanlardaki kişiler aranır. E-posta açmak kredi harcar; hangi kişi için açılacağına siz karar verirsiniz.</li>
                 <li>Kişiyi seçip <strong>Lead oluştur</strong> deyin; e-posta yazma ekranına geçersiniz.</li>
                 <li><strong>Rapor</strong> düğmesi görüşmeye götürülecek tek sayfalık yazdırılabilir raporu açar.</li>
             </ol>
+            <figure class="guide-shot"><img src="@Shot("score")" alt="Puan dökümü" loading="lazy" /><figcaption>Puan Dökümü: uygunluk puanı ve “Anahtar kelime” ölçütleri. Ölçütleri değiştirirseniz eski firmaları <em>Yeniden Analiz Et</em> ile güncelleyin.</figcaption></figure>
             <div class="guide-actions"><a class="btn btn-sm btn-outline-secondary" href="/Company?run=all">Firmalara git</a></div>
         </section>
 
@@ -238,6 +243,12 @@
                 <li><strong>Mail yaz</strong>: taslak seçin veya <strong>AI ile yaz</strong> ile kişiye ve firmaya özel mail üretin, düzenleyip gönderin.</li>
             </ol>
             <figure class="guide-shot"><img src="@Shot("compose")" alt="E-posta yazma" loading="lazy" /><figcaption>E-posta yazma: yapay zekâ taslağı, konu, metin ve gönder.</figcaption></figure>
+            <h3 class="h6 mt-3">Maili başka dile çevirin</h3>
+            <ol class="guide-steps">
+                <li><strong>Çevir</strong> menüsünden <strong>İngilizce, Almanca, Türkçe, Fransızca</strong> veya <strong>İspanyolca</strong> seçin; konu ve metin birlikte çevrilir.</li>
+                <li>Görseller, <code>{DEĞİŞKENLER}</code>, kişi ve firma adları korunur. Beğenmezseniz <em>Çeviriyi geri al</em> ile eski metne dönün; göndermeden önce çeviriyi okuyun.</li>
+            </ol>
+            <figure class="guide-shot"><img src="@Shot("translate")" alt="Mail çevirisi" loading="lazy" /><figcaption>E-posta yazma: Çevir menüsü ve dil seçenekleri.</figcaption></figure>
         </section>
 
         @* ---------------------------------------------------------------- *@
@@ -261,6 +272,7 @@
             <ol class="guide-steps">
                 <li>Üst menüdeki kadran simgesinden açın.</li>
                 <li>Her servis için bugün / bu ay kullanım, limit ve kalan yüzdesi görünür; %80'de uyarı, %95'te kritik uyarı verilir.</li>
+                <li><strong>Gemini maliyeti</strong>, Gemini'nin bildirdiği gerçek token sayılarından ve seçili modelin fiyatından hesaplanır; TL karşılığı Ayarlar'daki <em>USD / TL kuru</em> ile bulunur (varsayılan 50).</li>
             </ol>
         </section>
 
@@ -271,7 +283,8 @@
             <figure class="guide-shot"><img src="@Shot("settings")" alt="Ayarlar" loading="lazy" /><figcaption>Ayarlar: API anahtarları ve şifreler veritabanında şifreli saklanır; şifre alanları kaydedildikten sonra tekrar gösterilmez.</figcaption></figure>
             <ol class="guide-steps">
                 <li><strong>API anahtarları</strong>: Serper, Gemini ve Apollo anahtarlarını girin. Anahtarlar yalnızca yöneticiye görünür ve veritabanında şifreli saklanır.</li>
-                <li><strong>Arama</strong>: azami firma sayısı ve varsayılan bölge.</li>
+                <li><strong>Arama</strong>: azami firma sayısı ve varsayılan bölge. Firma sayısını her aramada Firma Ara ekranından da değiştirebilirsiniz.</li>
+                <li><strong>Limitler</strong>: Gemini aylık çağrı limiti, Apollo kredisi ve Gemini maliyeti için <em>USD / TL kuru</em>.</li>
                 <li><strong>E-posta</strong>: SMTP hesabını girip <em>Test e-postası gönder</em> ile deneyin; cevap takibi için IMAP bilgileri.</li>
                 <li><strong>Salesforce</strong>: bağlantıyı kurun; firmalar ve kişiler tek tıkla Salesforce'a aktarılır, sonraki değişiklikler otomatik senkronlanır.</li>
             </ol>
@@ -315,6 +328,14 @@
                 <dd>Arama sonuçları kişiye özeldir. Paylaşmak istediği firmaları favori listesini herkese açarak paylaşabilir.</dd>
                 <dt>“Kota doldu” uyarısı aldım.</dt>
                 <dd>API kullanımı ekranından hangi servisin dolduğunu görün; yönetici limiti veya anahtarı Ayarlar'dan günceller.</dd>
+                <dt>Bir firma neden bu puanı aldı?</dt>
+                <dd>Firma detayında sağdaki <em>Puan Dökümü</em>'ne bakın: uygunluk, anahtar kelimeler, hedef segment ve e-posta gibi her kalem puanıyla yazılıdır.</dd>
+                <dt>Almanya'da yalnızca Bayern'de arama yapabilir miyim?</dt>
+                <dd>Evet. <em>Gelişmiş Arama</em>'da ülkeyi Almanya seçin ve eyalet listesinden Bayern'i işaretleyin. Aynı yöntem diğer Avrupa ülkelerinde de çalışır.</dd>
+                <dt>Maili başka dilde nasıl gönderirim?</dt>
+                <dd>E-posta yazma ekranında <em>Çevir</em> menüsünden dili seçin; metin çevrilir, siz kontrol edip gönderirsiniz.</dd>
+                <dt>Uygulamayı İngilizce kullanabilir miyim?</dt>
+                <dd>Sağ üstteki <strong>TR | EN</strong> düğmesiyle arayüz dilini değiştirin; yapay zekâ çıktıları da seçili dilde hazırlanır.</dd>
                 <dt>Bir ekranda ne yapacağımı bilmiyorum.</dt>
                 <dd>Sağ üstteki <strong>?</strong> → <em>Bu sayfanın turu</em>; ekranın önemli bölümleri adım adım gösterilir.</dd>
             </dl>
