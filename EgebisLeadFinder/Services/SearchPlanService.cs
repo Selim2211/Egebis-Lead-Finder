@@ -100,7 +100,7 @@ public class SearchPlanService
 
         if (!criteria.SmartSearch) return plan;
 
-        if (string.IsNullOrWhiteSpace(await _settings.GetAsync(SettingKeys.GeminiApiKey, ct)))
+        if (string.IsNullOrWhiteSpace(await AiProviders.ActiveKeyAsync(_settings, ct)))
         {
             plan.Note = "Akıllı arama için Gemini anahtarı gerekli; arama yalnızca yazılan sektörle yapıldı.";
             return plan;

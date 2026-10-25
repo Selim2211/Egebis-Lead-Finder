@@ -12,7 +12,7 @@ public partial class GeminiAiService : IInsightAi
     private async Task<(string? Json, string? Error)> AskJsonAsync(string systemPrompt, string userText, object schema,
         double temperature, CancellationToken ct, bool localize = true)
     {
-        var apiKey = await _settings.GetAsync(SettingKeys.GeminiApiKey, ct);
+        var apiKey = await AiProviders.ActiveKeyAsync(_settings, ct);
         if (string.IsNullOrWhiteSpace(apiKey)) return (null, new MissingApiKeyException("Gemini").Message);
 
         var payload = new

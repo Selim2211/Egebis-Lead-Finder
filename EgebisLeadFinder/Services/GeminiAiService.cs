@@ -45,6 +45,9 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
     /// <summary>Ayarlar ekraninda secilen model; secim yoksa appsettings Ai:GeminiModel.</summary>
     private async Task<string> ModelAsync(CancellationToken ct)
     {
+        if (await AiProviders.IsNvidiaAsync(_settings, ct))
+            return await AiProviders.NvidiaModelAsync(_settings, ct);
+
         var stored = (await _settings.GetAsync(SettingKeys.GeminiModel, ct))?.Trim();
         return GeminiModelCatalog.IsValidModelId(stored) ? stored! : _options.GeminiModel;
     }
@@ -56,7 +59,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
     public async Task<AiAnalysisResult> AnalyzeCompanyAsync(string siteText, CancellationToken ct = default)
     {
         // Anahtar yalnizca Ayarlar ekranindan okunur (bkz. SettingKeys.IsSettingsOnly).
-        var apiKey = await _settings.GetAsync(SettingKeys.GeminiApiKey, ct);
+        var apiKey = await AiProviders.ActiveKeyAsync(_settings, ct);
         if (string.IsNullOrWhiteSpace(apiKey))
             return AiAnalysisResult.Failed(new MissingApiKeyException("Gemini").Message);
 
@@ -154,6 +157,21 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
     private async Task<(string? Content, string? Error)> SendWithRetryAsync(
         string url, string payloadJson, string apiKey, CancellationToken ct, TimeSpan? timeout = null)
     {
+        var nvidia = await AiProviders.IsNvidiaAsync(_settings, ct);
+        var label = nvidia ? "NVIDIA" : "Gemini";
+        var usageProvider = nvidia ? AiProviders.NvidiaUsageProvider : UsageProvider;
+        var requestUrl = url;
+        if (nvidia)
+        {
+            // Cagri noktalari Gemini bicimli istek uretir; burada OpenAI chat istegine cevrilir.
+            var prefix = _options.GeminiEndpoint.TrimEnd('/') + "/";
+            var model = url.StartsWith(prefix, StringComparison.Ordinal) ? url[prefix.Length..] : url;
+            const string suffix = ":generateContent";
+            if (model.EndsWith(suffix, StringComparison.Ordinal)) model = model[..^suffix.Length];
+            requestUrl = AiProviders.NvidiaEndpoint;
+            payloadJson = NvidiaChatAdapter.ToChatRequest(payloadJson, model);
+        }
+
         var attemptTimeout = timeout ?? TimeSpan.FromSeconds(_options.TimeoutSeconds);
         // Gemini ucretsiz katmaninda "model su an yogun talep altinda" (503) hatasi
         // dakikalarca surebilir; 4 deneme (~35 sn) cogu zaman yetersiz kaliyordu.
@@ -162,8 +180,9 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, url);
-            request.Headers.Add("x-goog-api-key", apiKey);
+            using var request = new HttpRequestMessage(HttpMethod.Post, requestUrl);
+            if (nvidia) request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+            else request.Headers.Add("x-goog-api-key", apiKey);
             request.Content = new StringContent(payloadJson, System.Text.Encoding.UTF8, "application/json");
 
             using var attemptCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -178,14 +197,17 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
-                throw new TimeoutException($"Gemini {attemptTimeout.TotalSeconds:0} sn içinde yanıt vermedi.");
+                throw new TimeoutException($"{label} {attemptTimeout.TotalSeconds:0} sn içinde yanıt vermedi.");
             }
 
             using var responseScope = response;
 
             if (response.IsSuccessStatusCode)
             {
-                await _usage.IncrementAsync(UsageProvider, ct);
+                await _usage.IncrementAsync(usageProvider, ct);
+                if (nvidia)
+                    return (NvidiaChatAdapter.ToGeminiResponse(body), null);
+
                 await RecordTokensAsync(url, body, ct);
                 return (body, null);
             }
@@ -194,7 +216,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
 
             // Gunluk/aylik kota bittiyse beklemek ise yaramaz: her firma icin 6 kez
             // ~35 sn bosa beklemek yerine akisi hemen durduruyoruz.
-            if (status == 429 && QuotaExceededException.LooksLikeQuota(body))
+            if (!nvidia && status == 429 && QuotaExceededException.LooksLikeQuota(body))
             {
                 _logger.LogWarning("Gemini kotası doldu: {Body}", Truncate(body, 300));
                 await _usage.RecordErrorAsync(UsageProvider, "Kota doldu (HTTP 429)", ct);
@@ -206,7 +228,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
             if (!retryable || attempt == maxAttempts)
             {
                 _logger.LogWarning("Gemini hatası {Status}: {Body}", status, Truncate(body, 400));
-                return (null, $"Gemini API {status}: {Truncate(body, 200)}");
+                return (null, $"{label} API {status}: {Truncate(body, 200)}");
             }
 
             _logger.LogInformation(
@@ -427,7 +449,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
     /// </summary>
     public async Task<CompanyRatingAiResult> RateCompanyAsync(CompanyRatingInput input, CancellationToken ct = default)
     {
-        var apiKey = await _settings.GetAsync(SettingKeys.GeminiApiKey, ct);
+        var apiKey = await AiProviders.ActiveKeyAsync(_settings, ct);
         if (string.IsNullOrWhiteSpace(apiKey))
             return CompanyRatingAiResult.Failed(new MissingApiKeyException("Gemini").Message);
 
@@ -534,7 +556,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
 
     public async Task<EmailDraftAiResult> WriteEmailAsync(EmailDraftInput input, CancellationToken ct = default)
     {
-        var apiKey = await _settings.GetAsync(SettingKeys.GeminiApiKey, ct);
+        var apiKey = await AiProviders.ActiveKeyAsync(_settings, ct);
         if (string.IsNullOrWhiteSpace(apiKey))
             return EmailDraftAiResult.Failed(new MissingApiKeyException("Gemini").Message);
 
@@ -696,7 +718,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
     /// </summary>
     public async Task<BusinessProfileDraft> DraftBusinessProfileAsync(string siteUrl, string siteText, CancellationToken ct = default)
     {
-        var apiKey = await _settings.GetAsync(SettingKeys.GeminiApiKey, ct);
+        var apiKey = await AiProviders.ActiveKeyAsync(_settings, ct);
         if (string.IsNullOrWhiteSpace(apiKey))
             return new BusinessProfileDraft { Error = new MissingApiKeyException("Gemini").Message };
 
@@ -833,7 +855,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
 
     public async Task<List<string>> SuggestSearchTermsAsync(SearchTermRequest request, CancellationToken ct = default)
     {
-        var apiKey = await _settings.GetAsync(SettingKeys.GeminiApiKey, ct);
+        var apiKey = await AiProviders.ActiveKeyAsync(_settings, ct);
         if (string.IsNullOrWhiteSpace(apiKey)) throw new MissingApiKeyException("Gemini");
 
         var payload = new
@@ -907,7 +929,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         var result = new Dictionary<int, CandidateVerdict>();
         if (request.Candidates.Count == 0) return result;
 
-        var apiKey = await _settings.GetAsync(SettingKeys.GeminiApiKey, ct);
+        var apiKey = await AiProviders.ActiveKeyAsync(_settings, ct);
         if (string.IsNullOrWhiteSpace(apiKey)) throw new MissingApiKeyException("Gemini");
 
         var payload = new
@@ -1003,7 +1025,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         var result = new Dictionary<int, string>();
         if (companies.Count == 0) return result;
 
-        var apiKey = await _settings.GetAsync(SettingKeys.GeminiApiKey, ct);
+        var apiKey = await AiProviders.ActiveKeyAsync(_settings, ct);
         if (string.IsNullOrWhiteSpace(apiKey)) throw new MissingApiKeyException("Gemini");
 
         var list = string.Join("\n", companies.Select(c => $"[{c.Id}] {c.Text}"));

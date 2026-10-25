@@ -59,6 +59,12 @@ public class SettingsController : Controller
                     ? form.GeminiModel.Trim()
                     : null,
             [SettingKeys.ApolloApiKey] = form.ApolloApiKey?.Trim(),
+            // Bos veya "gemini" = varsayilan saglayici (kayit tutulmaz).
+            [SettingKeys.AiProvider] = string.Equals(form.AiProvider?.Trim(), AiProviders.Nvidia, StringComparison.OrdinalIgnoreCase)
+                ? AiProviders.Nvidia
+                : null,
+            [SettingKeys.NvidiaApiKey] = form.NvidiaApiKey?.Trim(),
+            [SettingKeys.NvidiaModel] = Clean(form.NvidiaModel),
             [SettingKeys.SerperCreditLimit] = form.SerperCreditLimit > 0
                 ? form.SerperCreditLimit.ToString()
                 : null,
@@ -248,6 +254,9 @@ public class SettingsController : Controller
             SerperApiKey = Stored(SettingKeys.SerperApiKey),
             GeminiApiKey = Stored(SettingKeys.GeminiApiKey),
             ApolloApiKey = Stored(SettingKeys.ApolloApiKey),
+            AiProvider = Stored(SettingKeys.AiProvider),
+            NvidiaApiKey = Stored(SettingKeys.NvidiaApiKey),
+            NvidiaModel = Stored(SettingKeys.NvidiaModel),
 
             SerperFromConfig = FromConfig(SettingKeys.SerperApiKey),
             GeminiFromConfig = FromConfig(SettingKeys.GeminiApiKey),
