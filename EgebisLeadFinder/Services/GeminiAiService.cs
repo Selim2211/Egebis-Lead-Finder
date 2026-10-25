@@ -154,6 +154,8 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
     /// Gemini'nin ucretsiz katmani dakikalik istek limiti uygular ve limit asilinca
     /// 429 doner. Bu gecici bir durumdur, artan bekleme ile tekrar denenir.
     /// </summary>
+    private static readonly TimeSpan NvidiaMinTimeout = TimeSpan.FromSeconds(120);
+
     private async Task<(string? Content, string? Error)> SendWithRetryAsync(
         string url, string payloadJson, string apiKey, CancellationToken ct, TimeSpan? timeout = null)
     {
@@ -161,6 +163,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         var label = nvidia ? "NVIDIA" : "Gemini";
         var usageProvider = nvidia ? AiProviders.NvidiaUsageProvider : UsageProvider;
         var requestUrl = url;
+        string? nvidiaModel = null, originalPayload = payloadJson;
         if (nvidia)
         {
             // Cagri noktalari Gemini bicimli istek uretir; burada OpenAI chat istegine cevrilir.
@@ -169,10 +172,14 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
             const string suffix = ":generateContent";
             if (model.EndsWith(suffix, StringComparison.Ordinal)) model = model[..^suffix.Length];
             requestUrl = AiProviders.NvidiaEndpoint;
+            nvidiaModel = model;
             payloadJson = NvidiaChatAdapter.ToChatRequest(payloadJson, model);
         }
 
         var attemptTimeout = timeout ?? TimeSpan.FromSeconds(_options.TimeoutSeconds);
+        // Ucretsiz NVIDIA uclari yogunlukta yavas yanit verir; 45 sn cok kisa kaliyordu.
+        if (nvidia && attemptTimeout < NvidiaMinTimeout) attemptTimeout = NvidiaMinTimeout;
+        var thinkingParamsDropped = false;
         // Gemini ucretsiz katmaninda "model su an yogun talep altinda" (503) hatasi
         // dakikalarca surebilir; 4 deneme (~35 sn) cogu zaman yetersiz kaliyordu.
         const int maxAttempts = 6;
@@ -221,6 +228,15 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
                 _logger.LogWarning("Gemini kotası doldu: {Body}", Truncate(body, 300));
                 await _usage.RecordErrorAsync(UsageProvider, "Kota doldu (HTTP 429)", ct);
                 throw new QuotaExceededException("Gemini");
+            }
+
+            // Model dusunme kapatma parametresini tanimiyorsa parametresiz tekrar dene.
+            if (nvidia && status is 400 or 422 && !thinkingParamsDropped)
+            {
+                thinkingParamsDropped = true;
+                payloadJson = NvidiaChatAdapter.ToChatRequest(originalPayload, nvidiaModel!, thinkingOff: false);
+                _logger.LogInformation("NVIDIA {Status}: düşünme parametresi olmadan tekrar deneniyor.", status);
+                continue;
             }
 
             var retryable = status == 429 || status >= 500;

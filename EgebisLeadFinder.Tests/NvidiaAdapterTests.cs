@@ -55,6 +55,23 @@ public class NvidiaAdapterTests
     public void Json_ayiklama(string input, string expected) =>
         Assert.Equal(expected, NvidiaChatAdapter.ExtractJson(input));
 
+    [Theory]
+    [InlineData("openai/gpt-oss-20b", "reasoning_effort")]
+    [InlineData("nvidia/nemotron-3.5-lightning-30b-a3b", "chat_template_kwargs")]
+    [InlineData("deepseek-ai/deepseek-v4.1-flash", "chat_template_kwargs")]
+    public void Dusunme_model_ailesine_gore_kapatilir(string model, string param)
+    {
+        using var on = JsonDocument.Parse(NvidiaChatAdapter.ToChatRequest(GeminiPayload, model));
+        Assert.True(on.RootElement.TryGetProperty(param, out _));
+
+        using var off = JsonDocument.Parse(NvidiaChatAdapter.ToChatRequest(GeminiPayload, model, thinkingOff: false));
+        Assert.False(off.RootElement.TryGetProperty(param, out _));
+    }
+
+    [Fact]
+    public void Think_blogu_cevaptan_atilir() =>
+        Assert.Equal("{\"a\":1}", NvidiaChatAdapter.ExtractJson("<think>uzun düşünce</think>\n{\"a\":1}"));
+
     [Fact]
     public void Bos_yanit_aday_icermez()
     {

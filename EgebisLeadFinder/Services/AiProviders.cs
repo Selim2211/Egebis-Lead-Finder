@@ -14,7 +14,7 @@ public static class AiProviders
     public const string Gemini = "gemini";
     public const string Nvidia = "nvidia";
     public const string NvidiaEndpoint = "https://integrate.api.nvidia.com/v1/chat/completions";
-    public const string NvidiaDefaultModel = "meta/llama-3.3-70b-instruct";
+    public const string NvidiaDefaultModel = "nvidia/nemotron-3.5-lightning-30b-a3b";
 
     /// <summary>API kullanim sayacinda NVIDIA cagrilari bu adla tutulur.</summary>
     public const string NvidiaUsageProvider = "Nvidia";
@@ -39,9 +39,36 @@ public static class AiProviders
 /// <summary>Gemini bicimli istegi OpenAI chat istegine, chat yanitini Gemini zarfina cevirir.</summary>
 public static class NvidiaChatAdapter
 {
-    private const int MaxTokens = 4096;
+    // Dusunme kapali olsa bile bazi modeller kisa bir akil yurutme yazar; JSON yarim kalmasin.
+    private const int MaxTokens = 8192;
 
-    public static string ToChatRequest(string geminiPayloadJson, string model)
+    /// <summary>
+    /// Yeni NVIDIA modellerinin cogu cevaptan once uzun "dusunur" (reasoning); firma basina
+    /// 45+ sn surer. Model ailesine gore dusunmeyi kapatan / en aza indiren parametreler eklenir.
+    /// Model bir parametreyi tanimazsa (HTTP 400) cagiran taraf parametresiz yeniden dener.
+    /// </summary>
+    public static bool AddThinkingOff(JsonObject body, string model)
+    {
+        var m = model.ToLowerInvariant();
+        if (m.Contains("gpt-oss"))
+        {
+            body["reasoning_effort"] = "low";
+            return true;
+        }
+        if (m.Contains("nemotron") || m.Contains("qwen"))
+        {
+            body["chat_template_kwargs"] = new JsonObject { ["enable_thinking"] = false };
+            return true;
+        }
+        if (m.Contains("deepseek") || m.Contains("kimi"))
+        {
+            body["chat_template_kwargs"] = new JsonObject { ["thinking"] = false };
+            return true;
+        }
+        return false;
+    }
+
+    public static string ToChatRequest(string geminiPayloadJson, string model, bool thinkingOff = true)
     {
         var src = JsonNode.Parse(geminiPayloadJson)!.AsObject();
         var gen = src["generationConfig"] as JsonObject;
@@ -74,14 +101,16 @@ public static class NvidiaChatAdapter
         }
 
         var temperature = gen?["temperature"] is JsonValue t && t.TryGetValue<double>(out var d) ? d : 0.2;
-        return new JsonObject
+        var body = new JsonObject
         {
             ["model"] = model,
             ["messages"] = messages,
             ["temperature"] = temperature,
             ["max_tokens"] = MaxTokens,
             ["stream"] = false
-        }.ToJsonString();
+        };
+        if (thinkingOff) AddThinkingOff(body, model);
+        return body.ToJsonString();
     }
 
     /// <summary>OpenAI chat yanitini, mevcut ExtractText'in bekledigi Gemini zarfina cevirir.</summary>
@@ -128,6 +157,9 @@ public static class NvidiaChatAdapter
     public static string ExtractJson(string text)
     {
         var t = text.Trim();
+        // Bazi modeller dusunmeyi <think>...</think> olarak cevabin basina yazar.
+        var thinkEnd = t.IndexOf("</think>", StringComparison.OrdinalIgnoreCase);
+        if (thinkEnd >= 0) t = t[(thinkEnd + "</think>".Length)..].Trim();
         if (t.StartsWith("```", StringComparison.Ordinal))
         {
             var nl = t.IndexOf('\n');
