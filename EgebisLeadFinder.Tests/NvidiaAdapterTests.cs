@@ -88,6 +88,24 @@ public class NvidiaAdapterTests
     }
 
     [Fact]
+    public void Token_butcesi_varsa_kaynak_metin_kirpilir_sistem_korunur()
+    {
+        var longText = new string('a', 60_000);
+        var payload = GeminiPayload.Replace("Firma metni", longText);
+        using var doc = JsonDocument.Parse(OpenAiChatAdapter.ToChatRequest(payload, "openai/gpt-oss-120b", tokenBudget: 7000));
+        var root = doc.RootElement;
+        var maxTokens = root.GetProperty("max_tokens").GetInt32();
+        var messages = root.GetProperty("messages");
+        var system = messages[0].GetProperty("content").GetString()!;
+        var user = messages[1].GetProperty("content").GetString()!;
+
+        Assert.Contains("\"ad\"", system); // sema kirpilmaz
+        Assert.Contains("kısaltıldı", user);
+        var total = OpenAiChatAdapter.EstimateTokens(system) + OpenAiChatAdapter.EstimateTokens(user) + maxTokens;
+        Assert.True(total <= 7100, $"toplam {total}");
+    }
+
+    [Fact]
     public void Think_blogu_cevaptan_atilir() =>
         Assert.Equal("{\"a\":1}", OpenAiChatAdapter.ExtractJson("<think>uzun düşünce</think>\n{\"a\":1}"));
 

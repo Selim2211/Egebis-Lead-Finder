@@ -7,7 +7,7 @@ namespace EgebisLeadFinder.Services;
 /// <summary>OpenAI uyumlu chat completions saglayicisi (NVIDIA, Groq).</summary>
 public sealed record ChatProvider(
     string Id, string Label, string Endpoint, string KeySetting, string ModelSetting,
-    string DefaultModel, string UsageName);
+    string DefaultModel, string UsageName, int? RequestTokenBudget = null);
 
 /// <summary>
 /// Yapay zeka saglayicisi secimi. Varsayilan Gemini; Ayarlar'dan OpenAI uyumlu bir saglayici
@@ -26,7 +26,9 @@ public static class AiProviders
 
     public static readonly ChatProvider GroqProvider = new(
         Groq, "Groq", "https://api.groq.com/openai/v1/chat/completions",
-        SettingKeys.GroqApiKey, SettingKeys.GroqModel, "openai/gpt-oss-120b", "Groq");
+        SettingKeys.GroqApiKey, SettingKeys.GroqModel, "openai/gpt-oss-120b", "Groq",
+        // Ucretsiz katman dakikada 8000 token; tek istek (girdi + cikti payi) bunu asarsa 413 doner.
+        RequestTokenBudget: 7000);
 
     /// <summary>Secili OpenAI uyumlu saglayici; Gemini seciliyse null.</summary>
     public static async Task<ChatProvider?> ChatProviderAsync(ISettingsService settings, CancellationToken ct) =>
@@ -82,7 +84,8 @@ public static class OpenAiChatAdapter
         return false;
     }
 
-    public static string ToChatRequest(string geminiPayloadJson, string model, bool thinkingOff = true, bool jsonMode = false)
+    public static string ToChatRequest(string geminiPayloadJson, string model, bool thinkingOff = true, bool jsonMode = false,
+        int? tokenBudget = null)
     {
         var src = JsonNode.Parse(geminiPayloadJson)!.AsObject();
         var gen = src["generationConfig"] as JsonObject;
@@ -122,18 +125,48 @@ public static class OpenAiChatAdapter
             }
         }
 
+        // Token butcesi varsa (Groq ucretsiz katman) cikti payi kucultulur, en uzun mesaj
+        // (genelde site/kaynak metni) butceye sigacak kadar kirpilir.
+        var maxTokens = MaxTokens;
+        if (tokenBudget is { } budget)
+        {
+            maxTokens = Math.Min(MaxTokens, Math.Max(1024, budget / 4));
+            FitToBudget(messages, budget - maxTokens);
+        }
+
         var temperature = gen?["temperature"] is JsonValue t && t.TryGetValue<double>(out var d) ? d : 0.2;
         var body = new JsonObject
         {
             ["model"] = model,
             ["messages"] = messages,
             ["temperature"] = temperature,
-            ["max_tokens"] = MaxTokens,
+            ["max_tokens"] = maxTokens,
             ["stream"] = false
         };
         if (thinkingOff) AddThinkingOff(body, model);
         if (jsonMode && wantsJson) body["response_format"] = new JsonObject { ["type"] = "json_object" };
         return body.ToJsonString();
+    }
+
+    /// <summary>Turkce metinde ~3 karakter = 1 token (temkinli tahmin).</summary>
+    public static int EstimateTokens(string text) => text.Length / 3 + 1;
+
+    /// <summary>Toplam tahmini token butceyi asiyorsa en uzun mesaji sonundan kirpar.</summary>
+    public static void FitToBudget(JsonArray messages, int inputBudget)
+    {
+        string Content(JsonNode? m) => (m?["content"] as JsonValue)?.GetValue<string>() ?? string.Empty;
+        var total = messages.Sum(m => EstimateTokens(Content(m)));
+        if (total <= inputBudget) return;
+
+        // Sistem mesajinin sonunda JSON semasi ve dil kurali var; once kullanici mesaji (kaynak metin) kirpilir.
+        var candidates = messages.Where(m => (m?["role"] as JsonValue)?.GetValue<string>() != "system").ToList();
+        if (candidates.Count == 0) candidates = messages.ToList();
+        var longest = candidates.OrderByDescending(m => Content(m).Length).First()!;
+        var text = Content(longest);
+        var keepTokens = EstimateTokens(text) - (total - inputBudget);
+        var keepChars = Math.Max(500, keepTokens * 3);
+        if (keepChars < text.Length)
+            longest["content"] = text[..keepChars] + "\n[... metin uzunluk sınırı nedeniyle kısaltıldı ...]";
     }
 
     /// <summary>OpenAI chat yanitini, mevcut ExtractText'in bekledigi Gemini zarfina cevirir.</summary>

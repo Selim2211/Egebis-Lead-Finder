@@ -185,13 +185,14 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
             if (model.EndsWith(suffix, StringComparison.Ordinal)) model = model[..^suffix.Length];
             requestUrl = chat!.Endpoint;
             nvidiaModel = model;
-            payloadJson = OpenAiChatAdapter.ToChatRequest(payloadJson, model, jsonMode: jsonMode);
+            payloadJson = OpenAiChatAdapter.ToChatRequest(payloadJson, model, jsonMode: jsonMode, tokenBudget: chat.RequestTokenBudget);
         }
 
         var attemptTimeout = timeout ?? TimeSpan.FromSeconds(_options.TimeoutSeconds);
         // Ucretsiz uclar yogunlukta yavas yanit verir; 45 sn cok kisa kaliyordu.
         if (nvidia && attemptTimeout < ChatMinTimeout) attemptTimeout = ChatMinTimeout;
         var thinkingParamsDropped = false;
+        var shrunk = false;
         // Gemini ucretsiz katmaninda "model su an yogun talep altinda" (503) hatasi
         // dakikalarca surebilir; 4 deneme (~35 sn) cogu zaman yetersiz kaliyordu.
         const int maxAttempts = 6;
@@ -242,11 +243,22 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
                 throw new QuotaExceededException("Gemini");
             }
 
+            // 413: istek dakikalik token sinirindan buyuk (ör. Groq ucretsiz katman); beklemek ise
+            // yaramaz, kaynak metni daha cok kirpip bir kez daha dene.
+            if (nvidia && status == 413 && !shrunk)
+            {
+                shrunk = true;
+                var smaller = (int)((chat!.RequestTokenBudget ?? 8000) * 0.6);
+                payloadJson = OpenAiChatAdapter.ToChatRequest(originalPayload, nvidiaModel!, jsonMode: jsonMode, tokenBudget: smaller);
+                _logger.LogInformation("{Label} 413: istek {Budget} token bütçesine kırpılıp tekrar deneniyor.", label, smaller);
+                continue;
+            }
+
             // Model dusunme kapatma parametresini tanimiyorsa parametresiz tekrar dene.
             if (nvidia && status is 400 or 422 && !thinkingParamsDropped)
             {
                 thinkingParamsDropped = true;
-                payloadJson = OpenAiChatAdapter.ToChatRequest(originalPayload, nvidiaModel!, thinkingOff: false);
+                payloadJson = OpenAiChatAdapter.ToChatRequest(originalPayload, nvidiaModel!, thinkingOff: false, tokenBudget: chat!.RequestTokenBudget);
                 _logger.LogInformation("{Label} {Status}: ek parametreler olmadan tekrar deneniyor: {Body}", label, status, Truncate(body, 300));
                 continue;
             }
