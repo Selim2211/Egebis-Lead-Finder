@@ -5,5 +5,9 @@
   "Tüm yapay zekâ işleri (analiz, puanlama, e-posta, çeviri) seçilen sağlayıcıyla yapılır.": "All AI tasks (analysis, scoring, email, translation) use the selected provider.",
   "NVIDIA seçeneği deneme amaçlıdır; hız sınırı olabilir ve sonuçlar Gemini'den farklı olabilir.": "The NVIDIA option is for trial use; it may be rate-limited and results can differ from Gemini.",
   "Tüm yapay zekâ işleri (analiz, puanlama, e-posta, çeviri) seçilen sağlayıcıyla yapılır. NVIDIA seçeneği deneme amaçlıdır; hız sınırı olabilir ve sonuçlar Gemini'den farklı olabilir.": "All AI tasks (analysis, scoring, email, translation) use the selected provider. The NVIDIA option is for trial use; it may be rate-limited and results can differ from Gemini.",
-  "NVIDIA modeli": "NVIDIA model"
+  "NVIDIA modeli": "NVIDIA model",
+  "Groq (ücretsiz katman)": "Groq (free tier)",
+  "Groq modeli": "Groq model",
+  "NVIDIA ve Groq seçenekleri ücretsiz/deneme amaçlıdır; hız sınırı olabilir ve sonuçlar Gemini'den farklı olabilir.": "The NVIDIA and Groq options are free/trial; they may be rate-limited and results can differ from Gemini.",
+  "Tüm yapay zekâ işleri (analiz, puanlama, e-posta, çeviri) seçilen sağlayıcıyla yapılır. NVIDIA ve Groq seçenekleri ücretsiz/deneme amaçlıdır; hız sınırı olabilir ve sonuçlar Gemini'den farklı olabilir.": "All AI tasks (analysis, scoring, email, translation) use the selected provider. The NVIDIA and Groq options are free/trial; they may be rate-limited and results can differ from Gemini."
 }

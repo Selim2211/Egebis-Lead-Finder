@@ -36,6 +36,8 @@ public static class SettingKeys
     public const string AiProvider = "Ai:Provider";
     public const string NvidiaApiKey = "Ai:NvidiaApiKey";
     public const string NvidiaModel = "Ai:NvidiaModel";
+    public const string GroqApiKey = "Ai:GroqApiKey";
+    public const string GroqModel = "Ai:GroqModel";
 
     /// <summary>Lead ararken kullanilacak unvan anahtar kelimeleri (virgulle ayrilmis).</summary>
     public const string LeadTitleKeywords = "Enrichment:TitleKeywords";
@@ -158,7 +160,7 @@ public static class SettingKeys
     /// <summary>Ayarlar ekranindaki tum anahtarlar.</summary>
     public static readonly string[] All =
     {
-        LeadTitleKeywords, SerperApiKey, GeminiApiKey, GeminiModel, AiProvider, NvidiaApiKey, NvidiaModel, ApolloApiKey, SerperCreditLimit,
+        LeadTitleKeywords, SerperApiKey, GeminiApiKey, GeminiModel, AiProvider, NvidiaApiKey, NvidiaModel, GroqApiKey, GroqModel, ApolloApiKey, SerperCreditLimit,
         GeminiCostPerCallTry, LastKnownUsdTryRate, UsdTryRate, SearchMaxCompanies, SearchDefaultCountry, SearchRegion, FollowUpAfterDays, IcpProfile, BusinessProfile, ExtraBlockedDomains,
         SmtpFromAddress, SmtpFromName, SmtpHost, SmtpPort, SmtpUsername, SmtpPassword, SmtpSecurity,
         SalesforceConsumerKey, SalesforceConsumerSecret, SalesforceUsername, SalesforcePassword,
@@ -170,12 +172,12 @@ public static class SettingKeys
 
     /// <summary>Deger gizlenmeli mi? API anahtarlari ve e-posta sifresi ekranda maskeli gosterilir.</summary>
     public static bool IsSecret(string key) =>
-        key is SerperApiKey or GeminiApiKey or NvidiaApiKey or ApolloApiKey or SmtpPassword or ImapPassword
+        key is SerperApiKey or GeminiApiKey or NvidiaApiKey or GroqApiKey or ApolloApiKey or SmtpPassword or ImapPassword
             or SalesforceConsumerSecret or SalesforcePassword or SalesforceSecurityToken or SalesforceRefreshToken;
 
     /// <summary>
     /// Yalnizca Ayarlar ekranindan okunan anahtarlar: bos birakilirsa User Secrets /
     /// appsettings'e dusulmez, ozellik "anahtar eksik" hatasi verir.
     /// </summary>
-    public static bool IsSettingsOnly(string key) => key is GeminiApiKey or NvidiaApiKey;
+    public static bool IsSettingsOnly(string key) => key is GeminiApiKey or NvidiaApiKey or GroqApiKey;
 }

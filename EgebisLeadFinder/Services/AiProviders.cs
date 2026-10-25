@@ -4,40 +4,54 @@ using EgebisLeadFinder.Models;
 
 namespace EgebisLeadFinder.Services;
 
+/// <summary>OpenAI uyumlu chat completions saglayicisi (NVIDIA, Groq).</summary>
+public sealed record ChatProvider(
+    string Id, string Label, string Endpoint, string KeySetting, string ModelSetting,
+    string DefaultModel, string UsageName);
+
 /// <summary>
-/// Yapay zeka saglayicisi secimi. Varsayilan Gemini; Ayarlar'dan NVIDIA (OpenAI uyumlu
-/// chat completions) secilebilir. Cagri noktalari Gemini bicimli istek uretmeye devam eder;
-/// NVIDIA icin istek/yanit <see cref="NvidiaChatAdapter"/> ile tasima katmaninda cevrilir.
+/// Yapay zeka saglayicisi secimi. Varsayilan Gemini; Ayarlar'dan OpenAI uyumlu bir saglayici
+/// (NVIDIA, Groq) secilebilir. Cagri noktalari Gemini bicimli istek uretmeye devam eder;
+/// istek/yanit <see cref="OpenAiChatAdapter"/> ile tasima katmaninda cevrilir.
 /// </summary>
 public static class AiProviders
 {
     public const string Gemini = "gemini";
     public const string Nvidia = "nvidia";
-    public const string NvidiaEndpoint = "https://integrate.api.nvidia.com/v1/chat/completions";
-    public const string NvidiaDefaultModel = "nvidia/nemotron-3.5-lightning-30b-a3b";
+    public const string Groq = "groq";
 
-    /// <summary>API kullanim sayacinda NVIDIA cagrilari bu adla tutulur.</summary>
-    public const string NvidiaUsageProvider = "Nvidia";
+    public static readonly ChatProvider NvidiaProvider = new(
+        Nvidia, "NVIDIA", "https://integrate.api.nvidia.com/v1/chat/completions",
+        SettingKeys.NvidiaApiKey, SettingKeys.NvidiaModel, "nvidia/nemotron-3.5-lightning-30b-a3b", "Nvidia");
 
-    public static async Task<bool> IsNvidiaAsync(ISettingsService settings, CancellationToken ct) =>
-        string.Equals((await settings.GetAsync(SettingKeys.AiProvider, ct))?.Trim(), Nvidia,
-            StringComparison.OrdinalIgnoreCase);
+    public static readonly ChatProvider GroqProvider = new(
+        Groq, "Groq", "https://api.groq.com/openai/v1/chat/completions",
+        SettingKeys.GroqApiKey, SettingKeys.GroqModel, "openai/gpt-oss-120b", "Groq");
+
+    /// <summary>Secili OpenAI uyumlu saglayici; Gemini seciliyse null.</summary>
+    public static async Task<ChatProvider?> ChatProviderAsync(ISettingsService settings, CancellationToken ct) =>
+        (await settings.GetAsync(SettingKeys.AiProvider, ct))?.Trim().ToLowerInvariant() switch
+        {
+            Nvidia => NvidiaProvider,
+            Groq => GroqProvider,
+            _ => null
+        };
 
     /// <summary>Secili saglayicinin API anahtari (yalnizca Ayarlar ekranindan).</summary>
     public static async Task<string?> ActiveKeyAsync(ISettingsService settings, CancellationToken ct) =>
-        await IsNvidiaAsync(settings, ct)
-            ? await settings.GetAsync(SettingKeys.NvidiaApiKey, ct)
+        await ChatProviderAsync(settings, ct) is { } p
+            ? await settings.GetAsync(p.KeySetting, ct)
             : await settings.GetAsync(SettingKeys.GeminiApiKey, ct);
 
-    public static async Task<string> NvidiaModelAsync(ISettingsService settings, CancellationToken ct)
+    public static async Task<string> ModelAsync(ChatProvider provider, ISettingsService settings, CancellationToken ct)
     {
-        var stored = (await settings.GetAsync(SettingKeys.NvidiaModel, ct))?.Trim();
-        return string.IsNullOrWhiteSpace(stored) ? NvidiaDefaultModel : stored;
+        var stored = (await settings.GetAsync(provider.ModelSetting, ct))?.Trim();
+        return string.IsNullOrWhiteSpace(stored) ? provider.DefaultModel : stored;
     }
 }
 
 /// <summary>Gemini bicimli istegi OpenAI chat istegine, chat yanitini Gemini zarfina cevirir.</summary>
-public static class NvidiaChatAdapter
+public static class OpenAiChatAdapter
 {
     // Dusunme kapali olsa bile bazi modeller kisa bir akil yurutme yazar; JSON yarim kalmasin.
     private const int MaxTokens = 8192;
@@ -68,7 +82,7 @@ public static class NvidiaChatAdapter
         return false;
     }
 
-    public static string ToChatRequest(string geminiPayloadJson, string model, bool thinkingOff = true)
+    public static string ToChatRequest(string geminiPayloadJson, string model, bool thinkingOff = true, bool jsonMode = false)
     {
         var src = JsonNode.Parse(geminiPayloadJson)!.AsObject();
         var gen = src["generationConfig"] as JsonObject;
@@ -110,6 +124,7 @@ public static class NvidiaChatAdapter
             ["stream"] = false
         };
         if (thinkingOff) AddThinkingOff(body, model);
+        if (jsonMode && wantsJson) body["response_format"] = new JsonObject { ["type"] = "json_object" };
         return body.ToJsonString();
     }
 

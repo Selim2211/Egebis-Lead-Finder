@@ -45,8 +45,8 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
     /// <summary>Ayarlar ekraninda secilen model; secim yoksa appsettings Ai:GeminiModel.</summary>
     private async Task<string> ModelAsync(CancellationToken ct)
     {
-        if (await AiProviders.IsNvidiaAsync(_settings, ct))
-            return await AiProviders.NvidiaModelAsync(_settings, ct);
+        if (await AiProviders.ChatProviderAsync(_settings, ct) is { } chatProvider)
+            return await AiProviders.ModelAsync(chatProvider, _settings, ct);
 
         var stored = (await _settings.GetAsync(SettingKeys.GeminiModel, ct))?.Trim();
         return GeminiModelCatalog.IsValidModelId(stored) ? stored! : _options.GeminiModel;
@@ -154,16 +154,28 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
     /// Gemini'nin ucretsiz katmani dakikalik istek limiti uygular ve limit asilinca
     /// 429 doner. Bu gecici bir durumdur, artan bekleme ile tekrar denenir.
     /// </summary>
-    private static readonly TimeSpan NvidiaMinTimeout = TimeSpan.FromSeconds(120);
+    private static readonly TimeSpan ChatMinTimeout = TimeSpan.FromSeconds(120);
+
+    /// <summary>429'da saglayicinin istedigi bekleme (Retry-After); Groq dakikalik token limitinde bunu gonderir.</summary>
+    private static TimeSpan? RetryAfter(HttpResponseMessage response)
+    {
+        var ra = response.Headers.RetryAfter;
+        var wait = ra?.Delta ?? (ra?.Date is { } d ? d - DateTimeOffset.UtcNow : null);
+        if (wait is null || wait <= TimeSpan.Zero) return null;
+        return wait > TimeSpan.FromSeconds(60) ? TimeSpan.FromSeconds(60) : wait;
+    }
 
     private async Task<(string? Content, string? Error)> SendWithRetryAsync(
         string url, string payloadJson, string apiKey, CancellationToken ct, TimeSpan? timeout = null)
     {
-        var nvidia = await AiProviders.IsNvidiaAsync(_settings, ct);
-        var label = nvidia ? "NVIDIA" : "Gemini";
-        var usageProvider = nvidia ? AiProviders.NvidiaUsageProvider : UsageProvider;
+        var chat = await AiProviders.ChatProviderAsync(_settings, ct);
+        var nvidia = chat is not null; // OpenAI uyumlu saglayici (NVIDIA, Groq)
+        var label = chat?.Label ?? "Gemini";
+        var usageProvider = chat?.UsageName ?? UsageProvider;
         var requestUrl = url;
         string? nvidiaModel = null, originalPayload = payloadJson;
+        // Groq JSON modunu destekler; NVIDIA'da bazi modeller reddettigi icin kullanilmaz.
+        var jsonMode = chat?.Id == AiProviders.Groq;
         if (nvidia)
         {
             // Cagri noktalari Gemini bicimli istek uretir; burada OpenAI chat istegine cevrilir.
@@ -171,14 +183,14 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
             var model = url.StartsWith(prefix, StringComparison.Ordinal) ? url[prefix.Length..] : url;
             const string suffix = ":generateContent";
             if (model.EndsWith(suffix, StringComparison.Ordinal)) model = model[..^suffix.Length];
-            requestUrl = AiProviders.NvidiaEndpoint;
+            requestUrl = chat!.Endpoint;
             nvidiaModel = model;
-            payloadJson = NvidiaChatAdapter.ToChatRequest(payloadJson, model);
+            payloadJson = OpenAiChatAdapter.ToChatRequest(payloadJson, model, jsonMode: jsonMode);
         }
 
         var attemptTimeout = timeout ?? TimeSpan.FromSeconds(_options.TimeoutSeconds);
-        // Ucretsiz NVIDIA uclari yogunlukta yavas yanit verir; 45 sn cok kisa kaliyordu.
-        if (nvidia && attemptTimeout < NvidiaMinTimeout) attemptTimeout = NvidiaMinTimeout;
+        // Ucretsiz uclar yogunlukta yavas yanit verir; 45 sn cok kisa kaliyordu.
+        if (nvidia && attemptTimeout < ChatMinTimeout) attemptTimeout = ChatMinTimeout;
         var thinkingParamsDropped = false;
         // Gemini ucretsiz katmaninda "model su an yogun talep altinda" (503) hatasi
         // dakikalarca surebilir; 4 deneme (~35 sn) cogu zaman yetersiz kaliyordu.
@@ -213,7 +225,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
             {
                 await _usage.IncrementAsync(usageProvider, ct);
                 if (nvidia)
-                    return (NvidiaChatAdapter.ToGeminiResponse(body), null);
+                    return (OpenAiChatAdapter.ToGeminiResponse(body), null);
 
                 await RecordTokensAsync(url, body, ct);
                 return (body, null);
@@ -234,8 +246,8 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
             if (nvidia && status is 400 or 422 && !thinkingParamsDropped)
             {
                 thinkingParamsDropped = true;
-                payloadJson = NvidiaChatAdapter.ToChatRequest(originalPayload, nvidiaModel!, thinkingOff: false);
-                _logger.LogInformation("NVIDIA {Status}: düşünme parametresi olmadan tekrar deneniyor.", status);
+                payloadJson = OpenAiChatAdapter.ToChatRequest(originalPayload, nvidiaModel!, thinkingOff: false);
+                _logger.LogInformation("{Label} {Status}: ek parametreler olmadan tekrar deneniyor: {Body}", label, status, Truncate(body, 300));
                 continue;
             }
 
@@ -251,7 +263,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
                 "Gemini {Status} döndü, {Delay} sn sonra tekrar denenecek ({Attempt}/{Max}).",
                 status, delay.TotalSeconds, attempt, maxAttempts);
 
-            await Task.Delay(delay, ct);
+            await Task.Delay(status == 429 && RetryAfter(response) is { } wait && wait > delay ? wait : delay, ct);
             delay *= 2;
         }
 

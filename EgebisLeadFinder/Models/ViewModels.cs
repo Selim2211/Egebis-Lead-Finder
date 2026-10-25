@@ -437,10 +437,12 @@ public class SettingsViewModel
     public string? ApolloApiKey { get; set; }
 
     // --- Yapay zeka saglayicisi (varsayilan Gemini; istege bagli NVIDIA) ---
-    /// <summary>"nvidia" ya da bos (= Gemini).</summary>
+    /// <summary>"nvidia", "groq" ya da bos (= Gemini).</summary>
     public string? AiProvider { get; set; }
     public string? NvidiaApiKey { get; set; }
     public string? NvidiaModel { get; set; }
+    public string? GroqApiKey { get; set; }
+    public string? GroqModel { get; set; }
 
     // --- Firma arama parametreleri ---
 

@@ -60,11 +60,13 @@ public class SettingsController : Controller
                     : null,
             [SettingKeys.ApolloApiKey] = form.ApolloApiKey?.Trim(),
             // Bos veya "gemini" = varsayilan saglayici (kayit tutulmaz).
-            [SettingKeys.AiProvider] = string.Equals(form.AiProvider?.Trim(), AiProviders.Nvidia, StringComparison.OrdinalIgnoreCase)
-                ? AiProviders.Nvidia
+            [SettingKeys.AiProvider] = form.AiProvider?.Trim().ToLowerInvariant() is AiProviders.Nvidia or AiProviders.Groq
+                ? form.AiProvider.Trim().ToLowerInvariant()
                 : null,
             [SettingKeys.NvidiaApiKey] = form.NvidiaApiKey?.Trim(),
             [SettingKeys.NvidiaModel] = Clean(form.NvidiaModel),
+            [SettingKeys.GroqApiKey] = form.GroqApiKey?.Trim(),
+            [SettingKeys.GroqModel] = Clean(form.GroqModel),
             [SettingKeys.SerperCreditLimit] = form.SerperCreditLimit > 0
                 ? form.SerperCreditLimit.ToString()
                 : null,
@@ -257,6 +259,8 @@ public class SettingsController : Controller
             AiProvider = Stored(SettingKeys.AiProvider),
             NvidiaApiKey = Stored(SettingKeys.NvidiaApiKey),
             NvidiaModel = Stored(SettingKeys.NvidiaModel),
+            GroqApiKey = Stored(SettingKeys.GroqApiKey),
+            GroqModel = Stored(SettingKeys.GroqModel),
 
             SerperFromConfig = FromConfig(SettingKeys.SerperApiKey),
             GeminiFromConfig = FromConfig(SettingKeys.GeminiApiKey),

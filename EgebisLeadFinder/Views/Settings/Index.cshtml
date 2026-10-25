@@ -478,10 +478,11 @@
                     <select class="form-select" name="AiProvider" id="aiProvider">
                         <option value="" selected="@(Model.AiProvider != "nvidia")">Google Gemini (varsayılan)</option>
                         <option value="nvidia" selected="@(Model.AiProvider == "nvidia")">NVIDIA (ücretsiz deneme)</option>
+                        <option value="groq" selected="@(Model.AiProvider == "groq")">Groq (ücretsiz katman)</option>
                     </select>
                     <div class="form-text">
                         Tüm yapay zekâ işleri (analiz, puanlama, e-posta, çeviri) seçilen sağlayıcıyla yapılır.
-                        NVIDIA seçeneği deneme amaçlıdır; hız sınırı olabilir ve sonuçlar Gemini'den farklı olabilir.
+                        NVIDIA ve Groq seçenekleri ücretsiz/deneme amaçlıdır; hız sınırı olabilir ve sonuçlar Gemini'den farklı olabilir.
                     </div>
                     <div class="row g-3 mt-1">
                         <div class="col-md-7">
@@ -492,6 +493,15 @@
                             <label class="form-label">NVIDIA modeli</label>
                             <input class="form-control font-monospace" asp-for="NvidiaModel"
                                    placeholder="nvidia/nemotron-3.5-lightning-30b-a3b" autocomplete="off" />
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label">Groq API Key</label>
+                            <input class="form-control font-monospace" asp-for="GroqApiKey" autocomplete="off" />
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Groq modeli</label>
+                            <input class="form-control font-monospace" asp-for="GroqModel"
+                                   placeholder="openai/gpt-oss-120b" autocomplete="off" />
                         </div>
                     </div>
                 </div>

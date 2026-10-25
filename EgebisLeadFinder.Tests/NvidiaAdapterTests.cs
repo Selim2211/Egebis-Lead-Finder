@@ -15,7 +15,7 @@ public class NvidiaAdapterTests
     [Fact]
     public void Gemini_istegi_chat_istegine_cevrilir()
     {
-        var json = NvidiaChatAdapter.ToChatRequest(GeminiPayload, "meta/llama-3.3-70b-instruct");
+        var json = OpenAiChatAdapter.ToChatRequest(GeminiPayload, "meta/llama-3.3-70b-instruct");
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
@@ -39,7 +39,7 @@ public class NvidiaAdapterTests
              "usage":{"prompt_tokens":12,"completion_tokens":5}}
             """;
 
-        var gemini = NvidiaChatAdapter.ToGeminiResponse(chat);
+        var gemini = OpenAiChatAdapter.ToGeminiResponse(chat);
         using var doc = JsonDocument.Parse(gemini);
         var text = doc.RootElement.GetProperty("candidates")[0].GetProperty("content")
             .GetProperty("parts")[0].GetProperty("text").GetString();
@@ -53,7 +53,7 @@ public class NvidiaAdapterTests
     [InlineData("Işte sonuç: {\"a\":1} Umarım yardımcı olur.", "{\"a\":1}")]
     [InlineData("```\n{\"a\":1}\n```", "{\"a\":1}")]
     public void Json_ayiklama(string input, string expected) =>
-        Assert.Equal(expected, NvidiaChatAdapter.ExtractJson(input));
+        Assert.Equal(expected, OpenAiChatAdapter.ExtractJson(input));
 
     [Theory]
     [InlineData("openai/gpt-oss-20b", "reasoning_effort")]
@@ -61,21 +61,31 @@ public class NvidiaAdapterTests
     [InlineData("deepseek-ai/deepseek-v4.1-flash", "chat_template_kwargs")]
     public void Dusunme_model_ailesine_gore_kapatilir(string model, string param)
     {
-        using var on = JsonDocument.Parse(NvidiaChatAdapter.ToChatRequest(GeminiPayload, model));
+        using var on = JsonDocument.Parse(OpenAiChatAdapter.ToChatRequest(GeminiPayload, model));
         Assert.True(on.RootElement.TryGetProperty(param, out _));
 
-        using var off = JsonDocument.Parse(NvidiaChatAdapter.ToChatRequest(GeminiPayload, model, thinkingOff: false));
+        using var off = JsonDocument.Parse(OpenAiChatAdapter.ToChatRequest(GeminiPayload, model, thinkingOff: false));
         Assert.False(off.RootElement.TryGetProperty(param, out _));
     }
 
     [Fact]
+    public void Json_modu_yalnizca_istenince_eklenir()
+    {
+        using var on = JsonDocument.Parse(OpenAiChatAdapter.ToChatRequest(GeminiPayload, "openai/gpt-oss-120b", jsonMode: true));
+        Assert.Equal("json_object", on.RootElement.GetProperty("response_format").GetProperty("type").GetString());
+
+        using var off = JsonDocument.Parse(OpenAiChatAdapter.ToChatRequest(GeminiPayload, "openai/gpt-oss-120b"));
+        Assert.False(off.RootElement.TryGetProperty("response_format", out _));
+    }
+
+    [Fact]
     public void Think_blogu_cevaptan_atilir() =>
-        Assert.Equal("{\"a\":1}", NvidiaChatAdapter.ExtractJson("<think>uzun düşünce</think>\n{\"a\":1}"));
+        Assert.Equal("{\"a\":1}", OpenAiChatAdapter.ExtractJson("<think>uzun düşünce</think>\n{\"a\":1}"));
 
     [Fact]
     public void Bos_yanit_aday_icermez()
     {
-        var gemini = NvidiaChatAdapter.ToGeminiResponse("""{"choices":[]}""");
+        var gemini = OpenAiChatAdapter.ToGeminiResponse("""{"choices":[]}""");
         using var doc = JsonDocument.Parse(gemini);
         Assert.False(doc.RootElement.TryGetProperty("candidates", out _));
     }
