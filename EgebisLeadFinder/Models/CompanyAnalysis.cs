@@ -13,6 +13,10 @@ public class CompanyAnalysis
     [JsonPropertyName("companyName")]
     public string? CompanyName { get; set; }
 
+    /// <summary>Analizi ureten model (OpenAI uyumlu saglayicilarda yazilir; Gemini'de bos).</summary>
+    [JsonPropertyName("aiModel")]
+    public string? AiModel { get; set; }
+
     [JsonPropertyName("industry")]
     public string? Industry { get; set; }
 

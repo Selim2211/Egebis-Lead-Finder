@@ -176,16 +176,17 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         string? nvidiaModel = null, originalPayload = payloadJson;
         // Groq JSON modunu destekler; NVIDIA'da bazi modeller reddettigi icin kullanilmaz.
         var jsonMode = chat?.Id == AiProviders.Groq;
+        // Model havuzu: ayarlardaki sirali liste; dolu (sinira takilmis) modeller atlanir.
+        IReadOnlyList<string> models = Array.Empty<string>();
+        var triedModels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (nvidia)
         {
             // Cagri noktalari Gemini bicimli istek uretir; burada OpenAI chat istegine cevrilir.
-            var prefix = _options.GeminiEndpoint.TrimEnd('/') + "/";
-            var model = url.StartsWith(prefix, StringComparison.Ordinal) ? url[prefix.Length..] : url;
-            const string suffix = ":generateContent";
-            if (model.EndsWith(suffix, StringComparison.Ordinal)) model = model[..^suffix.Length];
             requestUrl = chat!.Endpoint;
-            nvidiaModel = model;
-            payloadJson = OpenAiChatAdapter.ToChatRequest(payloadJson, model, jsonMode: jsonMode, tokenBudget: chat.RequestTokenBudget);
+            models = await AiProviders.ModelListAsync(chat, _settings, ct);
+            nvidiaModel = ChatModelPool.Next(chat.Id, models, triedModels, DateTimeOffset.UtcNow) ?? models[0];
+            triedModels.Add(nvidiaModel);
+            payloadJson = OpenAiChatAdapter.ToChatRequest(payloadJson, nvidiaModel, jsonMode: jsonMode, tokenBudget: chat.RequestTokenBudget);
         }
 
         var attemptTimeout = timeout ?? TimeSpan.FromSeconds(_options.TimeoutSeconds);
@@ -226,7 +227,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
             {
                 await _usage.IncrementAsync(usageProvider, ct);
                 if (nvidia)
-                    return (OpenAiChatAdapter.ToGeminiResponse(body), null);
+                    return (OpenAiChatAdapter.ToGeminiResponse(body, nvidiaModel), null);
 
                 await RecordTokensAsync(url, body, ct);
                 return (body, null);
@@ -243,13 +244,39 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
                 throw new QuotaExceededException("Gemini");
             }
 
+            // Model sinira takildi ya da kaldirilmis: "dolu" isaretle, havuzda siradaki modele gec.
+            if (nvidia && (status == 429 || ChatModelPool.IsModelGone(status, body)))
+            {
+                var now = DateTimeOffset.UtcNow;
+                ChatModelPool.Block(chat!.Id, nvidiaModel!, ChatModelPool.BlockDuration(status, body, RetryAfter(response)), now);
+                if (ChatModelPool.Next(chat.Id, models, triedModels, now) is { } nextModel)
+                {
+                    _logger.LogInformation("{Label} {Model} sınıra takıldı ({Status}); {Next} modeline geçiliyor.",
+                        label, nvidiaModel, status, nextModel);
+                    nvidiaModel = nextModel;
+                    triedModels.Add(nextModel);
+                    shrunk = false;
+                    payloadJson = OpenAiChatAdapter.ToChatRequest(originalPayload, nvidiaModel,
+                        thinkingOff: !thinkingParamsDropped, jsonMode: jsonMode && !thinkingParamsDropped,
+                        tokenBudget: chat.RequestTokenBudget);
+                    attempt--; // model degisimi deneme hakkindan dusmez
+                    continue;
+                }
+                if (ChatModelPool.IsModelGone(status, body))
+                {
+                    _logger.LogWarning("{Label} modeli kullanılamıyor: {Body}", label, Truncate(body, 300));
+                    return (null, $"{label} API {status}: {Truncate(body, 200)}");
+                }
+            }
+
             // 413: istek dakikalik token sinirindan buyuk (ör. Groq ucretsiz katman); beklemek ise
             // yaramaz, kaynak metni daha cok kirpip bir kez daha dene.
             if (nvidia && status == 413 && !shrunk)
             {
                 shrunk = true;
                 var smaller = (int)((chat!.RequestTokenBudget ?? 8000) * 0.6);
-                payloadJson = OpenAiChatAdapter.ToChatRequest(originalPayload, nvidiaModel!, jsonMode: jsonMode, tokenBudget: smaller);
+                payloadJson = OpenAiChatAdapter.ToChatRequest(originalPayload, nvidiaModel!,
+                    thinkingOff: !thinkingParamsDropped, jsonMode: jsonMode && !thinkingParamsDropped, tokenBudget: smaller);
                 _logger.LogInformation("{Label} 413: istek {Budget} token bütçesine kırpılıp tekrar deneniyor.", label, smaller);
                 continue;
             }

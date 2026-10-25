@@ -85,7 +85,13 @@
     <div class="col-lg-7">
         <div class="card mb-4" data-tab="ozet">
             <div class="card-header d-flex justify-content-between align-items-center gap-2">
-                <span>Yapay Zeka Analizi</span>
+                <span>
+                    Yapay Zeka Analizi
+                    @if (!string.IsNullOrWhiteSpace(analysis?.AiModel))
+                    {
+                        <span class="tag tag-muted ms-1 font-monospace" translate="no" title="Bu analizi üreten model">@analysis.AiModel</span>
+                    }
+                </span>
 
                 @* Site okuma + Gemini analizi tek firma icin tekrar denenir. Ilk
                    aramada Gemini kotasi/gecici hata yuzunden analiz basarisiz

@@ -499,9 +499,10 @@
                             <input class="form-control font-monospace" asp-for="GroqApiKey" autocomplete="off" />
                         </div>
                         <div class="col-md-5">
-                            <label class="form-label">Groq modeli</label>
+                            <label class="form-label">Groq modelleri</label>
                             <input class="form-control font-monospace" asp-for="GroqModel"
-                                   placeholder="openai/gpt-oss-120b" autocomplete="off" />
+                                   placeholder="openai/gpt-oss-120b, openai/gpt-oss-20b" autocomplete="off" />
+                            <div class="form-text">Virgülle sıralı model listesi; biri sınıra takılınca sıradakine geçilir. Boşsa varsayılan liste kullanılır.</div>
                         </div>
                     </div>
                 </div>

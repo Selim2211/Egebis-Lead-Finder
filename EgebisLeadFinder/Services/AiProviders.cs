@@ -1,4 +1,7 @@
+using System.Collections.Concurrent;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Text.Json.Nodes;
 using EgebisLeadFinder.Models;
 
@@ -26,7 +29,7 @@ public static class AiProviders
 
     public static readonly ChatProvider GroqProvider = new(
         Groq, "Groq", "https://api.groq.com/openai/v1/chat/completions",
-        SettingKeys.GroqApiKey, SettingKeys.GroqModel, "openai/gpt-oss-120b", "Groq",
+        SettingKeys.GroqApiKey, SettingKeys.GroqModel, "openai/gpt-oss-120b, openai/gpt-oss-20b", "Groq",
         // Ucretsiz katman dakikada 8000 token; tek istek (girdi + cikti payi) bunu asarsa 413 doner.
         RequestTokenBudget: 7000);
 
@@ -45,11 +48,73 @@ public static class AiProviders
             ? await settings.GetAsync(p.KeySetting, ct)
             : await settings.GetAsync(SettingKeys.GeminiApiKey, ct);
 
-    public static async Task<string> ModelAsync(ChatProvider provider, ISettingsService settings, CancellationToken ct)
+    /// <summary>Ilk (oncelikli) model.</summary>
+    public static async Task<string> ModelAsync(ChatProvider provider, ISettingsService settings, CancellationToken ct) =>
+        (await ModelListAsync(provider, settings, ct))[0];
+
+    /// <summary>Model havuzu: Ayarlar'da virgulle yazilan sirali liste; bossa saglayicinin varsayilani.</summary>
+    public static async Task<IReadOnlyList<string>> ModelListAsync(ChatProvider provider, ISettingsService settings, CancellationToken ct)
     {
-        var stored = (await settings.GetAsync(provider.ModelSetting, ct))?.Trim();
-        return string.IsNullOrWhiteSpace(stored) ? provider.DefaultModel : stored;
+        var list = ChatModelPool.Parse(await settings.GetAsync(provider.ModelSetting, ct));
+        return list.Count > 0 ? list : ChatModelPool.Parse(provider.DefaultModel);
     }
+}
+
+/// <summary>
+/// Ayni hesabin modelleri arasinda yedekleme: Groq'ta sinirlar model basinadir. Bir model
+/// dakikalik/gunluk sinira takilinca ya da kaldirilmissa bir sure "dolu" isaretlenir ve
+/// siradaki modele gecilir. Durum bellekte tutulur (uygulama yeniden baslayinca sifirlanir).
+/// </summary>
+public static class ChatModelPool
+{
+    private static readonly ConcurrentDictionary<string, DateTimeOffset> BlockedUntil = new(StringComparer.OrdinalIgnoreCase);
+
+    public static IReadOnlyList<string> Parse(string? setting) =>
+        (setting ?? string.Empty)
+            .Split(new[] { ',', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    /// <summary>Bu cagrida denenmemis ve dolu olmayan ilk model; yoksa null.</summary>
+    public static string? Next(string provider, IReadOnlyList<string> models, ICollection<string> tried, DateTimeOffset now) =>
+        models.FirstOrDefault(m => !tried.Contains(m) && !IsBlocked(provider, m, now));
+
+    public static bool IsBlocked(string provider, string model, DateTimeOffset now) =>
+        BlockedUntil.TryGetValue(provider + "|" + model, out var until) && until > now;
+
+    public static void Block(string provider, string model, TimeSpan duration, DateTimeOffset now) =>
+        BlockedUntil[provider + "|" + model] = now + duration;
+
+    /// <summary>Gunluk sinir (tokens/requests per day) mi? Beklemek dakikalar/saatler surer.</summary>
+    public static bool IsDailyLimit(string body) =>
+        body.Contains("per day", StringComparison.OrdinalIgnoreCase)
+        || body.Contains("(TPD)", StringComparison.Ordinal) || body.Contains("(RPD)", StringComparison.Ordinal);
+
+    /// <summary>Model kaldirilmis / bulunamiyor mu?</summary>
+    public static bool IsModelGone(int status, string body) =>
+        status is 404 or 410
+        || (status == 400 && Regex.IsMatch(body, "decommissioned|model_not_found|does not exist", RegexOptions.IgnoreCase));
+
+    /// <summary>Groq hata metnindeki "try again in 7m12.5s" bekleme suresi.</summary>
+    public static TimeSpan? ParseTryAgain(string body)
+    {
+        var m = Regex.Match(body, @"try again in (?:(\d+)h)?(?:(\d+)m(?!s))?(?:([\d.]+)s)?(?:([\d.]+)ms)?", RegexOptions.IgnoreCase);
+        if (!m.Success || m.Length <= "try again in ".Length) return null;
+        double D(int i) => m.Groups[i].Success ? double.Parse(m.Groups[i].Value, System.Globalization.CultureInfo.InvariantCulture) : 0;
+        var t = TimeSpan.FromHours(D(1)) + TimeSpan.FromMinutes(D(2)) + TimeSpan.FromSeconds(D(3)) + TimeSpan.FromMilliseconds(D(4));
+        return t > TimeSpan.Zero ? t : null;
+    }
+
+    /// <summary>429/413/kaldirilmis model icin "dolu" suresi.</summary>
+    public static TimeSpan BlockDuration(int status, string body, TimeSpan? retryAfter)
+    {
+        if (IsModelGone(status, body)) return TimeSpan.FromHours(24);
+        var hinted = retryAfter ?? ParseTryAgain(body);
+        if (IsDailyLimit(body)) return hinted is { } h && h > TimeSpan.FromMinutes(1) ? h : TimeSpan.FromMinutes(30);
+        return hinted ?? TimeSpan.FromSeconds(60);
+    }
+
+    internal static void Reset() => BlockedUntil.Clear();
 }
 
 /// <summary>Gemini bicimli istegi OpenAI chat istegine, chat yanitini Gemini zarfina cevirir.</summary>
@@ -170,7 +235,9 @@ public static class OpenAiChatAdapter
     }
 
     /// <summary>OpenAI chat yanitini, mevcut ExtractText'in bekledigi Gemini zarfina cevirir.</summary>
-    public static string ToGeminiResponse(string chatResponseJson)
+    private static readonly JsonSerializerOptions RelaxedJson = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+
+    public static string ToGeminiResponse(string chatResponseJson, string? aiModel = null)
     {
         using var doc = JsonDocument.Parse(chatResponseJson);
         var root = doc.RootElement;
@@ -183,6 +250,19 @@ public static class OpenAiChatAdapter
             && content.ValueKind == JsonValueKind.String)
         {
             text = ExtractJson(content.GetString() ?? string.Empty);
+            // Hangi modelin urettigi analizle birlikte saklansin (firma detayinda gosterilir).
+            if (aiModel is not null)
+            {
+                try
+                {
+                    if (JsonNode.Parse(text) is JsonObject obj)
+                    {
+                        obj["aiModel"] = aiModel;
+                        text = obj.ToJsonString(RelaxedJson);
+                    }
+                }
+                catch (JsonException) { }
+            }
         }
 
         long Read(string name) =>
