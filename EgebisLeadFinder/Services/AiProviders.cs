@@ -97,6 +97,14 @@ public static class OpenAiChatAdapter
                 system += "\nJSON şeması (alan adları ve tipleri birebir bu şemaya uymalı):\n" + schema.ToJsonString();
         }
 
+        // Kucuk modeller uzun talimatin basindaki dil kuralini, ozellikle kaynak site yabanci dildeyse,
+        // unutup Ingilizce yaziyor; kural talimatin sonunda tekrarlanir.
+        if (system.Contains("ÇIKTI DİLİ: İngilizce", StringComparison.Ordinal))
+            system += "\n\nHATIRLATMA: JSON içindeki tüm açıklama/özet/gerekçe metinlerini İNGİLİZCE yaz.";
+        else if (system.Contains("Türkçe yaz", StringComparison.Ordinal))
+            system += "\n\nHATIRLATMA: Kaynak metin hangi dilde olursa olsun (İngilizce, Almanca vb.), JSON içindeki " +
+                      "tüm açıklama/özet/gerekçe metinlerini TÜRKÇE yaz. Alan adları şemadaki gibi kalsın.";
+
         var messages = new JsonArray();
         if (!string.IsNullOrWhiteSpace(system))
             messages.Add(new JsonObject { ["role"] = "system", ["content"] = system });

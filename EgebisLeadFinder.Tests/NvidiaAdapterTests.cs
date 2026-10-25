@@ -79,6 +79,15 @@ public class NvidiaAdapterTests
     }
 
     [Fact]
+    public void Turkce_kurali_talimatin_sonunda_tekrarlanir()
+    {
+        var payload = GeminiPayload.Replace("Sistem talimati", "Tüm metin alanlarını Türkçe yaz.");
+        using var doc = JsonDocument.Parse(OpenAiChatAdapter.ToChatRequest(payload, "openai/gpt-oss-120b"));
+        var system = doc.RootElement.GetProperty("messages")[0].GetProperty("content").GetString()!;
+        Assert.EndsWith("Alan adları şemadaki gibi kalsın.", system);
+    }
+
+    [Fact]
     public void Think_blogu_cevaptan_atilir() =>
         Assert.Equal("{\"a\":1}", OpenAiChatAdapter.ExtractJson("<think>uzun düşünce</think>\n{\"a\":1}"));
 

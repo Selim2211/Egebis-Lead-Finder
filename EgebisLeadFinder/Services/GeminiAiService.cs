@@ -255,13 +255,13 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
 
             if (!retryable || attempt == maxAttempts)
             {
-                _logger.LogWarning("Gemini hatası {Status}: {Body}", status, Truncate(body, 400));
+                _logger.LogWarning("{Label} hatası {Status}: {Body}", label, status, Truncate(body, 400));
                 return (null, $"{label} API {status}: {Truncate(body, 200)}");
             }
 
             _logger.LogInformation(
-                "Gemini {Status} döndü, {Delay} sn sonra tekrar denenecek ({Attempt}/{Max}).",
-                status, delay.TotalSeconds, attempt, maxAttempts);
+                "{Label} {Status} döndü, {Delay} sn sonra tekrar denenecek ({Attempt}/{Max}).",
+                label, status, delay.TotalSeconds, attempt, maxAttempts);
 
             await Task.Delay(status == 429 && RetryAfter(response) is { } wait && wait > delay ? wait : delay, ct);
             delay *= 2;
