@@ -311,7 +311,8 @@ h1, h2, h3, h4, h5, h6 { font-weight: 650; letter-spacing: -.022em; }
 
 /* ---------- Sayfa turu ---------- */
 .tour-spot { position: fixed; z-index: 2000; border-radius: 12px; pointer-events: none;
-    box-shadow: 0 0 0 4px rgba(245, 158, 11, .9), 0 0 0 9999px rgba(8, 20, 38, .58); transition: all .25s ease; }
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, .9), 0 0 0 9999px rgba(8, 20, 38, .58);
+    transition: left .25s cubic-bezier(0.77, 0, 0.175, 1), top .25s cubic-bezier(0.77, 0, 0.175, 1), width .25s cubic-bezier(0.77, 0, 0.175, 1), height .25s cubic-bezier(0.77, 0, 0.175, 1); }
 .tour-spot.is-center { left: 50%; top: 50%; width: 0; height: 0; box-shadow: 0 0 0 9999px rgba(8, 20, 38, .58); }
 .tour-pop { position: fixed; z-index: 2001; width: min(360px, calc(100vw - 32px)); padding: 1rem 1.1rem .9rem; border-radius: 16px;
     background: var(--eg-surface); color: var(--eg-text); box-shadow: var(--eg-shadow-lg); border: 1px solid var(--eg-border); }

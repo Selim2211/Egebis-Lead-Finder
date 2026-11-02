@@ -174,7 +174,7 @@ a { text-underline-offset: 3px; }
     box-shadow: var(--eg-shadow);
     position: relative;
     overflow: hidden;
-    transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+    transition: transform var(--dur-fast) var(--ease-out); /* golge animasyonu her karede boyama yapar: golge aninda degisir */
 }
 /* Eski renkli sol cizgi yerine ustte ince renk seridi */
 .stat-card::before {
@@ -189,7 +189,7 @@ a { text-underline-offset: 3px; }
 .stat-label { font-size: .78rem; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--eg-text-muted); }
 .stat-value { font-family: var(--eg-font-display); font-size: 2.35rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
 @media (hover: hover) and (pointer: fine) {
-    a.stat-card:hover { transform: translateY(-2px); box-shadow: var(--eg-shadow-lg); }
+    a.stat-card:hover { box-shadow: var(--eg-shadow-lg); }
 }
 
 /* ---------- Dugmeler: net, dolgun, basinca kucuk cokme ---------- */
@@ -308,11 +308,11 @@ textarea.form-control { min-height: auto; line-height: 1.5; }
     border: 0;
     border-radius: var(--eg-radius);
     box-shadow: var(--eg-shadow);
-    transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+    transition: transform var(--dur-fast) var(--ease-out); /* golge animasyonu her karede boyama yapar: golge aninda degisir */
 }
 .company-card::before { display: none; }
 @media (hover: hover) and (pointer: fine) {
-    .company-card:hover { transform: translateY(-2px); box-shadow: var(--eg-shadow-lg); }
+    .company-card:hover { box-shadow: var(--eg-shadow-lg); }
 }
 .company-card-name { font-family: var(--eg-font-display); font-weight: 700; letter-spacing: -0.01em; }
 .company-logo { border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18); }
@@ -348,14 +348,16 @@ textarea.form-control { min-height: auto; line-height: 1.5; }
     border-radius: 12px;
     box-shadow: var(--eg-shadow-lg);
     padding: .4rem;
-    transform-origin: top right;
+    transform-origin: top left;
+    /* Popper satir ici transform ile konumlar; animasyon ayri scale/translate ozellikleriyle cakismaz.
+       Keyframe degil transition: hizli ac-kapa'da kaldigi yerden doner. */
+    transition: opacity 160ms var(--ease-out), scale 160ms var(--ease-out), translate 160ms var(--ease-out);
 }
-.dropdown-menu.show { animation: eg-pop-in 160ms var(--ease-out); }
+.dropdown-menu-end, .dropdown-menu[data-bs-popper][style*="right"] { transform-origin: top right; }
+@starting-style {
+    .dropdown-menu.show { opacity: 0; scale: 0.97; translate: 0 -4px; }
+}
 .dropdown-item { border-radius: 8px; padding: .5rem .7rem; font-weight: 500; }
-@keyframes eg-pop-in {
-    from { opacity: 0; transform: scale(0.97) translateY(-4px); }
-    to   { opacity: 1; transform: none; }
-}
 
 .modal-content { border: 0; border-radius: 18px; box-shadow: var(--eg-shadow-lg); }
 .modal.fade .modal-dialog { transform: scale(0.97); opacity: 0; transition: transform 220ms var(--ease-out), opacity 220ms var(--ease-out); }
@@ -503,3 +505,83 @@ textarea.form-control { min-height: auto; line-height: 1.5; }
     .company-card-actions .action-delete { grid-column: auto; }
     .company-card-actions .action-delete .action-label { display: none; }
 }
+
+/* ==========================================================================
+   Hareket denetimi (improve-animations / remove-animations / animation-performance)
+   ========================================================================== */
+
+/* Sik kullanilan dugmelerde hover'da kalkma yok: gunde onlarca kez gorulur,
+   geri bildirimi zaten basinca kucuk cokme veriyor. Renk/golge degisimi kalir. */
+.theme-toggle:hover, .nav-link-icon:hover .nav-gear, .name-search-button:hover, .action-btn:hover,
+.btn-lead:hover, .todo-item:hover, .list-sort-btn:hover, a.pager-btn:hover, .tpl-var:hover,
+.nav-target:hover, .nav-target:focus-visible, .btn-accent:hover, .btn-primary:hover,
+.loc-map:hover iframe, .loc-map:focus-visible iframe {
+    transform: none;
+}
+/* Basinca cokme hover kuralindan sonra da gecerli kalsin */
+.nav-target:active, .name-search-button:active, .action-btn:active:not(:disabled),
+.btn-lead:active, .list-sort-btn:active, a.pager-btn:active, .tpl-var:active, .theme-toggle:active {
+    transform: scale(0.97);
+}
+
+/* Kart kalkmasi yalnizca fareli cihazlarda (dokunmatikte tiklama sahte hover uretir) */
+/* Kartlarda hover kalkmasi yok (liste uzerinde imlec gezdirilirken surekli tetiklenir) */
+.company-card:hover, .lead-card:hover, .stat-card:hover, .stat-card.stat-link:hover, a.stat-card:hover,
+    .img-chip:hover, .geo-open:hover, .loc-map:hover .loc-map-cta { transform: none; }
+
+
+
+
+/* Onay penceresi: 0.6'dan ziplayarak buyume yerine kisa, sakin giris */
+.eg-dialog {
+    transform: translateY(6px) scale(0.97);
+    transition: opacity 180ms var(--ease-out), transform 220ms var(--ease-out);
+}
+.eg-dialog-icon { animation: eg-dialog-icon-in 220ms var(--ease-out); }
+@keyframes eg-dialog-icon-in {
+    from { transform: scale(0.9); opacity: 0; }
+    to   { transform: none; opacity: 1; }
+}
+
+/* Bootstrap gecisleri marka egrisiyle */
+.collapse:not(.navbar-collapse), .collapsing:not(.navbar-collapse) { transition-timing-function: var(--ease-out); }
+.fade { transition: opacity 180ms var(--ease-out); }
+
+/* ---------- Eklenen hareketler (find-animation-opportunities, kapidan gecenler) ---------- */
+/* Karsilastirma cubugu: ilk firma secilince alttan belirir (ara sira; nereden geldigini anlatir) */
+.compare-tray {
+    transition: opacity 220ms var(--ease-out), translate 220ms var(--ease-out);
+}
+@starting-style {
+    .compare-tray { opacity: 0; translate: 0 16px; }
+}
+/* Acilir ayar bolumleri (details): icerik isinlanmasin, kisa bir belirme */
+details[open] > :not(summary) { animation: eg-reveal 180ms var(--ease-out); }
+@keyframes eg-reveal {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    details[open] > :not(summary) { animation: eg-fade .2s ease; }
+    .compare-tray { transition: opacity 200ms ease; }
+}
+
+/* ---------- apple-design: erisilebilirlik tercihleri ve materyal ---------- */
+/* Seffaflik azaltma isteyen kullanicida cam menu duz ve opak olur */
+@media (prefers-reduced-transparency: reduce) {
+    .eg-navbar { background: #0f1b30 !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+}
+/* Yuksek kontrast isteyende kartlar belirgin cizgiyle ayrilir */
+@media (prefers-contrast: more) {
+    .card, .company-card, .stat-card { box-shadow: none; border: 1px solid var(--eg-text-muted); }
+    .form-control, .form-select { border-color: var(--eg-text-muted); }
+    body { background-image: none; }
+}
+/* Acik/koyu tema gecisinde ani parlaklik sicramasi olmasin */
+body { transition: background-color 200ms ease, color 200ms ease; }
+
+/* Kucuk buyuk harfli etiketlerde hafif pozitif aralik, govde metninde sifir */
+.stat-label, .table > thead th, .fit-box-label, .form-label { font-optical-sizing: auto; }
+
+/* Lead kartlari: yalniz transform animasyonu (golge boyamasi yok) */
+.lead-card { transition: transform var(--dur-fast) var(--ease-out), border-color 150ms ease; }
