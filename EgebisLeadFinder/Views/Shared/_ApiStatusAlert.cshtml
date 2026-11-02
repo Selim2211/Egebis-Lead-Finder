@@ -1,0 +1,105 @@
+@inject EgebisLeadFinder.Services.UsageService AlertUsage
+@using EgebisLeadFinder.Services
+@{
+    // Acilis uyarisi: kredisi/kotasi biten ya da anahtari girilmemis API'ler.
+    // Veriler sayaclardan ve servislerin dondurdugu gercek hata yanitlarindan gelir (UsageService).
+    List<ProviderUsage> problems;
+    try { problems = await AlertUsage.GetStartupProblemsAsync(); }
+    catch { problems = new(); }
+
+    var blocking = problems.Where(p => p.InUse).ToList();
+}
+@if (blocking.Count > 0)
+{
+    var signature = string.Join("|", problems.Select(p => $"{p.Key}:{p.Level}:{p.LastErrorAt?.Ticks}:{p.KeyConfigured}"));
+    string Fmt(DateTime? utc) => utc is { } d ? d.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "—";
+
+    <div class="modal fade api-alert" id="apiStatusAlert" tabindex="-1" aria-labelledby="apiStatusAlertTitle" aria-hidden="true"
+         data-signature="@signature">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <div class="api-alert-head">
+                        <span class="api-alert-icon" aria-hidden="true">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 9v4M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+                            </svg>
+                        </span>
+                        <div>
+                            <h2 class="api-alert-title" id="apiStatusAlertTitle">Bazı servisler şu an kullanılamıyor</h2>
+                            <p class="api-alert-sub">Aşağıdaki servislerin kredisi, kotası ya da anahtarı sorunlu. Bu servislere bağlı işlemler hata verebilir.</p>
+                        </div>
+                    </div>
+
+                    <ul class="api-alert-list">
+                        @foreach (var p in problems)
+                        {
+                            var missingKey = p.InUse && !p.KeyConfigured && p.Key != "apollo";
+                            var status = missingKey ? "Anahtar girilmemiş"
+                                : p.Level == UsageLevel.Exhausted ? (p.LastErrorAt is not null ? "Kullanılamıyor" : "Kredi/limit doldu")
+                                : "Limit dolmak üzere";
+                            var tone = missingKey || p.Level == UsageLevel.Exhausted ? "is-danger" : "is-warning";
+                            <li class="api-alert-item @tone @(p.InUse ? "" : "is-idle")">
+                                <div class="api-alert-row">
+                                    <span class="api-alert-name">@p.Name</span>
+                                    <span class="api-alert-badge">@status</span>
+                                </div>
+                                @if (!p.InUse)
+                                {
+                                    <div class="api-alert-note">Şu an kullanılmıyor (yapay zekâ için başka sağlayıcı seçili); bu sorun işleri etkilemez.</div>
+                                }
+                                @if (missingKey)
+                                {
+                                    <div class="api-alert-detail">Ayarlar ekranında bu servisin API anahtarı boş.</div>
+                                }
+                                else if (p.LastErrorAt is not null && p.Level == UsageLevel.Exhausted)
+                                {
+                                    <div class="api-alert-detail" translate="no">@p.LastError</div>
+                                    <div class="api-alert-meta">
+                                        <span>Son hata: <strong>@Fmt(p.LastErrorAt)</strong></span>
+                                        <span>Son başarılı çağrı: <strong>@Fmt(p.LastSuccessAt)</strong></span>
+                                    </div>
+                                }
+                                @if (p.Limit > 0)
+                                {
+                                    <div class="api-alert-meta">
+                                        <span>Kullanım: <strong>@p.Used / @p.Limit</strong> @p.Unit (%@p.Percent)</span>
+                                    </div>
+                                }
+                            </li>
+                        }
+                    </ul>
+
+                    <p class="api-alert-foot">
+                        Kredi yükledikten ya da anahtarı yeniledikten sonra ilk başarılı çağrıda bu uyarı kendiliğinden kalkar.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-api-alert-snooze>Bugün tekrar gösterme</button>
+                    <a class="btn btn-outline-secondary btn-sm" asp-controller="Usage" asp-action="Index">API Kullanımı</a>
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-dismiss="modal">Tamam</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        (function () {
+            var el = document.getElementById('apiStatusAlert');
+            if (!el || !window.bootstrap) return;
+            var sig = el.dataset.signature;
+            var today = new Date().toISOString().slice(0, 10);
+            function get(store, k) { try { return store.getItem(k); } catch (e) { return null; } }
+            function set(store, k, v) { try { store.setItem(k, v); } catch (e) { } }
+            // Ayni tarayici oturumunda ayni durum bir kez gosterilir; durum degisirse (yeni hata) tekrar gelir.
+            if (get(sessionStorage, 'eg-api-alert') === sig) return;
+            if (get(localStorage, 'eg-api-alert-snooze') === sig + '#' + today) return;
+            var modal = bootstrap.Modal.getOrCreateInstance(el);
+            el.addEventListener('hidden.bs.modal', function () { set(sessionStorage, 'eg-api-alert', sig); });
+            el.querySelector('[data-api-alert-snooze]').addEventListener('click', function () {
+                set(localStorage, 'eg-api-alert-snooze', sig + '#' + today);
+                modal.hide();
+            });
+            modal.show();
+        })();
+    </script>
+}

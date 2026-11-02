@@ -257,6 +257,10 @@
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    @if (signedIn)
+    {
+        <partial name="_ApiStatusAlert" />
+    }
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script src="~/js/favorites.js" asp-append-version="true"></script>
     <script src="~/js/compare.js" asp-append-version="true"></script>

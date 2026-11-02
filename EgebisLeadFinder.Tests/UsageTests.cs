@@ -21,9 +21,32 @@ public class UsageTests
     public void Son_24_saatte_kota_hatasi_varsa_doldu_sayilir()
     {
         var now = new DateTime(2026, 9, 28, 12, 0, 0, DateTimeKind.Utc);
-        Assert.Equal(UsageLevel.Exhausted, UsageService.Combine(UsageLevel.Unknown, now.AddHours(-2), now));
-        Assert.Equal(UsageLevel.Normal, UsageService.Combine(UsageLevel.Normal, now.AddDays(-2), now));
-        Assert.Equal(UsageLevel.Warning, UsageService.Combine(UsageLevel.Warning, null, now));
+        Assert.Equal(UsageLevel.Exhausted, UsageService.Combine(UsageLevel.Unknown, now.AddHours(-2), null, now));
+        Assert.Equal(UsageLevel.Normal, UsageService.Combine(UsageLevel.Normal, now.AddDays(-2), now.AddDays(-1), now));
+        Assert.Equal(UsageLevel.Warning, UsageService.Combine(UsageLevel.Warning, null, null, now));
+    }
+
+    [Fact]
+    public void Hatadan_sonra_basarili_cagri_varsa_doldu_sayilmaz()
+    {
+        var now = new DateTime(2026, 11, 2, 12, 0, 0, DateTimeKind.Utc);
+        // Hata, ardindan basarili cagri (ör. kredi yuklendi): sorun gecmis
+        Assert.Equal(UsageLevel.Normal, UsageService.Combine(UsageLevel.Normal, now.AddHours(-3), now.AddHours(-1), now));
+        // Basarili cagri, ardindan hata: hala kullanilamaz
+        Assert.Equal(UsageLevel.Exhausted, UsageService.Combine(UsageLevel.Normal, now.AddHours(-1), now.AddHours(-3), now));
+        // 7 gunden eski hata dikkate alinmaz
+        Assert.Equal(UsageLevel.Normal, UsageService.Combine(UsageLevel.Normal, now.AddDays(-8), null, now));
+    }
+
+    [Theory]
+    [InlineData(402, "{\"error\":{\"code\":402,\"message\":\"Your prepayment credits are depleted\"}}", "Kredi bitti")]
+    [InlineData(401, "{}", "API anahtarı geçersiz")]
+    [InlineData(429, "Rate limit reached on tokens per day (TPD)", "Günlük kullanım sınırı doldu")]
+    public void Hata_metni_anlasilir_olur(int status, string body, string expected)
+    {
+        var text = ApiErrorText.Describe(status, body);
+        Assert.StartsWith(expected, text);
+        Assert.Contains("HTTP " + status, text);
     }
 
     [Fact]

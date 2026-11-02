@@ -36,6 +36,12 @@ public class ProviderUsage
     public DateTime? LastErrorAt { get; init; }
     public string? LastError { get; init; }
 
+    /// <summary>Son basarili cagri (sayac en son bu anda artti).</summary>
+    public DateTime? LastSuccessAt { get; init; }
+
+    /// <summary>Uygulama bu servisi su an kullaniyor mu? (ör. yapay zeka Groq'tayken Gemini kullanilmaz)</summary>
+    public bool InUse { get; init; } = true;
+
     public int[] Last30Days { get; init; } = Array.Empty<int>();
 
     /// <summary>Saglayicidan canli okunan bakiye (yalnizca Apollo destekliyor).</summary>
@@ -92,9 +98,20 @@ public class UsageService
             : UsageLevel.Normal;
     }
 
-    /// <summary>Son 24 saatte kota hatasi geldiyse limit tanimsiz olsa da \"doldu\" sayilir.</summary>
-    public static UsageLevel Combine(UsageLevel byLimit, DateTime? lastErrorAt, DateTime nowUtc) =>
-        lastErrorAt is { } at && nowUtc - at < TimeSpan.FromHours(24) ? UsageLevel.Exhausted : byLimit;
+    /// <summary>
+    /// Kota/kredi/anahtar hatasi geldiyse ve O ANDAN SONRA hic basarili cagri olmadiysa servis
+    /// "doldu" sayilir. Hatadan sonra basarili bir cagri olduysa sorun gecmistir (ör. kredi
+    /// yuklendi, gunluk sinir sifirlandi); o zaman yalnizca limit yuzdesi esas alinir.
+    /// 7 gunden eski hatalar dikkate alinmaz.
+    /// </summary>
+    public static UsageLevel Combine(UsageLevel byLimit, DateTime? lastErrorAt, DateTime? lastSuccessAt, DateTime nowUtc) =>
+        lastErrorAt is { } at
+        && nowUtc - at < TimeSpan.FromDays(7)
+        && (lastSuccessAt is null || lastSuccessAt < at)
+            ? UsageLevel.Exhausted
+            : byLimit;
+
+    private static DateTime? SuccessAt(ApiUsage row) => row.Count > 0 ? row.UpdatedAt : null;
 
     private static DateOnly TurkeyToday => DateOnly.FromDateTime(DateTime.UtcNow.AddHours(3));
 
@@ -126,8 +143,8 @@ public class UsageService
             Today = serper.Today, ThisWeek = serper.Week, ThisMonth = serper.Month,
             SinceReset = serper.Row.Count, ResetAt = serper.Row.ResetAt,
             Limit = serperLimit, Used = serper.Row.Count, LimitLabel = "toplam kredi (anahtar başına)",
-            Level = Combine(Evaluate(serper.Row.Count, serperLimit), serper.Row.LastErrorAt, now),
-            LastErrorAt = serper.Row.LastErrorAt, LastError = serper.Row.LastError,
+            Level = Combine(Evaluate(serper.Row.Count, serperLimit), serper.Row.LastErrorAt, SuccessAt(serper.Row), now),
+            LastErrorAt = serper.Row.LastErrorAt, LastError = serper.Row.LastError, LastSuccessAt = SuccessAt(serper.Row),
             Last30Days = serper.Series,
             Note = "Serper bakiye sorgulama API'si sunmuyor; sayaç uygulamanın yaptığı çağrılardan hesaplanır. Önbellekten dönen aramalar kredi harcamaz."
         };
@@ -139,8 +156,10 @@ public class UsageService
         var currentModel = await _settings.GetAsync(SettingKeys.GeminiModel, ct) ?? _aiOptions.GeminiModel;
         var monthCost = GeminiCostCalculator.Compute(await _usage.GetGeminiTokensAsync(monthStart, today, ct), gemini.Month, usdTry,
             _aiOptions, currentModel, today);
+        var chat = await AiProviders.ChatProviderAsync(_settings, ct);
         var geminiItem = new ProviderUsage
         {
+            InUse = chat is null,
             Key = "gemini",
             Name = "Google Gemini (yapay zekâ)",
             Purpose = "Site analizi, firma analizi, AI ile mail, NACE",
@@ -148,8 +167,8 @@ public class UsageService
             Today = gemini.Today, ThisWeek = gemini.Week, ThisMonth = gemini.Month,
             SinceReset = gemini.Row.Count, ResetAt = gemini.Row.ResetAt,
             Limit = geminiLimit, Used = gemini.Month, LimitLabel = "aylık çağrı limiti",
-            Level = Combine(Evaluate(gemini.Month, geminiLimit), gemini.Row.LastErrorAt, now),
-            LastErrorAt = gemini.Row.LastErrorAt, LastError = gemini.Row.LastError,
+            Level = Combine(Evaluate(gemini.Month, geminiLimit), gemini.Row.LastErrorAt, SuccessAt(gemini.Row), now),
+            LastErrorAt = gemini.Row.LastErrorAt, LastError = gemini.Row.LastError, LastSuccessAt = SuccessAt(gemini.Row),
             Last30Days = gemini.Series,
             EstimatedCostTry = monthCost.Try,
             CostNote = $"1 USD = {usdTry:0.##} TL · {monthCost.MeasuredCalls} çağrı gerçek token sayısıyla (girdi {monthCost.InputTokens:N0}, çıktı {monthCost.OutputTokens:N0})"
@@ -168,6 +187,8 @@ public class UsageService
             : Setting(await _settings.GetAsync(SettingKeys.ApolloCreditLimit, ct), 0);
         var apolloUsed = live is { Ok: true, Consumed: not null } ? live.Consumed!.Value : credits.Month;
         var apolloLastError = new[] { apollo.Row.LastErrorAt, credits.Row.LastErrorAt }.Max();
+        var apolloLastErrorText = (credits.Row.LastErrorAt ?? DateTime.MinValue) > (apollo.Row.LastErrorAt ?? DateTime.MinValue)
+            ? credits.Row.LastError : apollo.Row.LastError ?? credits.Row.LastError;
         var apolloItem = new ProviderUsage
         {
             Key = "apollo",
@@ -179,8 +200,12 @@ public class UsageService
             SinceReset = apollo.Row.Count, ResetAt = apollo.Row.ResetAt,
             Limit = apolloLimit, Used = apolloUsed,
             LimitLabel = live is { Ok: true } ? "dönem kredisi (Apollo'dan canlı)" : "aylık kredi limiti",
-            Level = Combine(Evaluate(apolloUsed, apolloLimit), apolloLastError, now),
-            LastErrorAt = apolloLastError, LastError = apollo.Row.LastError ?? credits.Row.LastError,
+            Level = live is { Ok: true, LeftOver: <= 0 }
+                ? UsageLevel.Exhausted
+                : Combine(Evaluate(apolloUsed, apolloLimit), apolloLastError,
+                    new[] { SuccessAt(apollo.Row), SuccessAt(credits.Row) }.Max(), now),
+            LastErrorAt = apolloLastError, LastError = apolloLastErrorText,
+            LastSuccessAt = new[] { SuccessAt(apollo.Row), SuccessAt(credits.Row) }.Max(),
             Last30Days = credits.Series,
             LiveInfo = live switch
             {
@@ -192,8 +217,48 @@ public class UsageService
             Note = $"Bu ay {apollo.Month} Apollo çağrısı yapıldı (kişi araması + e-posta açma); kredi sayacı yalnızca e-postası açılan kişileri sayar."
         };
 
-        return new List<ProviderUsage> { serperItem, geminiItem, apolloItem };
+        var list = new List<ProviderUsage> { serperItem, geminiItem, apolloItem };
+
+        // --- Secili ucretsiz yapay zeka saglayicisi (Groq / NVIDIA): limit API'si yok; hata kaydi esas alinir.
+        if (chat is not null)
+        {
+            var c = await Counts(chat.UsageName);
+            list.Insert(2, new ProviderUsage
+            {
+                Key = chat.Id,
+                Name = chat.Label + " (yapay zekâ)",
+                Purpose = "Site analizi, puanlama, AI ile mail, çeviri (şu an seçili sağlayıcı)",
+                KeyConfigured = !string.IsNullOrWhiteSpace(await _settings.GetAsync(chat.KeySetting, ct)),
+                Today = c.Today, ThisWeek = c.Week, ThisMonth = c.Month,
+                SinceReset = c.Row.Count, ResetAt = c.Row.ResetAt,
+                Used = c.Month, LimitLabel = "ücretsiz katman (sağlayıcı sınırı)",
+                Level = Combine(UsageLevel.Unknown, c.Row.LastErrorAt, SuccessAt(c.Row), now),
+                LastErrorAt = c.Row.LastErrorAt, LastError = c.Row.LastError, LastSuccessAt = SuccessAt(c.Row),
+                Last30Days = c.Series,
+                Note = "Ücretsiz katmanın bakiye API'si yok; günlük sınıra takılınca uygulama sıradaki modele geçer."
+            });
+        }
+        return list;
     }
+
+    /// <summary>
+    /// Acilis uyarisi icin: kullanilan servislerden kredisi/kotasi biten, %95'i asan ya da anahtari
+    /// girilmemis olanlar; ayrica kullanilmayan ama kredisi biten servisler (bilgi amacli). 60 sn onbellek.
+    /// </summary>
+    public async Task<List<ProviderUsage>> GetStartupProblemsAsync(CancellationToken ct = default)
+    {
+        if (_cache.TryGetValue(StartupCacheKey, out List<ProviderUsage>? cached) && cached is not null) return cached;
+        var items = (await GetAllAsync(ct))
+            .Where(i => i.InUse
+                ? i.Level >= UsageLevel.Critical || (!i.KeyConfigured && i.Key != "apollo")
+                : i.Level == UsageLevel.Exhausted)
+            .OrderByDescending(i => i.InUse).ThenByDescending(i => i.Level)
+            .ToList();
+        _cache.Set(StartupCacheKey, items, TimeSpan.FromSeconds(60));
+        return items;
+    }
+
+    private const string StartupCacheKey = "usage:startup-problems";
 
     /// <summary>Ust menu ve Panel icin: en kotu seviye (60 sn onbellek).</summary>
     public async Task<(UsageLevel Level, List<ProviderUsage> Items)> GetAlertAsync(CancellationToken ct = default)

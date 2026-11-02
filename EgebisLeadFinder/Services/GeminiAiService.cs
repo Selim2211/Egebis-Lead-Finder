@@ -295,6 +295,10 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
             if (!retryable || attempt == maxAttempts)
             {
                 _logger.LogWarning("{Label} hatası {Status}: {Body}", label, status, Truncate(body, 400));
+                // Kullaniciya acilista gosterilecek durum: kredi bitti / anahtar gecersiz / gunluk sinir.
+                // Gecici dakikalik sinir (429 TPM) kaydedilmez; bir sonraki basarili cagri durumu temizler.
+                if (status is 401 or 402 or 403 || (status == 429 && (!nvidia || ChatModelPool.IsDailyLimit(body))))
+                    await _usage.RecordErrorAsync(usageProvider, ApiErrorText.Describe(status, body), ct);
                 return (null, $"{label} API {status}: {Truncate(body, 200)}");
             }
 

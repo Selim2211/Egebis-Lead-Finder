@@ -585,3 +585,33 @@ body { transition: background-color 200ms ease, color 200ms ease; }
 
 /* Lead kartlari: yalniz transform animasyonu (golge boyamasi yok) */
 .lead-card { transition: transform var(--dur-fast) var(--ease-out), border-color 150ms ease; }
+
+/* ---------- Acilis: API durum uyarisi ---------- */
+.api-alert .modal-content { overflow: hidden; }
+.api-alert .modal-body { padding: 1.5rem 1.5rem 1rem; }
+.api-alert-head { display: flex; gap: .9rem; align-items: flex-start; margin-bottom: 1rem; }
+.api-alert-icon {
+    flex: none; width: 2.75rem; height: 2.75rem; border-radius: 14px; display: grid; place-items: center;
+    background: var(--eg-danger-bg); color: var(--eg-danger);
+}
+.api-alert-title { font-size: 1.15rem; font-weight: 750; margin: .1rem 0 .25rem; }
+.api-alert-sub { margin: 0; color: var(--eg-text-muted); font-size: .9rem; }
+.api-alert-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
+.api-alert-item {
+    border-radius: 12px; padding: .75rem .9rem; background: var(--eg-surface-alt);
+    box-shadow: inset 3px 0 0 var(--tone, var(--eg-border-strong));
+}
+.api-alert-item.is-danger { --tone: var(--eg-danger); }
+.api-alert-item.is-warning { --tone: var(--eg-warning); }
+.api-alert-item.is-idle { opacity: .8; }
+.api-alert-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.api-alert-name { font-weight: 700; }
+.api-alert-badge {
+    flex: none; font-size: .72rem; font-weight: 700; padding: .2rem .6rem; border-radius: 999px;
+    color: var(--tone); background: color-mix(in srgb, var(--tone) 12%, transparent);
+}
+.api-alert-detail { margin-top: .35rem; font-size: .86rem; color: var(--eg-text); word-break: break-word; }
+.api-alert-note { margin-top: .3rem; font-size: .8rem; color: var(--eg-text-muted); }
+.api-alert-meta { margin-top: .35rem; display: flex; flex-wrap: wrap; gap: .25rem 1rem; font-size: .78rem; color: var(--eg-text-muted); }
+.api-alert-meta strong { color: var(--eg-text); font-weight: 650; font-variant-numeric: tabular-nums; }
+.api-alert-foot { margin: .9rem 0 0; font-size: .8rem; color: var(--eg-text-muted); }
