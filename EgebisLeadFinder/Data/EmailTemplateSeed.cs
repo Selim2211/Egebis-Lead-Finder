@@ -11,7 +11,7 @@ namespace EgebisLeadFinder.Data;
 /// </summary>
 public static class EmailTemplateSeed
 {
-    public static readonly EmailTemplate[] All =
+    private static readonly EmailTemplate[] Raw =
     {
         new()
         {
@@ -145,4 +145,11 @@ public static class EmailTemplateSeed
                 """
         }
     };
+
+    /// <summary>
+    /// Ham metinlerdeki satir sonlari kaynak dosyanin satir sonuna baglidir (Windows'ta git CRLF'ye
+    /// cevirebilir). HasData tohumu satir sonuna gore degisirse EF "bekleyen model degisikligi" sanip
+    /// acilista migration'i durdurur. Bu yuzden her ortamda tek bicim: LF.
+    /// </summary>
+    public static readonly EmailTemplate[] All = Raw.Select(t => { t.Body = t.Body.Replace("\r\n", "\n"); return t; }).ToArray();
 }
