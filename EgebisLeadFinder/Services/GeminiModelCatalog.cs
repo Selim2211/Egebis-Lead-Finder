@@ -66,6 +66,10 @@ public partial class GeminiModelCatalog : IGeminiModelCatalog
         var cacheKey = "gemini-models:" + apiKey.GetHashCode();
         if (_cache.TryGetValue(cacheKey, out IReadOnlyList<GeminiModelInfo>? cached) && cached is not null)
             return (cached, null);
+        // Basarisizlik da kisa sure hatirlanir: Google'a ulasilamiyorsa Ayarlar ekrani her acilista
+        // 10 sn zaman asimini beklemesin.
+        if (_cache.TryGetValue(cacheKey + ":err", out string? cachedError) && cachedError is not null)
+            return (Array.Empty<GeminiModelInfo>(), cachedError);
 
         try
         {
@@ -84,7 +88,9 @@ public partial class GeminiModelCatalog : IGeminiModelCatalog
                 if (!response.IsSuccessStatusCode)
                 {
                     _logger.LogWarning("Gemini model listesi alınamadı: {Status}", (int)response.StatusCode);
-                    return (Array.Empty<GeminiModelInfo>(), $"Model listesi alınamadı (Gemini {(int)response.StatusCode}).");
+                    var error = $"Model listesi alınamadı (Gemini {(int)response.StatusCode}).";
+                    _cache.Set(cacheKey + ":err", error, TimeSpan.FromMinutes(5));
+                    return (Array.Empty<GeminiModelInfo>(), error);
                 }
 
                 using var doc = JsonDocument.Parse(body);
@@ -106,7 +112,9 @@ public partial class GeminiModelCatalog : IGeminiModelCatalog
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
         {
             _logger.LogWarning(ex, "Gemini model listesi alınamadı.");
-            return (Array.Empty<GeminiModelInfo>(), "Model listesi alınamadı; bağlantıyı kontrol edin.");
+            const string failure = "Model listesi alınamadı; bağlantıyı kontrol edin.";
+            _cache.Set(cacheKey + ":err", failure, TimeSpan.FromMinutes(5));
+            return (Array.Empty<GeminiModelInfo>(), failure);
         }
     }
 

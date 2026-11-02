@@ -37,11 +37,20 @@ public class UserService
     private readonly ApplicationDbContext _db;
     private readonly IPasswordHasher<AppUser> _hasher;
 
-    public UserService(ApplicationDbContext db, IPasswordHasher<AppUser> hasher)
+    public UserService(ApplicationDbContext db, IPasswordHasher<AppUser> hasher, Microsoft.Extensions.Caching.Memory.IMemoryCache? cache = null)
     {
         _db = db;
         _hasher = hasher;
+        _cache = cache;
     }
+
+    private readonly Microsoft.Extensions.Caching.Memory.IMemoryCache? _cache;
+
+    /// <summary>Oturum gecersiz kilindiginda dogrulama onbellegini temizler (pasif, silindi, sifre/rol degisti).</summary>
+    private void ForgetStamp(int userId) => _cache?.Remove(StampCacheKey(userId));
+
+    /// <summary>Oturum dogrulama onbellegi anahtari (Program.cs OnValidatePrincipal).</summary>
+    public static string StampCacheKey(int userId) => "auth-stamp:" + userId;
 
     public static string NormalizeUserName(string? userName) =>
         (userName ?? string.Empty).Trim().ToLowerInvariant();
@@ -150,7 +159,7 @@ public class UserService
         user.Email = Clean(email, 255);
         user.Role = role;
         user.IsActive = isActive;
-        if (securityChanged) user.SecurityStamp = NewStamp();
+        if (securityChanged) { user.SecurityStamp = NewStamp(); ForgetStamp(user.Id); }
 
         await _db.SaveChangesAsync(ct);
         return UserResult.Success(user);
@@ -168,6 +177,7 @@ public class UserService
         user.FailedLoginCount = 0;
         user.LockedUntil = null;
         user.SecurityStamp = NewStamp();
+        ForgetStamp(user.Id);
         await _db.SaveChangesAsync(ct);
         return UserResult.Success(user);
     }
@@ -185,6 +195,7 @@ public class UserService
         user.PasswordHash = _hasher.HashPassword(user, newPassword!);
         user.MustChangePassword = false;
         user.SecurityStamp = NewStamp();
+        ForgetStamp(user.Id);
         await _db.SaveChangesAsync(ct);
         return UserResult.Success(user);
     }
@@ -198,6 +209,7 @@ public class UserService
             return UserResult.Fail("Son aktif yönetici silinemez.");
 
         _db.Users.Remove(user);
+        ForgetStamp(user.Id);
         await _db.SaveChangesAsync(ct);
         return UserResult.Success(user);
     }

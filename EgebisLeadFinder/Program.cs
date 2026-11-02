@@ -14,6 +14,9 @@ using Microsoft.EntityFrameworkCore;
 using Polly;
 using Polly.Extensions.Http;
 using Serilog;
+using Serilog.Events;
+using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.Extensions.Caching.Memory;
 
 // Arka plan işleri (mail dizisi vb.) istek dışında çalışır: arayüz dili varsayılan olarak Türkçe kalır.
 System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = new System.Globalization.CultureInfo("tr-TR");
@@ -22,10 +25,30 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Konsol ve gunluk dosyasina log. Uzun suren aramalarda ne olup bittigini
 // sonradan izleyebilmek icin dosya logu onemli.
+//
+// Performans: Serilog "Logging" bolumunu okumaz; ayar yokken framework'un her adimi (rota eslesmesi,
+// her SQL komutu, her statik dosya) Information seviyesinde konsola ve dosyaya yaziliyordu: tek bir
+// sayfa ~450 satir / ~50 KB log uretiyordu. Docker'da konsol ciktisi senkron yazilir; yavas diskte
+// her istegi bekletir. Framework loglari Warning'e cekildi, uygulama loglari (arama, hata) aynen kalir.
+// Dosya yazimi tamponlu (2 sn'de bir diske).
 builder.Host.UseSerilog((context, config) => config
     .ReadFrom.Configuration(context.Configuration)
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
+    .MinimumLevel.Override("System", LogEventLevel.Warning)
     .WriteTo.Console()
-    .WriteTo.File("logs/egebis-.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 14));
+    .WriteTo.File("logs/egebis-.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 14,
+        buffered: true, flushToDiskInterval: TimeSpan.FromSeconds(2)));
+
+// HTML/JSON yanitlari sikistirilir (Firmalar sayfasi ~270 KB -> ~30 KB). Statik dosyalar zaten
+// MapStaticAssets ile onceden sikistirilmis gelir.
+builder.Services.AddResponseCompression(o =>
+{
+    o.Providers.Add<BrotliCompressionProvider>();
+    o.Providers.Add<GzipCompressionProvider>();
+    o.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[] { "application/json" });
+});
 
 // Her sayfa giris ister (AllowAnonymous olanlar haric); tum degistirici islemler audit log'a yazilir.
 builder.Services.AddControllersWithViews(o =>
@@ -59,12 +82,26 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         o.SlidingExpiration = true;
 
         // Kullanici pasiflestirildi, silindi, rolu/sifresi degisti: eski cerez hemen gecersiz olur.
+        //
+        // Performans: bu kontrol her istekte (sayfadaki her CSS/JS/resim dahil, sayfa basina ~30 kez)
+        // veritabanina gidiyordu. Statik dosyalarda atlanir; sonuc kullanici basina kisa sure onbellekte
+        // tutulur. Kullanici pasiflestirilince / sifresi degisince UserService onbellegi hemen temizler.
         o.Events.OnValidatePrincipal = async ctx =>
         {
+            if (StaticPaths.IsStatic(ctx.HttpContext.Request.Path)) return;
+
             var id = ctx.Principal?.UserId();
             var stamp = ctx.Principal?.FindFirst(UserService.StampClaim)?.Value;
+            var cache = ctx.HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
+            var cacheKey = id is null ? null : UserService.StampCacheKey(id.Value);
+            if (cacheKey is not null && cache.TryGetValue(cacheKey, out string? cachedStamp) && cachedStamp == stamp && stamp is not null)
+                return;
+
             var users = ctx.HttpContext.RequestServices.GetRequiredService<UserService>();
             var user = id is null ? null : await users.FindAsync(id.Value);
+
+            if (user is not null && user.IsActive && user.SecurityStamp == stamp && cacheKey is not null)
+                cache.Set(cacheKey, user.SecurityStamp, TimeSpan.FromSeconds(60));
 
             if (user is null || !user.IsActive || user.SecurityStamp != stamp)
             {
@@ -281,7 +318,13 @@ catch (Exception ex)
     app.Logger.LogError(ex, "Kritik alanlar şifrelenemedi; veritabanı güncel değilse migration'ları uygulayın.");
 }
 
-app.UseSerilogRequestLogging();
+app.UseSerilogRequestLogging(o => o.GetLevel = (ctx, elapsedMs, ex) =>
+    ex is not null || ctx.Response.StatusCode >= 500 ? LogEventLevel.Error
+    : elapsedMs > 2000 ? LogEventLevel.Warning                       // sunucuda yavas sayfayi bulmak icin
+    : StaticPaths.IsStatic(ctx.Request.Path) || ctx.Request.Path.StartsWithSegments("/Company/JobStatus")
+      || ctx.Request.Path.StartsWithSegments("/health") ? LogEventLevel.Debug
+    : LogEventLevel.Information);
+app.UseResponseCompression();
 
 if (!app.Environment.IsDevelopment())
 {

@@ -36,6 +36,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   app:
     build:
@@ -61,6 +66,12 @@ services:
       Encryption__Key: ${ENCRYPTION_KEY:-}
       Search__Provider: Serper
       TZ: Europe/Istanbul
+    # Konsol logu dondurulur: sinirsiz buyuyen Docker log dosyasi diski doldurup sunucuyu yavaslatir.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     volumes:
       - applogs:/app/logs
       - appkeys:/app/keys
