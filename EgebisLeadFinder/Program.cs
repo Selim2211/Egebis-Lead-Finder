@@ -63,6 +63,8 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<UsageService>();
 builder.Services.AddSingleton<ApiHealthService>();
+builder.Services.AddSingleton<EgebisLeadFinder.Services.Diagnostics.RequestTimings>();
+builder.Services.AddScoped<EgebisLeadFinder.Services.Diagnostics.DiagnosticsService>();
 builder.Services.AddScoped<SearchRunService>();
 builder.Services.AddScoped<FavoriteService>();
 builder.Services.AddSingleton<IAuditLogger, AuditLogger>();
@@ -326,6 +328,7 @@ app.UseSerilogRequestLogging(o => o.GetLevel = (ctx, elapsedMs, ex) =>
       || ctx.Request.Path.StartsWithSegments("/health") ? LogEventLevel.Debug
     : LogEventLevel.Information);
 app.UseResponseCompression();
+app.UseMiddleware<EgebisLeadFinder.Services.Diagnostics.RequestTimingMiddleware>(); // Sistem Teshisi: sunucu suresi
 
 if (!app.Environment.IsDevelopment())
 {

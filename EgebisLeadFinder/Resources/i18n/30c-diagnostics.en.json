@@ -1,0 +1,22 @@
+{
+  "Sistem Teşhisi": "System Diagnostics",
+  "Sistem Teşhisi ve Loglar": "System Diagnostics & Logs",
+  "Sunucudaki yavaşlık ve hataların kaynağını bulmak için ölçümler ve son loglar. Şifre ve API anahtarları gösterilmez.": "Measurements and recent logs to find the cause of slowness and errors on the server. Passwords and API keys are never shown.",
+  "Tümünü çalıştır": "Run all",
+  "Tümünü kopyala": "Copy all",
+  "\"Tümünü çalıştır\"a basın, bitince \"Tümünü kopyala\" ile sonucu kopyalayıp geliştiriciye gönderin.": "Press \"Run all\"; when it finishes, use \"Copy all\" and send the result to the developer.",
+  "1. Sunucu ölçümleri": "1. Server measurements",
+  "Çalıştır": "Run",
+  "Bellek, disk, veritabanı, sunucudan internete erişim ve son isteklerin sunucudaki süresi.": "Memory, disk, database, internet access from the server and server-side time of recent requests.",
+  "Henüz çalıştırılmadı.": "Not run yet.",
+  "2. Tarayıcı ↔ sunucu hız testi": "2. Browser ↔ server speed test",
+  "Sayfaların sizin bilgisayarınızda kaç ms'de geldiğini ve bunun ne kadarının sunucuda, ne kadarının ağda geçtiğini ölçer.": "Measures how many ms pages take to reach your computer and how much of that is spent on the server versus the network.",
+  "3. Son loglar": "3. Recent logs",
+  "Yalnızca uyarı ve hatalar": "Warnings and errors only",
+  "Tümü": "All",
+  "300 satır": "300 lines",
+  "1000 satır": "1000 lines",
+  "3000 satır": "3000 lines",
+  "Getir": "Fetch",
+  "Henüz getirilmedi.": "Not fetched yet."
+}

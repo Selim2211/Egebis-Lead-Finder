@@ -1,0 +1,173 @@
+@{
+    ViewData["Title"] = "Sistem Teşhisi";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Sistem Teşhisi</h1>
+        <div class="page-sub">Sunucudaki yavaşlık ve hataların kaynağını bulmak için ölçümler ve son loglar. Şifre ve API anahtarları gösterilmez.</div>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-accent" id="diagAll">Tümünü çalıştır</button>
+        <button type="button" class="btn btn-outline-secondary" id="diagCopy">Tümünü kopyala</button>
+        <a class="btn btn-outline-secondary" asp-controller="Settings" asp-action="Index">Ayarlar</a>
+    </div>
+</div>
+
+<p class="text-muted small mb-3">
+    "Tümünü çalıştır"a basın, bitince "Tümünü kopyala" ile sonucu kopyalayıp geliştiriciye gönderin.
+</p>
+
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>1. Sunucu ölçümleri</span>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-diag-run="server">Çalıştır</button>
+    </div>
+    <div class="card-body">
+        <div class="small text-muted mb-2">Bellek, disk, veritabanı, sunucudan internete erişim ve son isteklerin sunucudaki süresi.</div>
+        <pre class="diag-out" id="diagServer" translate="no">Henüz çalıştırılmadı.</pre>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>2. Tarayıcı ↔ sunucu hız testi</span>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-diag-run="browser">Çalıştır</button>
+    </div>
+    <div class="card-body">
+        <div class="small text-muted mb-2">Sayfaların sizin bilgisayarınızda kaç ms'de geldiğini ve bunun ne kadarının sunucuda, ne kadarının ağda geçtiğini ölçer.</div>
+        <pre class="diag-out" id="diagBrowser" translate="no">Henüz çalıştırılmadı.</pre>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header d-flex flex-wrap gap-2 justify-content-between align-items-center">
+        <span>3. Son loglar</span>
+        <div class="d-flex gap-2 align-items-center">
+            <select class="form-select form-select-sm w-auto" id="diagLogMode" aria-label="Log filtresi">
+                <option value="problems">Yalnızca uyarı ve hatalar</option>
+                <option value="all">Tümü</option>
+            </select>
+            <select class="form-select form-select-sm w-auto" id="diagLogLines" aria-label="Satır sayısı">
+                <option value="300">300 satır</option>
+                <option value="1000">1000 satır</option>
+                <option value="3000">3000 satır</option>
+            </select>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-diag-run="log">Getir</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <pre class="diag-out diag-log" id="diagLog" translate="no">Henüz getirilmedi.</pre>
+    </div>
+</div>
+
+<style>
+    .diag-out { max-height: 460px; overflow: auto; margin: 0; padding: .75rem; border-radius: .5rem;
+        background: var(--eg-surface-alt); color: var(--eg-text); border: 1px solid var(--eg-border); font-size: .78rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+    .diag-log { max-height: 560px; }
+</style>
+
+@section Scripts {
+    <script>
+        (function () {
+            var urls = {
+                run: '@Url.Action("Run", "Diagnostics")',
+                log: '@Url.Action("Log", "Diagnostics")',
+                ping: '@Url.Action("Ping", "Diagnostics")',
+                pages: ['@Url.Action("Index", "Home")', '@Url.Action("Index", "Company")', '@Url.Action("Index", "Lead")']
+            };
+            var out = { server: document.getElementById('diagServer'), browser: document.getElementById('diagBrowser'), log: document.getElementById('diagLog') };
+
+            async function text(url) {
+                var r = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.text();
+            }
+
+            async function runServer() {
+                out.server.textContent = 'Ölçülüyor… (10–20 sn sürebilir)';
+                try { out.server.textContent = await text(urls.run); }
+                catch (e) { out.server.textContent = 'Çalıştırılamadı: ' + e.message; }
+            }
+
+            function serverMs(entry) {
+                var st = (entry && entry.serverTiming) || [];
+                for (var i = 0; i < st.length; i++) if (st[i].name === 'app') return st[i].duration;
+                return null;
+            }
+
+            async function timed(url) {
+                var t0 = performance.now();
+                var r = await fetch(url + (url.indexOf('?') < 0 ? '?' : '&') + '_t=' + Date.now(), { credentials: 'same-origin', cache: 'no-store' });
+                var body = await r.text();
+                var total = performance.now() - t0;
+                var entries = performance.getEntriesByName(r.url);
+                var e = entries[entries.length - 1];
+                return { total: total, server: serverMs(e), ttfb: e ? e.responseStart - e.requestStart : null, kb: body.length / 1024, status: r.status };
+            }
+
+            function median(a) { var s = a.slice().sort(function (x, y) { return x - y; }); return s.length ? s[Math.floor(s.length / 2)] : 0; }
+
+            async function runBrowser() {
+                var lines = ['Tarayıcı: ' + navigator.userAgent, 'Bağlantı: ' + ((navigator.connection && navigator.connection.effectiveType) || 'bilinmiyor'), ''];
+                out.browser.textContent = 'Ölçülüyor…';
+                try {
+                    var pings = [];
+                    for (var i = 0; i < 8; i++) pings.push((await timed(urls.ping)).total);
+                    lines.push('Boş istek (yalnızca ağ gidiş-dönüş), 8 kez: ortanca ' + median(pings).toFixed(0) + ' ms, en kötü ' + Math.max.apply(null, pings).toFixed(0) + ' ms');
+                    for (var p = 0; p < urls.pages.length; p++) {
+                        var runs = [];
+                        for (var j = 0; j < 3; j++) runs.push(await timed(urls.pages[p]));
+                        var tot = median(runs.map(function (r) { return r.total; }));
+                        var srv = median(runs.map(function (r) { return r.server || 0; }));
+                        lines.push(urls.pages[p].padEnd(10) + ' toplam ' + tot.toFixed(0) + ' ms | sunucuda ' + srv.toFixed(0) + ' ms | ağ+aktarım ' + Math.max(0, tot - srv).toFixed(0) + ' ms | ' + runs[0].kb.toFixed(0) + ' KB (HTTP ' + runs[0].status + ')');
+                    }
+                    var nav = performance.getEntriesByType('navigation')[0];
+                    if (nav) lines.push('', 'Bu sayfanın ilk açılışı: tam yükleme ' + nav.loadEventEnd.toFixed(0) + ' ms, sunucu yanıtı ' + (nav.responseStart - nav.requestStart).toFixed(0) + ' ms');
+                    var slowRes = performance.getEntriesByType('resource').filter(function (r) { return r.duration > 500 && r.name.indexOf('/Diagnostics/') < 0; })
+                        .sort(function (a, b) { return b.duration - a.duration; }).slice(0, 6);
+                    if (slowRes.length) {
+                        lines.push('', 'Yavaş yüklenen dosyalar (500 ms üstü):');
+                        slowRes.forEach(function (r) { lines.push('  ' + r.duration.toFixed(0) + ' ms  ' + r.name); });
+                    }
+                    lines.push('', 'Yorum: "sunucuda" süresi küçük ama "ağ+aktarım" büyükse sorun ağda; "sunucuda" büyükse sorun sunucuda.');
+                    out.browser.textContent = lines.join('\n');
+                } catch (e) { out.browser.textContent = 'Çalıştırılamadı: ' + e.message; }
+            }
+
+            async function runLog() {
+                out.log.textContent = 'Getiriliyor…';
+                var mode = document.getElementById('diagLogMode').value;
+                var n = document.getElementById('diagLogLines').value;
+                try {
+                    out.log.textContent = await text(urls.log + '?lines=' + n + '&problems=' + (mode === 'problems'));
+                    out.log.scrollTop = out.log.scrollHeight;
+                } catch (e) { out.log.textContent = 'Getirilemedi: ' + e.message; }
+            }
+
+            var runners = { server: runServer, browser: runBrowser, log: runLog };
+            document.querySelectorAll('[data-diag-run]').forEach(function (b) {
+                b.addEventListener('click', async function () {
+                    b.disabled = true;
+                    try { await runners[b.dataset.diagRun](); } finally { b.disabled = false; }
+                });
+            });
+
+            document.getElementById('diagAll').addEventListener('click', async function () {
+                var b = this; b.disabled = true;
+                try { await runServer(); await runBrowser(); await runLog(); } finally { b.disabled = false; }
+            });
+
+            document.getElementById('diagCopy').addEventListener('click', async function () {
+                var all = '### 1. Sunucu ölçümleri\n' + out.server.textContent + '\n\n### 2. Tarayıcı ↔ sunucu hız testi\n' + out.browser.textContent + '\n\n### 3. Son loglar\n' + out.log.textContent;
+                var b = this, old = b.textContent;
+                try { await navigator.clipboard.writeText(all); b.textContent = 'Kopyalandı'; }
+                catch (e) {
+                    var blob = new Blob([all], { type: 'text/plain' }); var a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob); a.download = 'leadfinder-teshis.txt'; a.click(); b.textContent = 'İndirildi';
+                }
+                setTimeout(function () { b.textContent = old; }, 1600);
+            });
+        })();
+    </script>
+}
