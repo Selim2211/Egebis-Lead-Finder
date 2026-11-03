@@ -16,6 +16,14 @@ public class UsageController : Controller
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken ct) => View(await _usage.GetAllAsync(ct));
 
+    /// <summary>Acilis uyarisi penceresi (layout sayfa acildiktan sonra yukler; bos yanit = sorun yok).</summary>
+    [HttpGet]
+    public IActionResult StartupAlert()
+    {
+        Response.Headers.CacheControl = "no-store";
+        return PartialView("_ApiStatusAlert");
+    }
+
     /// <summary>Apollo'nun canli kredi durumunu sorgular (bakiye API'si olan tek saglayici).</summary>
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Refresh(CancellationToken ct)

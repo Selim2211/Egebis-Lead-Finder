@@ -42,6 +42,9 @@ public class ProviderUsage
     /// <summary>Uygulama bu servisi su an kullaniyor mu? (ör. yapay zeka Groq'tayken Gemini kullanilmaz)</summary>
     public bool InUse { get; init; } = true;
 
+    /// <summary>Acilista yapilan canli erisim kontrolunun hata metni (ulasilamadi, anahtar reddedildi...).</summary>
+    public string? LiveError { get; set; }
+
     public int[] Last30Days { get; init; } = Array.Empty<int>();
 
     /// <summary>Saglayicidan canli okunan bakiye (yalnizca Apollo destekliyor).</summary>
@@ -75,10 +78,13 @@ public class UsageService
     private readonly IHttpClientFactory _httpFactory;
     private readonly ILogger<UsageService> _logger;
     private readonly Configuration.AiOptions _aiOptions;
+    private readonly ApiHealthService? _health;
 
     public UsageService(IApiUsageTracker usage, ISettingsService settings, IMemoryCache cache,
-        IHttpClientFactory httpFactory, ILogger<UsageService> logger, Microsoft.Extensions.Options.IOptions<Configuration.AiOptions> aiOptions)
+        IHttpClientFactory httpFactory, ILogger<UsageService> logger, Microsoft.Extensions.Options.IOptions<Configuration.AiOptions> aiOptions,
+        ApiHealthService? health = null)
     {
+        _health = health;
         _aiOptions = aiOptions.Value;
         _usage = usage;
         _settings = settings;
@@ -248,9 +254,17 @@ public class UsageService
     public async Task<List<ProviderUsage>> GetStartupProblemsAsync(CancellationToken ct = default)
     {
         if (_cache.TryGetValue(StartupCacheKey, out List<ProviderUsage>? cached) && cached is not null) return cached;
-        var items = (await GetAllAsync(ct))
+        var all = await GetAllAsync(ct);
+        if (_health is not null)
+            await Task.WhenAll(all.Where(i => i.InUse && i.KeyConfigured).Select(async i =>
+            {
+                var key = await _settings.GetAsync(KeySettingFor(i.Key), ct);
+                if (!string.IsNullOrWhiteSpace(key)) i.LiveError = await _health.CheckAsync(i.Key, key.Trim(), ct);
+            }));
+
+        var items = all
             .Where(i => i.InUse
-                ? i.Level >= UsageLevel.Critical || (!i.KeyConfigured && i.Key != "apollo")
+                ? i.LiveError is not null || i.Level >= UsageLevel.Critical || (!i.KeyConfigured && i.Key != "apollo")
                 : i.Level == UsageLevel.Exhausted)
             .OrderByDescending(i => i.InUse).ThenByDescending(i => i.Level)
             .ToList();
@@ -259,6 +273,15 @@ public class UsageService
     }
 
     private const string StartupCacheKey = "usage:startup-problems";
+
+    private static string KeySettingFor(string key) => key switch
+    {
+        "serper" => SettingKeys.SerperApiKey,
+        "apollo" => SettingKeys.ApolloApiKey,
+        AiProviders.Groq => SettingKeys.GroqApiKey,
+        AiProviders.Nvidia => SettingKeys.NvidiaApiKey,
+        _ => SettingKeys.GeminiApiKey
+    };
 
     /// <summary>Ust menu ve Panel icin: en kotu seviye (60 sn onbellek).</summary>
     public async Task<(UsageLevel Level, List<ProviderUsage> Items)> GetAlertAsync(CancellationToken ct = default)

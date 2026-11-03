@@ -62,6 +62,7 @@ builder.Services.AddSingleton<IPasswordHasher<AppUser>, PasswordHasher<AppUser>>
 builder.Services.AddScoped<UserService>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<UsageService>();
+builder.Services.AddSingleton<ApiHealthService>();
 builder.Services.AddScoped<SearchRunService>();
 builder.Services.AddScoped<FavoriteService>();
 builder.Services.AddSingleton<IAuditLogger, AuditLogger>();

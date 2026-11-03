@@ -1,0 +1,7 @@
+{
+  "Aşağıdaki servislere ulaşılamıyor ya da kredisi, kotası veya anahtarı sorunlu. Bu servislere bağlı işlemler hata verebilir.": "The services below cannot be reached or have a credit, quota or key problem. Features that depend on them may fail.",
+  "Ulaşılamıyor": "Unreachable",
+  "Kontrol:": "Checked:",
+  "(uygulama açılışında canlı denendi)": "(tested live when the app opened)",
+  "Sorun giderildiğinde (bağlantı düzelince, kredi yüklenince ya da anahtar yenilenince) bu uyarı kendiliğinden kalkar.": "This alert clears by itself once the problem is fixed (connection restored, credit added or key renewed)."
+}

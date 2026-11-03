@@ -261,7 +261,39 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     @if (signedIn)
     {
-        <partial name="_ApiStatusAlert" />
+        <div id="apiStatusAlertHost" data-url="@Url.Action("StartupAlert", "Usage")"></div>
+        <script>
+            // Acilis uyarisi: API'lere canli erisim kontrolu sunucuda yapilir (5 dk onbellek); sayfa
+            // acilisini bekletmemek icin sonradan yuklenir. Ayni durum oturumda bir kez gosterilir.
+            (function () {
+                var host = document.getElementById('apiStatusAlertHost');
+                if (!host || !window.fetch || !window.bootstrap) return;
+                function get(store, k) { try { return store.getItem(k); } catch (e) { return null; } }
+                function set(store, k, v) { try { store.setItem(k, v); } catch (e) { } }
+                var last = +(get(sessionStorage, 'eg-api-alert-at') || 0);
+                if (Date.now() - last < 5 * 60 * 1000) return;
+                fetch(host.dataset.url, { credentials: 'same-origin' })
+                    .then(function (r) { return r.ok ? r.text() : ''; })
+                    .then(function (html) {
+                        set(sessionStorage, 'eg-api-alert-at', String(Date.now()));
+                        host.innerHTML = html;
+                        var el = document.getElementById('apiStatusAlert');
+                        if (!el) return;
+                        var sig = el.dataset.signature;
+                        var today = new Date().toISOString().slice(0, 10);
+                        if (get(sessionStorage, 'eg-api-alert') === sig) return;
+                        if (get(localStorage, 'eg-api-alert-snooze') === sig + '#' + today) return;
+                        var modal = bootstrap.Modal.getOrCreateInstance(el);
+                        el.addEventListener('hidden.bs.modal', function () { set(sessionStorage, 'eg-api-alert', sig); });
+                        el.querySelector('[data-api-alert-snooze]').addEventListener('click', function () {
+                            set(localStorage, 'eg-api-alert-snooze', sig + '#' + today);
+                            modal.hide();
+                        });
+                        modal.show();
+                    })
+                    .catch(function () { });
+            })();
+        </script>
     }
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script src="~/js/favorites.js" asp-append-version="true"></script>

@@ -164,7 +164,7 @@ public class ApolloPeopleSearchService : IPeopleSearchService
             var body = await response.Content.ReadAsStringAsync(ct);
             if (_usage is not null) await _usage.IncrementAsync(ApolloPersonEmailFinder.UsageProvider, ct);
 
-            if (_usage is not null && (int)response.StatusCode is 402 or 429)
+            if (_usage is not null && (int)response.StatusCode is 401 or 402 or 403 or 429)
                 await _usage.RecordErrorAsync(ApolloPersonEmailFinder.UsageProvider, $"Kişi araması reddedildi (HTTP {(int)response.StatusCode})", ct);
 
             if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized
