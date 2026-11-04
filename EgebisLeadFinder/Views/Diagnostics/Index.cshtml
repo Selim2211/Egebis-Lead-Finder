@@ -112,9 +112,9 @@
                 var lines = ['Tarayıcı: ' + navigator.userAgent, 'Bağlantı: ' + ((navigator.connection && navigator.connection.effectiveType) || 'bilinmiyor'), ''];
                 out.browser.textContent = 'Ölçülüyor…';
                 try {
-                    var pings = [];
-                    for (var i = 0; i < 8; i++) pings.push((await timed(urls.ping)).total);
-                    lines.push('Boş istek (yalnızca ağ gidiş-dönüş), 8 kez: ortanca ' + median(pings).toFixed(0) + ' ms, en kötü ' + Math.max.apply(null, pings).toFixed(0) + ' ms');
+                    var pings = [], pingNet = [];
+                    for (var i = 0; i < 8; i++) { var pg = await timed(urls.ping); pings.push(pg.total); pingNet.push(pg.total - (pg.server || 0)); }
+                    lines.push('Boş istek, 8 kez: ortanca ' + median(pings).toFixed(0) + ' ms (bunun ağda geçen kısmı ' + median(pingNet).toFixed(0) + ' ms), en kötü ' + Math.max.apply(null, pings).toFixed(0) + ' ms');
                     for (var p = 0; p < urls.pages.length; p++) {
                         var runs = [];
                         for (var j = 0; j < 3; j++) runs.push(await timed(urls.pages[p]));

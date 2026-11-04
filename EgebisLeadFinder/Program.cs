@@ -65,6 +65,7 @@ builder.Services.AddScoped<UsageService>();
 builder.Services.AddSingleton<ApiHealthService>();
 builder.Services.AddSingleton<EgebisLeadFinder.Services.Diagnostics.RequestTimings>();
 builder.Services.AddScoped<EgebisLeadFinder.Services.Diagnostics.DiagnosticsService>();
+builder.Services.AddHostedService<EgebisLeadFinder.Services.Diagnostics.StartupWarmup>();
 builder.Services.AddScoped<SearchRunService>();
 builder.Services.AddScoped<FavoriteService>();
 builder.Services.AddSingleton<IAuditLogger, AuditLogger>();

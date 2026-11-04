@@ -53,7 +53,7 @@ public partial class DiagnosticsService
         ThreadPool.GetMaxThreads(out var maxWorkers, out _);
         sb.AppendLine($"Thread pool kuyruğu: {ThreadPool.PendingWorkItemCount}   meşgul worker: {maxWorkers - freeWorkers}");
 
-        if (OperatingSystem.IsLinux()) LinuxSection(sb);
+        if (OperatingSystem.IsLinux()) await LinuxSection(sb, ct);
 
         Section(sb, "Disk");
         DiskSection(sb);
@@ -73,10 +73,34 @@ public partial class DiagnosticsService
 
     private static void Section(StringBuilder sb, string title) => sb.AppendLine().AppendLine($"==== {title} ====");
 
-    private static void LinuxSection(StringBuilder sb)
+    private static async Task LinuxSection(StringBuilder sb, CancellationToken ct)
     {
         Section(sb, "Sunucu yükü (Linux)");
-        sb.AppendLine($"Yük ortalaması (1/5/15 dk): {Read("/proc/loadavg")?.Split(' ').Take(3).Aggregate((a, b) => a + " " + b)}");
+        var load = Read("/proc/loadavg")?.Split(' ');
+        if (load is { Length: >= 4 })
+            sb.AppendLine($"Yük ortalaması (1/5/15 dk): {load[0]} {load[1]} {load[2]}   (işlemci sayısı {Environment.ProcessorCount}; yük bunu aşarsa işler sıra bekler)   " +
+                          $"şu an çalışan/toplam iş parçacığı: {load[3]}");
+
+        // 2 sn boyunca makinenin TUM islemci zamani nereye gidiyor? (uygulama mi, baska programlar mi,
+        // disk beklemesi mi, sanal makinede "steal" = fiziksel sunucunun baska VM'lere verdigi zaman mi)
+        var before = CpuTimes();
+        var procBefore = Process.GetCurrentProcess().TotalProcessorTime;
+        var sw = Stopwatch.StartNew();
+        await Task.Delay(2000, ct);
+        var after = CpuTimes();
+        var appCpu = (Process.GetCurrentProcess().TotalProcessorTime - procBefore).TotalMilliseconds / (sw.Elapsed.TotalMilliseconds * Environment.ProcessorCount) * 100;
+        if (before is not null && after is not null)
+        {
+            var d = after.Zip(before, (a, b) => (double)(a - b)).ToArray();
+            var total = d.Sum();
+            double Pct(params int[] idx) => total > 0 ? idx.Sum(i => d[i]) / total * 100 : 0;
+            // /proc/stat cpu: user nice system idle iowait irq softirq steal
+            var busy = Pct(0, 1, 2, 5, 6);
+            sb.AppendLine($"İşlemci (2 sn ölçüm, tüm makine): dolu %{busy:0} (kullanıcı %{Pct(0, 1):0}, sistem %{Pct(2, 5, 6):0}), " +
+                          $"disk bekleme %{Pct(4):0}, steal %{Pct(7):0}, boşta %{Pct(3):0}");
+            sb.AppendLine($"Bu uygulamanın payı: %{appCpu:0.0}  → makinedeki yükün {(busy - appCpu > 30 ? "BÜYÜK KISMI BAŞKA PROGRAMLARDAN" : "kaynağı belirsiz")}");
+            if (Pct(7) > 10) sb.AppendLine("UYARI: steal yüksek — sanal makinenin bulunduğu fiziksel sunucu aşırı yüklü (BT/sanallaştırma tarafı).");
+        }
         var mem = Read("/proc/meminfo");
         if (mem is not null)
         {
@@ -169,6 +193,8 @@ public partial class DiagnosticsService
             sb.AppendLine($"Veritabanı boyutu: {await Scalar(conn, "select pg_size_pretty(pg_database_size(current_database()))", ct)}");
             sb.AppendLine($"Açık bağlantı: {await Scalar(conn, "select count(*) from pg_stat_activity where datname = current_database()", ct)}");
             sb.AppendLine($"Önbellek isabeti: %{await Scalar(conn, "select round(100.0 * sum(blks_hit) / nullif(sum(blks_hit) + sum(blks_read), 0), 1) from pg_stat_database where datname = current_database()", ct)}");
+            sb.AppendLine($"Şu an çalışan sorgu: {await Scalar(conn, "select count(*) from pg_stat_activity where datname = current_database() and state = 'active' and pid <> pg_backend_pid()", ct)}   " +
+                          $"en uzun süren: {await Scalar(conn, "select coalesce(round(extract(epoch from max(now() - query_start)) * 1000), 0) || ' ms' from pg_stat_activity where datname = current_database() and state = 'active' and pid <> pg_backend_pid()", ct)}");
             await using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "select relname, n_live_tup, n_dead_tup from pg_stat_user_tables order by n_live_tup desc limit 6";
@@ -284,6 +310,14 @@ public partial class DiagnosticsService
     private static string Truncate(string s, int n) => s.Length <= n ? s : s[..n] + "…";
 
     private static string Human(TimeSpan t) => t.TotalDays >= 1 ? $"{(int)t.TotalDays} gün {t.Hours} sa" : t.TotalHours >= 1 ? $"{(int)t.TotalHours} sa {t.Minutes} dk" : $"{t.Minutes} dk";
+
+    private static long[]? CpuTimes()
+    {
+        var line = Read("/proc/stat")?.Split('\n').FirstOrDefault(l => l.StartsWith("cpu "));
+        if (line is null) return null;
+        var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries).Skip(1).Take(8).Select(long.Parse).ToArray();
+        return parts.Length == 8 ? parts : null;
+    }
 
     private static string? Read(string path)
     {
