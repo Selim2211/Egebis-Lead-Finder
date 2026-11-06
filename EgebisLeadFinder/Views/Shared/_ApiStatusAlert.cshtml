@@ -29,6 +29,10 @@
                         </span>
                         <div>
                             <h2 class="api-alert-title" id="apiStatusAlertTitle">Bazı servisler şu an kullanılamıyor</h2>
+                            @if (problems.Count(p => p.LiveError?.StartsWith(ApiHealthService.NetworkPrefix) == true) >= 2)
+                            {
+                                <p class="api-alert-sub"><strong>Birden fazla servise aynı anda ulaşılamıyor: bu genellikle servislerin değil, sunucunun internet bağlantısının (ya da DNS'in) sorunudur.</strong></p>
+                            }
                             <p class="api-alert-sub">Aşağıdaki servislere ulaşılamıyor ya da kredisi, kotası veya anahtarı sorunlu. Bu servislere bağlı işlemler hata verebilir.</p>
                         </div>
                     </div>

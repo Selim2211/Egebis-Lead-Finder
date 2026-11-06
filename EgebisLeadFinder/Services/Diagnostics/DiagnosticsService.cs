@@ -28,9 +28,11 @@ public partial class DiagnosticsService
     private readonly IHttpClientFactory _httpFactory;
     private readonly RequestTimings _timings;
     private readonly IWebHostEnvironment _env;
+    private readonly IConfiguration _config;
 
-    public DiagnosticsService(ApplicationDbContext db, IHttpClientFactory httpFactory, RequestTimings timings, IWebHostEnvironment env)
+    public DiagnosticsService(ApplicationDbContext db, IHttpClientFactory httpFactory, RequestTimings timings, IWebHostEnvironment env, IConfiguration config)
     {
+        _config = config;
         _db = db;
         _httpFactory = httpFactory;
         _timings = timings;
@@ -57,6 +59,9 @@ public partial class DiagnosticsService
 
         Section(sb, "Disk");
         DiskSection(sb);
+
+        Section(sb, "Oturum anahtarları (\"Beni hatırla\" bunlara bağlı)");
+        KeysSection(sb);
 
         Section(sb, "Veritabanı");
         await DatabaseSection(sb, ct);
@@ -131,6 +136,35 @@ public partial class DiagnosticsService
                 sb.AppendLine($"Bekleme baskısı {r,-6}: son 10 sn %{some.Groups[1].Value}, 1 dk %{some.Groups[2].Value}, 5 dk %{some.Groups[3].Value}");
         }
         sb.AppendLine("(Bekleme baskısı: işlemlerin CPU/bellek/disk beklerken geçirdiği süre. %10 üstü darboğaz demektir.)");
+    }
+
+    /// <summary>
+    /// Oturum cerezi bu anahtarlarla sifrelenir. Anahtarlar kalici klasorde degilse (ya da deploy'da
+    /// klasor/volume silinirse) her yeniden baslatmada herkesin oturumu duser, "beni hatirla" calismaz.
+    /// </summary>
+    private void KeysSection(StringBuilder sb)
+    {
+        var path = _config["DataProtection:KeysPath"];
+        sb.AppendLine($"Anahtar klasörü ayarı: {(string.IsNullOrWhiteSpace(path) ? "YOK (anahtarlar yalnızca bellekte; her yeniden başlatmada oturumlar düşer)" : path)}");
+        sb.AppendLine($"Uygulama başlangıcı: {StartedAt.ToLocalTime():dd.MM.yyyy HH:mm:ss}");
+        if (string.IsNullOrWhiteSpace(path)) return;
+        try
+        {
+            if (!Directory.Exists(path)) { sb.AppendLine("Klasör YOK."); return; }
+            var files = new DirectoryInfo(path).GetFiles("key-*.xml").OrderBy(f => f.CreationTimeUtc).ToList();
+            sb.AppendLine($"Anahtar dosyası: {files.Count} adet" + (files.Count > 0
+                ? $", en eskisi {files[0].CreationTime:dd.MM.yyyy HH:mm}, en yenisi {files[^1].CreationTime:dd.MM.yyyy HH:mm}" : " (hiç yok)"));
+            var probe = Path.Combine(path, ".yazma-testi-" + Guid.NewGuid().ToString("N"));
+            File.WriteAllText(probe, "x");
+            File.Delete(probe);
+            sb.AppendLine("Klasöre yazılabiliyor: evet");
+            if (files.Count > 0 && files[0].CreationTimeUtc > DateTime.UtcNow.AddDays(-1))
+                sb.AppendLine("DİKKAT: en eski anahtar 1 günden yeni → anahtarlar yakın zamanda sıfırlanmış olabilir (deploy'da volume silinmiş mi?). Bu durumda herkes oturumdan düşer.");
+        }
+        catch (Exception ex)
+        {
+            sb.AppendLine("Anahtar klasörü okunamadı/yazılamadı: " + ex.Message);
+        }
     }
 
     private void DiskSection(StringBuilder sb)

@@ -31,34 +31,47 @@ public class ApiHealthService
         var cacheKey = "health:" + service + ":" + apiKey.GetHashCode();
         if (_cache.TryGetValue(cacheKey, out (bool Done, string? Error) hit) && hit.Done) return hit.Error;
 
-        var request = BuildRequest(service, apiKey);
-        if (request is null) return null;
+        if (BuildRequest(service, apiKey) is null) return null;
 
-        string? error;
-        try
+        // Uygulama yeni acilmisken (sunucu yogun, DNS/baglanti havuzu soguk) ilk istek zaman asimina
+        // ugrayabiliyordu ve uc servis birden "ulasilamiyor" gorunuyordu. Ag hatasinda bir kez daha,
+        // daha uzun beklemeyle denenir; gercekten ulasilamiyorsa o zaman bildirilir.
+        string? error = null;
+        var network = false;
+        for (var attempt = 1; attempt <= 2; attempt++)
         {
-            using var http = _httpFactory.CreateClient();
-            http.Timeout = TimeSpan.FromSeconds(8);
-            using (request)
-            using (var response = await http.SendAsync(request, ct))
+            network = false;
+            try
             {
+                using var http = _httpFactory.CreateClient();
+                http.Timeout = TimeSpan.FromSeconds(attempt == 1 ? 8 : 20);
+                using var request = BuildRequest(service, apiKey)!;
+                using var response = await http.SendAsync(request, ct);
                 var body = await response.Content.ReadAsStringAsync(ct);
                 error = Classify(service, (int)response.StatusCode, body);
+                break;
             }
-        }
-        catch (TaskCanceledException) when (!ct.IsCancellationRequested)
-        {
-            error = "Sunucudan ulaşılamadı: 8 saniyede yanıt gelmedi (ağ, güvenlik duvarı ya da servis yavaş)";
-        }
-        catch (HttpRequestException ex)
-        {
-            error = "Sunucudan ulaşılamadı: " + NetworkReason(ex);
+            catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+            {
+                network = true;
+                error = NetworkPrefix + $"{(attempt == 1 ? 8 : 20)} saniyede yanıt gelmedi (sunucunun internet bağlantısı, DNS ya da güvenlik duvarı)";
+            }
+            catch (HttpRequestException ex)
+            {
+                network = true;
+                error = NetworkPrefix + NetworkReason(ex);
+            }
+            if (attempt == 1) await Task.Delay(1500, ct);
         }
 
         if (error is not null) _logger.LogWarning("API erişim kontrolü başarısız ({Service}): {Error}", service, error);
-        _cache.Set(cacheKey, (true, error), CacheFor);
+        // Ag hatasi gecici olabilir: kisa tutulur ki baglanti duzelince uyari hemen kalksin.
+        _cache.Set(cacheKey, (true, error), network ? TimeSpan.FromSeconds(30) : CacheFor);
         return error;
     }
+
+    /// <summary>Ag/zaman asimi hatalarinin ortak oneki (arayuz bununla "internet sorunu"nu ayirt eder).</summary>
+    public const string NetworkPrefix = "Sunucudan ulaşılamadı: ";
 
     private static HttpRequestMessage? BuildRequest(string service, string key)
     {

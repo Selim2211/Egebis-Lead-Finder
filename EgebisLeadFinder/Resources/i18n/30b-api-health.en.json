@@ -3,5 +3,6 @@
   "Ulaşılamıyor": "Unreachable",
   "Kontrol:": "Checked:",
   "(uygulama açılışında canlı denendi)": "(tested live when the app opened)",
-  "Sorun giderildiğinde (bağlantı düzelince, kredi yüklenince ya da anahtar yenilenince) bu uyarı kendiliğinden kalkar.": "This alert clears by itself once the problem is fixed (connection restored, credit added or key renewed)."
+  "Sorun giderildiğinde (bağlantı düzelince, kredi yüklenince ya da anahtar yenilenince) bu uyarı kendiliğinden kalkar.": "This alert clears by itself once the problem is fixed (connection restored, credit added or key renewed).",
+  "Birden fazla servise aynı anda ulaşılamıyor: bu genellikle servislerin değil, sunucunun internet bağlantısının (ya da DNS'in) sorunudur.": "Several services are unreachable at the same time: this is usually a problem with the server's internet connection (or DNS), not with the services themselves."
 }
