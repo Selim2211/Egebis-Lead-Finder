@@ -24,6 +24,10 @@ services:
     image: postgres:17-alpine
     container_name: egebis-db
     restart: unless-stopped
+    # Swap kapali: sunucuda disk yavas oldugunda bos duran konteyner sayfalari diske atilip her istekte
+    # geri okunuyordu. Bellekte kalirlar (veritabani kucuk; 1 GB fazlasiyla yeter).
+    mem_limit: 1g
+    memswap_limit: 1g
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-egebisleadfinder}
       POSTGRES_USER: ${POSTGRES_USER:-egebis}
@@ -49,6 +53,8 @@ services:
     image: egebis-lead-finder:latest
     container_name: egebis-app
     restart: unless-stopped
+    mem_limit: 1536m
+    memswap_limit: 1536m
     depends_on:
       db:
         condition: service_healthy

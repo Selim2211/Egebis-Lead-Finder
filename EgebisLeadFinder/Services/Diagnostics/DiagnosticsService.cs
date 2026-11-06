@@ -89,10 +89,16 @@ public partial class DiagnosticsService
         // 2 sn boyunca makinenin TUM islemci zamani nereye gidiyor? (uygulama mi, baska programlar mi,
         // disk beklemesi mi, sanal makinede "steal" = fiziksel sunucunun baska VM'lere verdigi zaman mi)
         var before = CpuTimes();
+        var vmBefore = VmStat();
+        var diskBefore = DiskStats();
+        var ioBefore = SelfIo();
         var procBefore = Process.GetCurrentProcess().TotalProcessorTime;
         var sw = Stopwatch.StartNew();
         await Task.Delay(2000, ct);
         var after = CpuTimes();
+        var vmAfter = VmStat();
+        var diskAfter = DiskStats();
+        var ioAfter = SelfIo();
         var appCpu = (Process.GetCurrentProcess().TotalProcessorTime - procBefore).TotalMilliseconds / (sw.Elapsed.TotalMilliseconds * Environment.ProcessorCount) * 100;
         if (before is not null && after is not null)
         {
@@ -106,6 +112,30 @@ public partial class DiagnosticsService
             sb.AppendLine($"Bu uygulamanın payı: %{appCpu:0.0}  → makinedeki yükün {(busy - appCpu > 30 ? "BÜYÜK KISMI BAŞKA PROGRAMLARDAN" : "kaynağı belirsiz")}");
             if (Pct(7) > 10) sb.AppendLine("UYARI: steal yüksek — sanal makinenin bulunduğu fiziksel sunucu aşırı yüklü (BT/sanallaştırma tarafı).");
         }
+        // Bellek <-> disk trafigi: swap'e yazilip okunuyorsa (pswpin/out) ya da dosyadan sayfa okunuyorsa
+        // (pgmajfault) bos duran programlar disk beklerken takilir.
+        if (vmBefore is not null && vmAfter is not null)
+        {
+            long Dv(string k) => vmAfter.GetValueOrDefault(k) - vmBefore.GetValueOrDefault(k);
+            sb.AppendLine($"Bellek trafiği (2 sn): swap'ten okunan {Dv("pswpin")} sayfa, swap'e yazılan {Dv("pswpout")} sayfa, diskten okunan büyük sayfa hatası {Dv("pgmajfault")}");
+        }
+        var status = Read("/proc/self/status");
+        if (status is not null)
+            sb.AppendLine($"Bu uygulamanın swap'e atılmış belleği: {Regex.Match(status, @"VmSwap:\s+(\d+) kB").Groups[1].Value} kB (0 değilse uygulamanın sayfaları diskte; her istekte geri okunur)");
+        if (ioBefore is not null && ioAfter is not null)
+            sb.AppendLine($"Bu uygulamanın disk G/Ç'si (2 sn): okunan {(ioAfter.Value.Read - ioBefore.Value.Read) / 1024} KB, yazılan {(ioAfter.Value.Write - ioBefore.Value.Write) / 1024} KB");
+        if (diskBefore is not null && diskAfter is not null)
+            foreach (var (dev, a) in diskAfter.OrderBy(k => k.Key))
+            {
+                if (!diskBefore.TryGetValue(dev, out var b)) continue;
+                var ios = (a.Reads - b.Reads) + (a.Writes - b.Writes);
+                if (ios == 0) continue;
+                // diskstats: okuma/yazma sayisi ve toplam bekleme suresi (ms) -> islem basina ortalama gecikme
+                var rLat = a.Reads > b.Reads ? (double)(a.ReadMs - b.ReadMs) / (a.Reads - b.Reads) : 0;
+                var wLat = a.Writes > b.Writes ? (double)(a.WriteMs - b.WriteMs) / (a.Writes - b.Writes) : 0;
+                var busyPct = (a.IoMs - b.IoMs) / 2000.0 * 100;
+                sb.AppendLine($"Disk {dev}: {a.Reads - b.Reads} okuma (ort. {rLat:0.0} ms), {a.Writes - b.Writes} yazma (ort. {wLat:0.0} ms), meşgul %{Math.Min(100, busyPct):0}  → {(wLat > 50 || rLat > 50 ? "YAVAŞ DİSK" : "normal")}");
+            }
         var mem = Read("/proc/meminfo");
         if (mem is not null)
         {
@@ -220,6 +250,24 @@ public partial class DiagnosticsService
                 times.Add(sw.Elapsed.TotalMilliseconds);
             }
             sb.AppendLine($"Basit sorgu (5 kez): ortalama {times.Average():0.0} ms, en kötü {times.Max():0.0} ms");
+
+            // Yazma gecikmesi: PostgreSQL her kayit icin diske senkron (fsync) yazar. Yavas diskte ilk belirti budur.
+            var commits = new List<double>();
+            for (var i = 0; i < 3; i++)
+            {
+                sw.Restart();
+                await using var tx = await conn.BeginTransactionAsync(ct);
+                await using (var c = conn.CreateCommand())
+                {
+                    c.Transaction = tx;
+                    c.CommandText = "create temp table if not exists lf_diag(i int); insert into lf_diag values (1);";
+                    await c.ExecuteNonQueryAsync(ct);
+                }
+                await tx.CommitAsync(ct);
+                commits.Add(sw.Elapsed.TotalMilliseconds);
+            }
+            sb.AppendLine($"Veritabanı yazma+onay (3 kez): ortalama {commits.Average():0.0} ms, en kötü {commits.Max():0.0} ms  → {(commits.Max() > 100 ? "YAVAŞ (disk yazması bekliyor)" : "normal")}");
+            sb.AppendLine($"Veritabanı blok okuması: {await Scalar(conn, "select blks_read || ' diskten / ' || blks_hit || ' bellekten' from pg_stat_database where datname = current_database()", ct)}");
 
             sw.Restart();
             var companies = await _db.Companies.CountAsync(ct);
@@ -344,6 +392,47 @@ public partial class DiagnosticsService
     private static string Truncate(string s, int n) => s.Length <= n ? s : s[..n] + "…";
 
     private static string Human(TimeSpan t) => t.TotalDays >= 1 ? $"{(int)t.TotalDays} gün {t.Hours} sa" : t.TotalHours >= 1 ? $"{(int)t.TotalHours} sa {t.Minutes} dk" : $"{t.Minutes} dk";
+
+    private static Dictionary<string, long>? VmStat()
+    {
+        var text = Read("/proc/vmstat");
+        if (text is null) return null;
+        var d = new Dictionary<string, long>();
+        foreach (var line in text.Split('\n'))
+        {
+            var p = line.Split(' ');
+            if (p.Length == 2 && long.TryParse(p[1], out var v)) d[p[0]] = v;
+        }
+        return d;
+    }
+
+    private static (long Read, long Write)? SelfIo()
+    {
+        var text = Read("/proc/self/io");
+        if (text is null) return null;
+        long V(string k) => long.TryParse(Regex.Match(text, k + @":\s+(\d+)").Groups[1].Value, out var x) ? x : 0;
+        return (V("read_bytes"), V("write_bytes"));
+    }
+
+    private record DiskStat(long Reads, long ReadMs, long Writes, long WriteMs, long IoMs);
+
+    private static Dictionary<string, DiskStat>? DiskStats()
+    {
+        var text = Read("/proc/diskstats");
+        if (text is null) return null;
+        var d = new Dictionary<string, DiskStat>();
+        foreach (var line in text.Split('\n'))
+        {
+            var p = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (p.Length < 13) continue;
+            var name = p[2];
+            if (name.StartsWith("loop") || name.StartsWith("ram")) continue;
+            if (long.TryParse(p[3], out var r) && long.TryParse(p[6], out var rms) && long.TryParse(p[7], out var w)
+                && long.TryParse(p[10], out var wms) && long.TryParse(p[12], out var io))
+                d[name] = new DiskStat(r, rms, w, wms, io);
+        }
+        return d;
+    }
 
     private static long[]? CpuTimes()
     {
