@@ -615,3 +615,21 @@ body { transition: background-color 200ms ease, color 200ms ease; }
 .api-alert-meta { margin-top: .35rem; display: flex; flex-wrap: wrap; gap: .25rem 1rem; font-size: .78rem; color: var(--eg-text-muted); }
 .api-alert-meta strong { color: var(--eg-text); font-weight: 650; font-variant-numeric: tabular-nums; }
 .api-alert-foot { margin: .9rem 0 0; font-size: .8rem; color: var(--eg-text-muted); }
+
+/* ---- NACE kodu kutusu (Firma Ara) ---- */
+.nace-info-btn {
+    display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%;
+    background: transparent; color: var(--eg-text-muted); cursor: help;
+    transition: color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+}
+.nace-info-btn:focus-visible { outline: 2px solid var(--eg-amber); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { .nace-info-btn:hover { color: var(--eg-ink); background: var(--eg-ink-soft); } }
+:root[data-theme="dark"] .nace-info-btn:hover { color: #fff; background: rgba(255, 255, 255, .1); }
+.nace-status.is-ok { color: #1f7a4d; }
+.nace-status.is-warn { color: #9a6700; }
+.nace-status.is-error { color: #b42318; }
+:root[data-theme="dark"] .nace-status.is-ok { color: #5fd49a; }
+:root[data-theme="dark"] .nace-status.is-warn { color: #f0b84a; }
+:root[data-theme="dark"] .nace-status.is-error { color: #ff8a80; }
+.nace-tip .tooltip-inner { max-width: 340px; text-align: left; white-space: pre-line; padding: .6rem .75rem; line-height: 1.45; }
+

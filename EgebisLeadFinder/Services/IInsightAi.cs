@@ -13,6 +13,9 @@ public interface IInsightAi
     /// <summary>Anahtar kelimeye uyan NACE Rev.2 kodlari (bolum "22" veya sinif "22.22").</summary>
     Task<NaceMatchAiResult> MatchNaceAsync(string keyword, CancellationToken ct = default);
 
+    /// <summary>Tek bir NACE kodunun (2-6 hane) ne anlama geldigini ve o faaliyeti yapan firmalar icin arama terimlerini cikarir.</summary>
+    Task<NaceDescribeResult> DescribeNaceAsync(string code, string? officialContext, CancellationToken ct = default);
+
     /// <summary>Secilen NACE sektorlerinin sirketimize ne kadar uygun oldugunu degerlendirir.</summary>
     Task<SectorAiResult> AnalyzeSectorsAsync(BusinessProfile? profile, string keyword, IReadOnlyList<SectorInput> sectors, CancellationToken ct = default);
 
@@ -47,6 +50,23 @@ public class IcpSuggestion
 }
 
 public record NaceSuggestion(string Code, string Name, string? Reason);
+
+/// <summary>Bir NACE kodunun yapay zeka aciklamasi (Firma Ara'daki NACE kodu kutusu).</summary>
+public class NaceDescribeResult
+{
+    public string? Name { get; set; }
+
+    /// <summary>2-4 kelimelik kisa sektor adi (Sektor kutusunu doldurmak icin; ör. "Beyaz eşya").</summary>
+    public string? ShortName { get; set; }
+    public string? Description { get; set; }
+
+    /// <summary>Bu faaliyeti yapan firmalari bulmak icin Turkce arama terimleri (ör. "elektrikli ev aleti üreticisi").</summary>
+    public List<string> SearchTerms { get; set; } = new();
+
+    /// <summary>Yapay zeka kodun anlamindan emin degilse false (aciklama yalnizca tahmindir).</summary>
+    public bool Confident { get; set; } = true;
+    public string? Error { get; set; }
+}
 
 public class NaceMatchAiResult
 {

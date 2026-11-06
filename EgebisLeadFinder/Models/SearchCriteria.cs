@@ -52,6 +52,31 @@ public class SearchCriteria
 
     public bool IsNameSearch => !string.IsNullOrWhiteSpace(CompanyName);
 
+    /// <summary>
+    /// Opsiyonel NACE kodu (ör. "27.51.08"). Doluysa arama terimleri kodun faaliyetinden uretilir
+    /// ve sonuc, firmanin NACE kodu acikca baska olanlar elenerek suzulur. Kontrolor kanonik bicime getirir.
+    /// </summary>
+    public string? NaceCode { get; set; }
+
+    /// <summary>NACE kodunun faaliyeti icin yapay zekanin urettigi arama terimleri. Formdan gelmez.</summary>
+    [BindNever]
+    public List<string> NaceTerms { get; set; } = new();
+
+    /// <summary>"NACE 27.51.08: Elektrikli ev aletleri imalatı" gibi yapay zeka istemlerine eklenen baglam. Formdan gelmez.</summary>
+    [BindNever]
+    public string? NaceContext { get; set; }
+
+    /// <summary>Yapay zeka istemlerinde kullanilacak sektor metni: sektor + (varsa) NACE baglami.</summary>
+    [BindNever]
+    public string AiIndustry => string.IsNullOrWhiteSpace(NaceContext) ? Industry : $"{Industry} ({NaceContext})";
+
+    /// <summary>
+    /// On eleme (siteler okunmadan) icin kisa sektor metni: uzun NACE aciklamasi modeli fazla katilastirip tum adaylari
+    /// eleyebildiginden yalnizca kod eklenir.
+    /// </summary>
+    [BindNever]
+    public string ScreenIndustry => string.IsNullOrWhiteSpace(NaceCode) ? Industry : $"{Industry} (NACE {NaceCode})";
+
     /// <summary>Firma Ara'da tiklanan "Biz ne arıyoruz?" segmenti (BusinessProfile.Segments[].Id).</summary>
     public string? SegmentId { get; set; }
 

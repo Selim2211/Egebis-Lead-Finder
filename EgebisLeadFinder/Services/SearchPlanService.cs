@@ -90,6 +90,8 @@ public class SearchPlanService
     public async Task<SearchPlan> PrepareAsync(SearchCriteria criteria, CancellationToken ct = default)
     {
         var plan = new SearchPlan { Terms = { criteria.Industry.Trim() } };
+        AddNaceTerms(plan.Terms, criteria);
+        criteria.SearchTerms = plan.Terms.Skip(1).ToList(); // akilli arama kapaliyken de NACE terimleri kullanilir
         if (criteria.IsNameSearch || string.IsNullOrWhiteSpace(criteria.Industry)) return plan;
 
         plan.Profile = BusinessProfileService.Parse(await _settings.GetAsync(SettingKeys.BusinessProfile, ct));
@@ -111,17 +113,17 @@ public class SearchPlanService
 
         var region = SearchRegions.Get(criteria.RegionKey ?? SearchRegions.ByCountry(criteria.Country)?.Key);
         var language = LanguageNames.GetValueOrDefault(region.PackCode, "İngilizce");
-        var cacheKey = $"search-terms:{criteria.Industry.Trim().ToLowerInvariant()}|{region.PackCode}|{plan.Segment?.Id}|{plan.Profile.UpdatedAt:O}";
+        var cacheKey = $"search-terms:{criteria.AiIndustry.Trim().ToLowerInvariant()}|{region.PackCode}|{plan.Segment?.Id}|{plan.Profile.UpdatedAt:O}";
 
         try
         {
             if (!_cache.TryGetValue(cacheKey, out List<string>? suggested) || suggested is null)
             {
                 suggested = await _ai.SuggestSearchTermsAsync(
-                    new SearchTermRequest(criteria.Industry.Trim(), plan.Segment, plan.Profile, region.Country, language, MaxTerms - 1), ct);
+                    new SearchTermRequest(criteria.AiIndustry.Trim(), plan.Segment, plan.Profile, region.Country, language, MaxTerms - 1), ct);
                 _cache.Set(cacheKey, suggested, TermCacheDuration);
             }
-            plan.Terms = MergeTerms(criteria.Industry, plan.Segment, suggested);
+            plan.Terms = MergeTerms(criteria.Industry, plan.Segment, criteria.NaceTerms.Concat(suggested));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -153,6 +155,13 @@ public class SearchPlanService
     /// <summary>On eleme payi: elenenlerin yerine aday kalsin diye %50 fazla (en az 5, en fazla 50) toplanir.</summary>
     public static int CollectTargetFor(int max) =>
         Math.Min(max + Math.Clamp(max / 2, 5, 50), SettingKeys.SearchMaxCompaniesUpperLimit + 50);
+
+    /// <summary>NACE kodundan gelen terimler (akilli arama kapali ya da AI yoksa bile) arama terimlerine eklenir.</summary>
+    private static void AddNaceTerms(List<string> terms, SearchCriteria criteria)
+    {
+        foreach (var t in criteria.NaceTerms.Take(3))
+            if (!terms.Contains(t, StringComparer.OrdinalIgnoreCase)) terms.Add(t);
+    }
 
     /// <summary>Kullanicinin terimi basta; segment arama terimi ve AI onerileri; tekrarsiz, en fazla MaxTerms.</summary>
     public static List<string> MergeTerms(string industry, TargetSegment? segment, IEnumerable<string> suggested)
@@ -207,7 +216,7 @@ public class SearchPlanService
             try
             {
                 verdicts = await _ai.ScreenCandidatesAsync(
-                    new CandidateScreenRequest(criteria.Industry, plan.Segment, plan.Profile, items), ct);
+                    new CandidateScreenRequest(criteria.ScreenIndustry, plan.Segment, plan.Profile, items), ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {

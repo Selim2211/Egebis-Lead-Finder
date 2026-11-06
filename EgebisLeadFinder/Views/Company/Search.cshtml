@@ -146,6 +146,18 @@
                         }
                     </div>
 
+                    <div class="mb-3 nace-field">
+                        <label class="form-label d-flex align-items-center gap-1" for="basicNace">
+                            NACE kodu <span class="text-muted-2 fw-normal">(isteğe bağlı)</span>
+                            <button type="button" class="nace-info-btn" data-nace-info aria-label="NACE kodu açıklaması" tabindex="0">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                            </button>
+                        </label>
+                        <input class="form-control nace-input" id="basicNace" name="Criteria.NaceCode" value="@Model.Criteria.NaceCode"
+                               placeholder="27.51.08" inputmode="decimal" autocomplete="off" maxlength="12" />
+                        <div class="form-text nace-status" data-nace-status aria-live="polite">Çok spesifik arama için: kodu yazınca anlamı ve arama terimleri gelir.</div>
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label" for="basicIndustry">Sektör *</label>
                         <input class="form-control" id="basicIndustry" name="Criteria.Industry" list="industryOptions"
@@ -427,6 +439,18 @@
             <div class="modal-body">
                 <div class="row g-4">
                     <div class="col-lg-4">
+                        <div class="mb-3 nace-field">
+                            <label class="form-label d-flex align-items-center gap-1" for="advNace">
+                                NACE kodu <span class="text-muted-2 fw-normal">(isteğe bağlı)</span>
+                                <button type="button" class="nace-info-btn" data-nace-info aria-label="NACE kodu açıklaması" tabindex="0">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                                </button>
+                            </label>
+                            <input class="form-control nace-input" id="advNace" name="Criteria.NaceCode" value="@Model.Criteria.NaceCode"
+                                   placeholder="27.51.08" inputmode="decimal" autocomplete="off" maxlength="12" />
+                            <div class="form-text nace-status" data-nace-status aria-live="polite">Çok spesifik arama için: kodu yazınca anlamı ve arama terimleri gelir.</div>
+                        </div>
+
                         <div class="mb-3">
                             <label class="form-label" for="advIndustry">Sektör *</label>
                             <input class="form-control" id="advIndustry" name="Criteria.Industry" list="industryOptions"
@@ -774,6 +798,101 @@
             });
         });
 
+        // NACE kodu: yazilinca kodun anlami yapay zekadan gelir (sunucuda 30 gun onbellek). Hem temel formdaki hem
+        // gelismis aramadaki alan ayni degeri tasir; bilgi baloncugu (ⓘ) uzerine gelince acilir.
+        var naceFields = Array.prototype.slice.call(document.querySelectorAll('.nace-field')).map(function (box) {
+            return { input: box.querySelector('.nace-input'), status: box.querySelector('[data-nace-status]'), btn: box.querySelector('[data-nace-info]') };
+        });
+        var industryInputs = [document.getElementById('basicIndustry'), advIndustry];
+        var naceUrl = '@Url.Action("NaceInfo", "Company")';
+        var NACE_HINT = 'Çok spesifik arama için: kodu yazınca anlamı ve arama terimleri gelir.';
+        var NACE_TIP_EMPTY = 'NACE kodunu yazınca ne anlama geldiği burada görünür.';
+        var naceCache = {}, naceTimer = null, naceSeq = 0, autoIndustry = '';
+
+        function naceDigits(v) { return (v || '').replace(/\D/g, ''); }
+
+        function naceTip(f, text) {
+            if (!window.bootstrap) return;
+            var tip = bootstrap.Tooltip.getInstance(f.btn);
+            if (!tip) tip = new bootstrap.Tooltip(f.btn, { title: text, customClass: 'nace-tip', placement: 'top', trigger: 'hover focus' });
+            tip.setContent({ '.tooltip-inner': text });
+        }
+
+        function naceRender(info, message, tone) {
+            var tip = NACE_TIP_EMPTY, line = message || NACE_HINT;
+            if (info && info.ok) {
+                var shown = info.official ? info.name : (info.shortName || info.name);
+                tip = info.code + ' · ' + info.name
+                    + (info.basis ? '\n\nKapsadığı resmî faaliyetlerden: ' + info.basis : '')
+                    + (info.description && info.name.indexOf(info.description.slice(0, 40)) < 0 && info.description.indexOf(info.name.slice(0, 60)) < 0 ? '\n\n' + info.description : '')
+                    + (info.terms && info.terms.length ? '\n\nArama terimleri: ' + info.terms.join(', ') : '')
+                    + (info.official ? '\n\nKod adı resmî TÜİK/GİB listesindendir; açıklama ve arama terimleri yapay zekâdır.'
+                                     : '\n\nAd, resmî alt faaliyetlere dayanan yapay zekâ özetidir.');
+                line = info.code + ' · ' + (shown.length > 90 ? shown.slice(0, 90) + '…' : shown);
+                tone = 'ok';
+            } else if (message) {
+                tip = message;
+            }
+            naceFields.forEach(function (f) {
+                f.status.textContent = line;
+                f.status.classList.toggle('is-ok', tone === 'ok');
+                f.status.classList.toggle('is-warn', tone === 'warn');
+                f.status.classList.toggle('is-error', tone === 'error');
+                naceTip(f, tip);
+            });
+        }
+
+        function naceApplyIndustry(info) {
+            // Sektor bossa (ya da bizim doldurdugumuzla ayniysa) kodun adiyla doldurulur; elle yazilana dokunulmaz.
+            var sector = info.shortName || info.name;
+            industryInputs.forEach(function (i) { if (!i.value.trim() || i.value === autoIndustry) i.value = sector; });
+            autoIndustry = sector;
+        }
+
+        function naceLookup(raw) {
+            var seq = ++naceSeq;
+            var digits = naceDigits(raw);
+            if (digits.length === 0) {
+                industryInputs.forEach(function (i) { if (autoIndustry && i.value === autoIndustry) i.value = ''; });
+                autoIndustry = '';
+                naceRender(null, '', '');
+                return;
+            }
+            if ([2, 3, 4, 6].indexOf(digits.length) < 0) {
+                naceRender(null, digits.length < 2 ? 'Kod en az 2 haneli olmalı.' : 'Kod 2, 4 veya 6 haneli olmalı (örn. 27.51.08).', 'error');
+                return;
+            }
+            if (naceCache[digits]) { naceRender(naceCache[digits]); if (naceCache[digits].ok) naceApplyIndustry(naceCache[digits]); return; }
+            naceRender(null, 'Yapay zekâ kodu çözüyor…', '');
+            fetch(naceUrl + '?code=' + encodeURIComponent(digits), { credentials: 'same-origin' })
+                .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                .then(function (info) {
+                    if (seq !== naceSeq) return; // daha yeni bir kod yazildi
+                    if (info.ok) { naceCache[digits] = info; naceRender(info); naceApplyIndustry(info); }
+                    else naceRender(null, info.error || 'Kod çözülemedi.', 'error');
+                })
+                .catch(function () { if (seq === naceSeq) naceRender(null, 'Kod şu an çözülemedi; arama yine de yapılabilir.', 'error'); });
+        }
+
+        function naceSetValue(v) { naceFields.forEach(function (f) { f.input.value = v; }); naceRequired(); }
+        // NACE girildiyse sektor zorunlu degildir (kodun adi sektor olur).
+        function naceRequired() {
+            var has = naceFields[0].input.value.trim() !== '';
+            industryInputs.forEach(function (i) { i.required = !has; });
+        }
+
+        naceFields.forEach(function (f) {
+            f.input.addEventListener('input', function () {
+                naceSetValue(f.input.value);
+                clearTimeout(naceTimer);
+                naceTimer = setTimeout(function () { naceLookup(f.input.value); }, 600);
+            });
+            f.input.addEventListener('blur', function () { clearTimeout(naceTimer); naceLookup(f.input.value); });
+            f.btn.addEventListener('click', function (e) { e.preventDefault(); naceLookup(f.input.value); });
+        });
+        naceRequired();
+        if (naceFields[0].input.value.trim()) naceLookup(naceFields[0].input.value); else naceRender(null, '', '');
+
         var smartToggle = document.getElementById('smartSearchToggle');
         smartToggle.addEventListener('change', function () {
             document.querySelectorAll('.smart-sync').forEach(function (i) { i.value = smartToggle.checked ? 'true' : 'false'; });
@@ -850,6 +969,7 @@
             item.addEventListener('click', function () {
                 advName.value = item.getAttribute('data-name') || '';
                 advIndustry.value = item.getAttribute('data-industry') || '';
+                naceSetValue(''); naceLookup(''); // kayitli profilin NACE kodu yok: onceki kod bu aramaya karismasin
                 var city = item.getAttribute('data-city') || '';
                 var list = city.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
                 setRegion(item.getAttribute('data-region') || 'TR');

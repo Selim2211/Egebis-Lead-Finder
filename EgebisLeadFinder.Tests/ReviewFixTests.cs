@@ -103,6 +103,8 @@ public class ReviewFixTests
             Task.FromResult(new CompareAiResult());
         public Task<NaceMatchAiResult> MatchNaceAsync(string keyword, CancellationToken ct = default) =>
             Task.FromResult(new NaceMatchAiResult { Codes = { new("22.22", "Plastik ambalaj", "ambalaj"), new("22", "Plastik", null) } });
+        public Task<NaceDescribeResult> DescribeNaceAsync(string code, string? division, CancellationToken ct = default) =>
+            Task.FromResult(new NaceDescribeResult { Name = "Test", Description = "d" });
         public Task<SectorAiResult> AnalyzeSectorsAsync(BusinessProfile? p, string k, IReadOnlyList<SectorInput> s, CancellationToken ct = default) =>
             Task.FromResult(new SectorAiResult());
         public Task<IcpSuggestion> SuggestIcpAsync(string url, string text, CancellationToken ct = default) =>

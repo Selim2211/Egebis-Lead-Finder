@@ -1,0 +1,20 @@
+{
+  "NACE kodu": "NACE code",
+  "(isteğe bağlı)": "(optional)",
+  "NACE kodu açıklaması": "NACE code description",
+  "Çok spesifik arama için: kodu yazınca anlamı ve arama terimleri gelir.": "For very specific searches: type the code and its meaning and search terms appear.",
+  "NACE kodunu yazınca ne anlama geldiği burada görünür.": "Type a NACE code and its meaning appears here.",
+  "Arama terimleri: ": "Search terms: ",
+  "Kod en az 2 haneli olmalı.": "The code must have at least 2 digits.",
+  "Kod 2, 4 veya 6 haneli olmalı (örn. 27.51.08).": "The code must have 2, 4 or 6 digits (e.g. 27.51.08).",
+  "Yapay zekâ kodu çözüyor…": "The AI is decoding the code…",
+  "Kod çözülemedi.": "Could not decode the code.",
+  "Kod şu an çözülemedi; arama yine de yapılabilir.": "The code could not be decoded right now; you can still search.",
+  "Geçersiz NACE kodu. 2, 4 veya 6 haneli girin (örn. 27, 27.51 ya da 27.51.08).": "Invalid NACE code. Enter 2, 4 or 6 digits (e.g. 27, 27.51 or 27.51.08).",
+  "Sektör alanı ya da NACE kodu zorunludur.": "A sector or a NACE code is required.",
+  "Yapay zekâya ulaşılamadı.": "The AI could not be reached.",
+  "Yapay zekâ kodun adını veremedi.": "The AI could not name this code.",
+  "Kapsadığı resmî faaliyetlerden: ": "Official activities it covers: ",
+  "Kod adı resmî TÜİK/GİB listesindendir; açıklama ve arama terimleri yapay zekâdır.": "The code name comes from the official TÜİK/GİB list; the description and search terms are AI-generated.",
+  "Ad, resmî alt faaliyetlere dayanan yapay zekâ özetidir.": "The name is an AI summary based on the official sub-activities."
+}

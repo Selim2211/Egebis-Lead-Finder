@@ -134,6 +134,73 @@ public partial class GeminiAiService : IInsightAi
         return ParseNaceMatches(json!);
     }
 
+    public async Task<NaceDescribeResult> DescribeNaceAsync(string code, string? officialContext, CancellationToken ct = default)
+    {
+        var schema = new
+        {
+            type = "object",
+            properties = new
+            {
+                name = new { type = "string", description = "Kısa Türkçe faaliyet adı (en fazla 12 kelime), yalnızca verilen resmî bilgiye dayanır" },
+                shortName = new { type = "string", description = "Bu faaliyeti anlatan 2-4 kelimelik sektör adı (ör. \"Beyaz eşya\", \"Plastik ambalaj\")" },
+                description = new { type = "string", description = "Bu kodun hangi faaliyetleri kapsadığı, 1-2 cümle, Türkçe" },
+                searchTerms = new { type = "array", items = new { type = "string" }, description = "Bu faaliyeti yapan firmaları Google'da bulmak için 3-5 Türkçe arama terimi" }
+            },
+            required = new[] { "name", "shortName", "description", "searchTerms" }
+        };
+
+        var (json, error) = await AskJsonAsync(NaceDescribePrompt, $"NACE kodu: {code}\n{officialContext}", schema, 0.1, ct, localize: false); // ad/terimler arayuz dilinden bagimsiz Turkce kalir (Turkiye'de aranir)
+        if (error is not null) return new NaceDescribeResult { Error = error };
+        return ParseNaceDescribe(json!);
+    }
+
+    public static NaceDescribeResult ParseNaceDescribe(string json)
+    {
+        var result = new NaceDescribeResult();
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            result.Name = root.TryGetProperty("name", out var n) ? n.GetString()?.Trim() : null;
+            result.ShortName = root.TryGetProperty("shortName", out var sn) ? sn.GetString()?.Trim() : null;
+            result.Description = root.TryGetProperty("description", out var d) ? d.GetString()?.Trim() : null;
+            if (root.TryGetProperty("searchTerms", out var t) && t.ValueKind == JsonValueKind.Array)
+                result.SearchTerms = t.EnumerateArray()
+                    .SelectMany(x => SplitJoinedTerms(x.GetString()))
+                    .Where(x => x.Length is > 2 and <= 60)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Take(5)
+                    .ToList();
+            if (string.IsNullOrWhiteSpace(result.Name)) result.Error = "Yapay zekâ kodun adını veremedi.";
+        }
+        catch (JsonException)
+        {
+            result.Error = "Yapay zekâ yanıtı çözümlenemedi.";
+        }
+        return result;
+    }
+
+    /// <summary>Model bazen iki terimi tek dizgeye yapistirir ("a\",\"b"); ayirir ve tirnaklari temizler.</summary>
+    private static IEnumerable<string> SplitJoinedTerms(string? raw) =>
+        System.Text.RegularExpressions.Regex.Split(raw ?? string.Empty, @"""\s*,\s*""")
+            .Select(p => p.Trim().Trim('"').Trim());
+
+    private const string NaceDescribePrompt = """
+        Sana bir NACE Rev.2 kodu ve o kodun RESMÎ bilgisi verilecek (TÜİK/GİB Türkiye sınıflandırması: 2, 4 veya 6
+        haneli). Resmî bilgi, kodun adını ya da kapsadığı resmî alt faaliyetleri içerir.
+
+        KESİN KURAL: Kodun anlamını YALNIZCA verilen resmî bilgiye dayanarak açıkla. Kendi hafızandaki kod anlamını
+        KULLANMA, kod uydurma, verilen bilgide olmayan bir faaliyet ekleme.
+
+        - name: verilen resmî bilgiyi özetleyen kısa Türkçe ad (en fazla 12 kelime).
+        - shortName: aynı faaliyeti anlatan 2-4 kelimelik sektör adı (ör. "Beyaz eşya", "Plastik ambalaj").
+        - description: resmî adı/listeyi AYNEN TEKRAR ETME (zaten gösteriliyor). Bu kodla çalışan firmaların kimler olduğunu
+          (hangi tür üretici/işletme) 1-2 kısa cümleyle, resmî bilgideki ürünlere dayanarak özetle.
+        - searchTerms: bu faaliyeti yapan ÜRETİCİ/FAALİYET GÖSTEREN firmaları Google'da bulmaya yarayacak 3-5 kısa
+          Türkçe arama terimi (ör. "buzdolabı üreticisi"). Terimler resmî bilgideki ürün/faaliyete özgü olsun, genel
+          kelimelerden ("sanayi", "firma") kaçın. Her terim ayrı bir dizi elemanı olsun.
+        """;
+
     public static NaceMatchAiResult ParseNaceMatches(string json)
     {
         var result = new NaceMatchAiResult();

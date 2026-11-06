@@ -69,6 +69,29 @@ public class CompanyController : Controller
         return View(model);
     }
 
+    /// <summary>
+    /// NACE kodu kutusunun bilgi baloncugu: kodun adi, aciklamasi ve arama terimleri (yapay zeka; 30 gun onbellek).
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> NaceInfo(string? code, [FromServices] NaceLookupService lookup, CancellationToken ct)
+    {
+        var info = await lookup.LookupAsync(code, ct);
+        Response.Headers.CacheControl = "no-store";
+        return Json(new
+        {
+            ok = info.Ok,
+            code = info.Code,
+            name = info.Name,
+            shortName = info.ShortName,
+            description = info.Description,
+            division = info.DivisionName is null ? null : $"{info.Code[..2]} · {info.DivisionName}",
+            terms = info.SearchTerms,
+            official = info.Official,
+            basis = info.Basis,
+            error = info.Error
+        });
+    }
+
     /// <summary>Arama sayfasinin ortak verileri: kayitli profiller + Ayarlar'daki arama limitleri.</summary>
     private async Task FillSearchPageAsync(CompanySearchViewModel model, CancellationToken ct)
     {
@@ -162,8 +185,33 @@ public class CompanyController : Controller
         }
 
         c.CompanyName = null;
+
+        // NACE kodu: gecerliyse kodun adi/arama terimleri cozulur; sektor bossa kodun adi sektor olur.
+        c.NaceTerms.Clear();
+        c.NaceContext = null;
+        if (!string.IsNullOrWhiteSpace(c.NaceCode))
+        {
+            var info = await HttpContext.RequestServices.GetRequiredService<NaceLookupService>().LookupAsync(c.NaceCode, ct);
+            if (!info.Ok) return info.Error;
+
+            c.NaceCode = info.Code;
+            c.NaceTerms = info.SearchTerms.ToList();
+            c.NaceContext = string.IsNullOrWhiteSpace(info.Description)
+                ? $"NACE {info.Code}: {info.Name}"
+                : $"NACE {info.Code}: {info.Name} — {info.Description}";
+            if (string.IsNullOrWhiteSpace(c.Industry))
+            {
+                var sector = info.ShortName ?? info.Name ?? c.NaceCode;
+                c.Industry = sector.Length > 150 ? sector[..150] : sector;
+            }
+        }
+        else
+        {
+            c.NaceCode = null;
+        }
+
         if (string.IsNullOrWhiteSpace(c.Industry))
-            return "Sektör alanı zorunludur.";
+            return "Sektör alanı ya da NACE kodu zorunludur.";
 
         c.Industry = c.Industry.Trim();
         // Ekrandaki "firma sayisi" secimi o aramaya ozeldir; Ayarlar'daki deger varsayilandir.

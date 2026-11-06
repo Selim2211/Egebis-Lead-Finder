@@ -241,6 +241,7 @@ builder.Services.AddScoped<BusinessProfileService>();
 builder.Services.AddScoped<ISearchPlannerAi>(sp => (ISearchPlannerAi)sp.GetRequiredService<IAiService>());
 builder.Services.AddScoped<SearchPlanService>();
 builder.Services.AddScoped<IInsightAi>(sp => (IInsightAi)sp.GetRequiredService<IAiService>());
+builder.Services.AddScoped<NaceLookupService>();
 builder.Services.AddScoped<IMailTranslatorAi>(sp => (IMailTranslatorAi)sp.GetRequiredService<IAiService>());
 builder.Services.AddScoped<IScoringSignalAi>(sp => (IScoringSignalAi)sp.GetRequiredService<IAiService>());
 builder.Services.AddScoped<ProfileSignalService>();

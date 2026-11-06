@@ -262,6 +262,20 @@ public class LeadDiscoveryService
             .OrderByDescending(c => c.Score)
             .ToList();
 
+        // NACE kodlu aramada: firmanin (yapay zekanin atadigi) kodu aranan kodla acikca uyusmuyorsa listeden
+        // cikarilir. Firmalar yine de havuza kaydedildi; kodu bilinmeyenler/daha genel olanlar elenmez.
+        if (!string.IsNullOrWhiteSpace(criteria.NaceCode))
+        {
+            var kept = result.Companies.Where(c => NaceCatalog.MatchesTarget(c.NaceCode, criteria.NaceCode)).ToList();
+            result.NaceFiltered = result.Companies.Count - kept.Count;
+            if (result.NaceFiltered > 0)
+            {
+                result.Companies = kept;
+                result.Warning = Join(result.Warning,
+                    $"{result.NaceFiltered} firma NACE {criteria.NaceCode} ile uyuşmadığı için listeden çıkarıldı (firma havuzuna yine de kaydedildi).");
+            }
+        }
+
         _logger.LogInformation(
             "Arama tamamlandı: {Found} bulundu, {Known} zaten kayıtlı, {Processed} işlendi, {Failed} hatalı.",
             result.FoundBySearch, result.AlreadyKnown, result.Processed, result.Failed);
@@ -432,6 +446,9 @@ public class DiscoveryResult
 
     /// <summary>Arama durmadi ama kismen etkilendi (ör. kota bir kisim sorgudan sonra doldu).</summary>
     public string? Warning { get; set; }
+
+    /// <summary>NACE kodu aranan kodla uyusmadigi icin listeden cikarilan firma sayisi.</summary>
+    public int NaceFiltered { get; set; }
 
     /// <summary>Akilli aramada kullanilan terimler (ilk: kullanicinin yazdigi).</summary>
     public List<string> SearchTerms { get; set; } = new();
