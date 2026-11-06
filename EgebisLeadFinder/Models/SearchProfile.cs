@@ -17,6 +17,11 @@ public class SearchProfile
     public string Name { get; set; } = string.Empty;
 
     public string? Industry { get; set; }
+
+    /// <summary>Opsiyonel NACE kodu (kanonik: "27", "27.51" ya da "27.51.08"); doluysa bu profille arama NACE'e gore yapilir ve suzulur.</summary>
+    [MaxLength(12)]
+    public string? NaceCode { get; set; }
+
     public string? City { get; set; }
     public string? Country { get; set; }
 

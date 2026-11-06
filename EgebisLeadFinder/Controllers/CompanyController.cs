@@ -320,6 +320,7 @@ public class CompanyController : Controller
         }
 
         profile.Industry = criteria.Industry;
+        profile.NaceCode = criteria.NaceCode;
         profile.City = criteria.City;
         profile.Country = criteria.Country;
         profile.RegionKey = criteria.RegionKey;
@@ -331,6 +332,7 @@ public class CompanyController : Controller
 
     private static bool SameCriteria(SearchProfile p, SearchCriteria c) =>
         string.Equals(p.Industry?.Trim(), c.Industry?.Trim(), StringComparison.OrdinalIgnoreCase)
+        && string.Equals(p.NaceCode ?? "", c.NaceCode ?? "", StringComparison.OrdinalIgnoreCase)
         && string.Equals(p.City ?? "", c.City ?? "", StringComparison.OrdinalIgnoreCase)
         && string.Equals(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key, c.RegionKey, StringComparison.OrdinalIgnoreCase);
 
@@ -350,6 +352,7 @@ public class CompanyController : Controller
             id = profile.Id,
             name = profile.Name,
             industry = profile.Industry,
+            naceCode = profile.NaceCode,
             city = profile.City,
             regionKey = profile.RegionKey,
             regionName = SearchRegions.Get(profile.RegionKey).Name,

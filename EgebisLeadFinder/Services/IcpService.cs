@@ -77,6 +77,46 @@ public class IcpService
         return (filled, candidates.Count);
     }
 
+    /// <summary>
+    /// NACE kodlu aramada: kodu bos kalan firmalara (dernek, rehber, analizi eksik olanlar) kayitli analizden toplu NACE atar,
+    /// boylece kodu bilinmeyen firma sizmasin. Yalniz bellekteki varliklara yazar (kaydetmek cagiranin isi); site taranmaz.
+    /// </summary>
+    public async Task<NaceAssignResult> AssignMissingNaceAsync(IReadOnlyList<Company> companies, CancellationToken ct = default)
+    {
+        var missing = companies
+            .Where(c => string.IsNullOrWhiteSpace(c.NaceCode) && (c.AiAnalysis != null || c.Industry != null || c.Description != null))
+            .ToList();
+        var filled = 0;
+        var unresolved = new List<Company>();
+        foreach (var batch in missing.Chunk(NaceBatchSize))
+        {
+            var items = batch.Select((c, i) => (i + 1, NaceBrief(c.Name, c.Industry, c.Description, c.AiAnalysis))).ToList();
+            Dictionary<int, string> codes;
+            try
+            {
+                codes = await _naceAi.ClassifyNaceAsync(items, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Yapay zeka kesintisi: kodu bos kalanlar "belirlenemedi" sayilmaz (yanlislikla elenmesin).
+                return new NaceAssignResult(filled, unresolved);
+            }
+
+            for (var i = 0; i < batch.Length; i++)
+            {
+                codes.TryGetValue(i + 1, out var raw);
+                var code = NaceCatalog.Normalize(raw);
+                if (code is null || NaceCatalog.Division(code) is null) { unresolved.Add(batch[i]); continue; }
+                batch[i].NaceCode = code;
+                filled++;
+            }
+        }
+        return new NaceAssignResult(filled, unresolved);
+    }
+
+    /// <summary>Toplu NACE atamasinin sonucu: atanan sayisi ve yapay zekanin denedigi ama kod cikaramadigi firmalar.</summary>
+    public record NaceAssignResult(int Filled, List<Company> Unresolved);
+
     public static string NaceBrief(string name, string? industry, string? description, string? aiAnalysis)
     {
         var analysis = CompanyController.ParseAnalysis(aiAnalysis);

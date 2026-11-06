@@ -266,13 +266,24 @@ public class LeadDiscoveryService
         // cikarilir. Firmalar yine de havuza kaydedildi; kodu bilinmeyenler/daha genel olanlar elenmez.
         if (!string.IsNullOrWhiteSpace(criteria.NaceCode))
         {
-            var kept = result.Companies.Where(c => NaceCatalog.MatchesTarget(c.NaceCode, criteria.NaceCode)).ToList();
-            result.NaceFiltered = result.Companies.Count - kept.Count;
-            if (result.NaceFiltered > 0)
+            // Kodu bos kalanlara (dernek, rehber, eksik analiz) once toplu NACE atanir; yoksa kodu bilinmeyen firma sizardi.
+            var assigned = await _icp.AssignMissingNaceAsync(result.Companies, ct);
+            if (assigned.Filled > 0) await db.SaveChangesAsync(ct);
+
+            // Kodu acikca baska olanlar + yapay zekanin denedigi ama kod cikaramadigi (dernek, rehber...) firmalar elenir;
+            // hic bilgisi olmayan (site okunamamis) firmalar elenmez.
+            var unresolved = assigned.Unresolved.ToHashSet();
+            var kept = result.Companies
+                .Where(c => !unresolved.Contains(c) && NaceCatalog.MatchesTarget(c.NaceCode, criteria.NaceCode))
+                .ToList();
+            var dropped = result.Companies.Except(kept).ToList();
+            result.NaceFiltered = dropped.Count;
+            if (dropped.Count > 0)
             {
                 result.Companies = kept;
+                var names = string.Join(", ", dropped.Take(4).Select(c => $"{c.Name} ({(string.IsNullOrWhiteSpace(c.NaceCode) ? "kod belirlenemedi" : c.NaceCode)})"));
                 result.Warning = Join(result.Warning,
-                    $"{result.NaceFiltered} firma NACE {criteria.NaceCode} ile uyuşmadığı için listeden çıkarıldı (firma havuzuna yine de kaydedildi).");
+                    $"{dropped.Count} firma NACE {criteria.NaceCode} ile uyuşmadığı için listeden çıkarıldı: {names}{(dropped.Count > 4 ? " …" : "")}. Firma havuzuna yine de kaydedildi.");
             }
         }
 

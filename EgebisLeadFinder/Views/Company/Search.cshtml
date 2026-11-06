@@ -320,9 +320,18 @@
 
                     @if (result.Companies.Count == 0 && result.AbortReason is null && !result.Cancelled)
                     {
-                        <p class="text-muted-2 mb-0">
-                            Sonuç bulunamadı. Sektör veya şehri değiştirip tekrar deneyin.
-                        </p>
+                        @if (result.NaceFiltered > 0)
+                        {
+                            <p class="text-muted-2 mb-0">
+                                Bulunan firmaların hiçbiri NACE koduyla eşleşmedi. Firma sayısını artırın ya da kodu veya sektörü değiştirip tekrar deneyin.
+                            </p>
+                        }
+                        else
+                        {
+                            <p class="text-muted-2 mb-0">
+                                Sonuç bulunamadı. Sektör veya şehri değiştirip tekrar deneyin.
+                            </p>
+                        }
                     }
                 </div>
 
@@ -510,14 +519,14 @@
                             {
                                 var mine = p.CanEdit(me, isAdmin);
                                 <button type="button" class="profile-item" data-id="@p.Id" data-name="@p.Name"
-                                        data-industry="@p.Industry" data-city="@p.City"
+                                        data-industry="@p.Industry" data-nace="@p.NaceCode" data-city="@p.City"
                                         data-public="@(p.IsPublic ? "true" : "false")" data-mine="@(mine ? "true" : "false")"
                                         data-region="@SearchRegions.Get(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key).Key">
                                     <span class="profile-item-name">
                                         @p.Name
                                         <span class="profile-region">@SearchRegions.Get(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key).Name</span>
                                     </span>
-                                    <span class="profile-item-meta">@p.Industry · @ProfileCityLabel(p.City)</span>
+                                    <span class="profile-item-meta">@p.Industry@(string.IsNullOrWhiteSpace(p.NaceCode) ? "" : " · NACE " + p.NaceCode) · @ProfileCityLabel(p.City)</span>
                                     <span class="profile-item-date">
                                         Kaydedildi: @p.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
                                         <span class="profile-share @(p.IsPublic ? "is-public" : "")">@ShareLabel(p, me)</span>
@@ -969,7 +978,7 @@
             item.addEventListener('click', function () {
                 advName.value = item.getAttribute('data-name') || '';
                 advIndustry.value = item.getAttribute('data-industry') || '';
-                naceSetValue(''); naceLookup(''); // kayitli profilin NACE kodu yok: onceki kod bu aramaya karismasin
+                naceSetValue(item.getAttribute('data-nace') || ''); naceLookup(item.getAttribute('data-nace') || ''); // profilin NACE kodu (yoksa bos): onceki kod karismasin
                 var city = item.getAttribute('data-city') || '';
                 var list = city.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
                 setRegion(item.getAttribute('data-region') || 'TR');
@@ -1038,6 +1047,7 @@
             }
             item.setAttribute('data-name', p.name);
             item.setAttribute('data-industry', p.industry || '');
+            item.setAttribute('data-nace', p.naceCode || '');
             item.setAttribute('data-city', p.city || '');
             item.setAttribute('data-region', p.regionKey || 'TR');
             item.setAttribute('data-public', p.isPublic ? 'true' : 'false');
@@ -1048,7 +1058,7 @@
             reg.textContent = p.regionName || '';
             item.querySelector('.profile-item-name').appendChild(reg);
             advProfileId.value = p.id;
-            item.querySelector('.profile-item-meta').textContent = (p.industry || '') + ' · ' + formatCities(p.city);
+            item.querySelector('.profile-item-meta').textContent = (p.industry || '') + (p.naceCode ? ' · NACE ' + p.naceCode : '') + ' · ' + formatCities(p.city);
             var date = item.querySelector('.profile-item-date');
             date.textContent = 'Kaydedildi: ' + p.createdAt + ' ';
             var share = document.createElement('span');

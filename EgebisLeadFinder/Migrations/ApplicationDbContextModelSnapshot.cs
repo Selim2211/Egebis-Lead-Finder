@@ -832,6 +832,10 @@ namespace EgebisLeadFinder.Migrations
                     b.Property<bool>("IsPublic")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("NaceCode")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(150)

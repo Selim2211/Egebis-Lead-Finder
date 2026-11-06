@@ -16,5 +16,6 @@
   "Yapay zekâ kodun adını veremedi.": "The AI could not name this code.",
   "Kapsadığı resmî faaliyetlerden: ": "Official activities it covers: ",
   "Kod adı resmî TÜİK/GİB listesindendir; açıklama ve arama terimleri yapay zekâdır.": "The code name comes from the official TÜİK/GİB list; the description and search terms are AI-generated.",
-  "Ad, resmî alt faaliyetlere dayanan yapay zekâ özetidir.": "The name is an AI summary based on the official sub-activities."
+  "Ad, resmî alt faaliyetlere dayanan yapay zekâ özetidir.": "The name is an AI summary based on the official sub-activities.",
+  "Bulunan firmaların hiçbiri NACE koduyla eşleşmedi. Firma sayısını artırın ya da kodu veya sektörü değiştirip tekrar deneyin.": "None of the companies found matched the NACE code. Increase the number of companies or change the code or sector and try again."
 }
