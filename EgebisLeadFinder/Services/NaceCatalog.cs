@@ -45,6 +45,17 @@ public static class NaceCatalog
         return d.Length < 2 ? new() : Activities.Where(a => a.Key.StartsWith(d, StringComparison.Ordinal)).ToList();
     }
 
+    /// <summary>
+    /// Kod resmi listede gercekten var mi? 2 haneli: bolum; 3-6 haneli: bu onekle baslayan en az bir resmi faaliyet.
+    /// Yapay zekanin urettigi "20.22", "28.32" gibi var olmayan siniflari yakalar.
+    /// </summary>
+    public static bool Exists(string? code)
+    {
+        var d = new string((code ?? string.Empty).Where(char.IsDigit).ToArray());
+        if (d.Length == 2) return Division(d) is not null;
+        return d.Length is >= 3 and <= 6 && Activities.Keys.Any(k => k.StartsWith(d, StringComparison.Ordinal));
+    }
+
     /// <summary>"275108" -> "27.51.08".</summary>
     public static string FormatSixDigit(string digits) => $"{digits[..2]}.{digits[2..4]}.{digits[4..6]}";
 

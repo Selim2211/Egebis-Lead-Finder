@@ -70,7 +70,7 @@ public class IcpService
             foreach (var company in companies)
             {
                 var code = NaceCatalog.Normalize(codes[company.Id]);
-                if (code is null || NaceCatalog.Division(code) is null) continue;
+                if (code is null || !NaceCatalog.Exists(code)) continue;   // resmi listede olmayan (uydurma) kod atanmaz
                 company.NaceCode = code;
                 await ScoreAsync(company, CompanyController.ParseAnalysis(company.AiAnalysis), site: null, ct);
                 filled++;
@@ -112,7 +112,7 @@ public class IcpService
             {
                 codes.TryGetValue(i + 1, out var raw);
                 var code = NaceCatalog.Normalize(raw);
-                if (code is null || NaceCatalog.Division(code) is null) { unresolved.Add(batch[i]); continue; }
+                if (code is null || !NaceCatalog.Exists(code)) { unresolved.Add(batch[i]); continue; }   // uydurma kod = belirlenemedi
                 batch[i].NaceCode = code;
                 filled++;
             }
@@ -121,15 +121,15 @@ public class IcpService
     }
 
     /// <summary>
-    /// 6 haneli NACE aramasinda: firma kodu aranan kodla ayni dalda ama daha genelse (ör. 27.51) ya da bilinmiyorsa, aranan
-    /// kodun resmi alt faaliyetleri arasindan firmanin 6 haneli kodu secilir ve firmaya yazilir. Yapay zeka sadece resmi
+    /// 4 ya da 6 haneli NACE aramasinda: aranan kodun sinifindaki (ilk 4 hane) resmi alt faaliyetler arasindan firmanin 6 haneli
+    /// kodu secilir ve firmaya yazilir (firmanin eski/serbest tahmin kodu kullanilmaz). Yapay zeka sadece resmi
     /// listeden secer. Donen: secim yapilamayan (hicbiri uymayan) firmalar; yapay zeka kesintisinde bos doner (kimse elenmesin).
     /// </summary>
     public async Task<List<Company>> RefineNaceAsync(IReadOnlyList<Company> companies, string targetCode, CancellationToken ct = default)
     {
         var unresolved = new List<Company>();
         var digits = new string(targetCode.Where(char.IsDigit).ToArray());
-        if (digits.Length != 6 || companies.Count == 0) return unresolved;
+        if (digits.Length < 4 || companies.Count == 0) return unresolved;
 
         // Aranan kodun sinifindaki (ilk 4 hane) tum resmi alt faaliyetler secenek olur: firma baska bir alt koda duserse de
         // dogru kod secilir (sonra aranan kodla karsilastirilir).
@@ -261,7 +261,12 @@ public class IcpService
             company.EvaluationNote = null;
         }
         if (!string.IsNullOrWhiteSpace(analysis?.NaceCode))
-            company.NaceCode = NaceCatalog.Normalize(analysis.NaceCode);
+        {
+            // Yapay zekanin serbest urettigi kod resmi listede yoksa (ör. 20.22, 28.32) kullanilmaz: kod bos kalir ve
+            // sonradan resmi listeden secilir.
+            var proposed = NaceCatalog.Normalize(analysis.NaceCode);
+            if (NaceCatalog.Exists(proposed)) company.NaceCode = proposed;
+        }
 
         return breakdown;
     }

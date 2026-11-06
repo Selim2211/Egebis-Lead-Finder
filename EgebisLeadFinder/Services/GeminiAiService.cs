@@ -1196,8 +1196,10 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         ve firma hakkında kısa bilgi (ad, sektör, ürünler, açıklama) var.
 
         Her firma için ana faaliyetine EN UYGUN TEK kodu YALNIZCA bu listeden seç ve naceCode alanına "27.51.08" biçiminde yaz.
-        Hiçbir kod firmanın ana faaliyetine açıkça uymuyorsa (ör. perakende, servis, dernek, bayi) ya da bilgi yetersizse
-        naceCode alanını boş bırak. Listede olmayan kod YAZMA. Her firma için verilen numarayı id alanına aynen yaz.
+        Ürünü kendi adı/markasıyla üreten, ürettiren ya da tasarlayıp pazarlayan firmaları (marka sahibi) ilgili ÜRETİM koduna
+        dahil et; fason üretim yaptırmaları bunu değiştirmez. naceCode alanını YALNIZCA başkalarının markalarını satan
+        bayi/mağaza/e-ticaret sitesi, servis/tamir, dernek/kamu/rehber sitesi, ürünle hiç ilgisi olmayan firmalar ya da bilgi
+        yetersizse boş bırak. Listede olmayan kod YAZMA. Her firma için verilen numarayı id alanına aynen yaz.
         """;
 
     private const string NaceSystemPrompt = """

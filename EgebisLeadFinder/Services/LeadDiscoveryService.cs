@@ -267,22 +267,28 @@ public class LeadDiscoveryService
         if (!string.IsNullOrWhiteSpace(criteria.NaceCode))
         {
             // Kodu bos kalanlara (dernek, rehber, eksik analiz) once toplu NACE atanir; yoksa kodu bilinmeyen firma sizardi.
-            var assigned = await _icp.AssignMissingNaceAsync(result.Companies, ct);
-            var unresolved = assigned.Unresolved.ToHashSet();
-            var changed = assigned.Filled > 0;
-
-            // 6 haneli kod arandiysa: firma kodu daha genel (ör. 27.51) ya da yeni atandiysa, aranan kodun resmi alt
-            // faaliyetleri arasindan firmanin 6 haneli kodu secilir (yapay zeka yalniz resmi listeden secer). Hicbirine
-            // uymayanlar (perakende, servis...) "kod belirlenemedi" olarak elenir.
             var digits = new string(criteria.NaceCode.Where(char.IsDigit).ToArray());
-            if (digits.Length == 6)
+            var unresolved = new HashSet<Company>();
+            bool changed;
+            if (digits.Length >= 4)
             {
+                // 4/6 haneli kodda karar KAPALI RESMI LISTEDEN verilir: yapay zeka her firma icin aranan sinifin resmi alt
+                // faaliyetlerinden birini secer ya da "hicbiri" der. Firmanin eski serbest tahmin kodu (yanlis/uydurma olabiliyor,
+                // ör. Arcelik'e 28.32) hesaba katilmaz; daha once 6 haneli kod almis firmalar yeniden sorulmaz. Hicbiri
+                // olmayanlar (perakende, servis, dernek...) elenir; bilgisi olmayan (site okunamamis) firmalar elenmez.
                 var toRefine = result.Companies
-                    .Where(c => !unresolved.Contains(c) && NaceCatalog.Compare(c.NaceCode, criteria.NaceCode) == NaceFit.Partial
-                                && (c.AiAnalysis != null || c.Industry != null || c.Description != null))
+                    .Where(c => (c.AiAnalysis != null || c.Industry != null || c.Description != null)
+                                && new string((c.NaceCode ?? string.Empty).Where(char.IsDigit).ToArray()).Length != 6)
                     .ToList();
                 foreach (var c in await _icp.RefineNaceAsync(toRefine, criteria.NaceCode, ct)) unresolved.Add(c);
-                changed |= toRefine.Count > 0;
+                changed = toRefine.Count > 0;
+            }
+            else
+            {
+                // 2 haneli (bolum) arama: kodu bos kalanlara toplu kod atanir (yalniz resmi listede var olanlar).
+                var assigned = await _icp.AssignMissingNaceAsync(result.Companies, ct);
+                foreach (var c in assigned.Unresolved) unresolved.Add(c);
+                changed = assigned.Filled > 0;
             }
             if (changed) await db.SaveChangesAsync(ct);
 

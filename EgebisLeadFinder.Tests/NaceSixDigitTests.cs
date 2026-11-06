@@ -93,12 +93,31 @@ public class NaceSixDigitTests
     }
 
     [Fact]
-    public async Task Refine_only_runs_for_six_digit_targets()
+    public async Task Refine_runs_for_class_and_six_digit_targets_but_not_for_a_whole_division()
     {
         var ai = new FakeChooser { Answer = { [1] = "27.51.08" } };
         var icp = new IcpService(null!, null!, null!, ai);
-        var a = Firm("A");
+
+        var a = Firm("A", nace: "28.32");                   // eski yanlis/uydurma tahmin kod: hesaba katilmaz
         Assert.Empty(await icp.RefineNaceAsync(new[] { a }, "27.51"));
-        Assert.Null(ai.Options);                            // yapay zeka hic cagrilmadi
+        Assert.Equal("27.51.08", a.NaceCode);               // 4 haneli aramada da resmi listeden secilir
+
+        ai.Options = null;
+        Assert.Empty(await icp.RefineNaceAsync(new[] { Firm("B") }, "27"));
+        Assert.Null(ai.Options);                            // bolum (2 hane) icin yapay zeka cagrilmaz
     }
+
+    [Theory]
+    [InlineData("27.51", true)]
+    [InlineData("27.51.08", true)]
+    [InlineData("27.5", true)]
+    [InlineData("27", true)]
+    [InlineData("20.22", false)]    // gercek hata: kozmetik firmasina atanmisti, Rev.2'de yok
+    [InlineData("28.32", false)]    // gercek hata: Arcelik Kurutucu/Elektrik Motorlari'na atanmisti
+    [InlineData("81.20", false)]    // gercek hata: derneğe atanmisti
+    [InlineData("27.51.99", false)]
+    [InlineData("99", true)]
+    [InlineData("1", false)]
+    public void Exists_rejects_made_up_classes(string code, bool expected) =>
+        Assert.Equal(expected, NaceCatalog.Exists(code));
 }
