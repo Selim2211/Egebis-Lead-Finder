@@ -5,6 +5,9 @@ namespace EgebisLeadFinder.Services;
 
 public record NaceDivision(string Code, string Name, string SectionCode, string SectionName);
 
+/// <summary>Firma NACE kodunun aranan kodla karsilastirma sonucu (bkz. NaceCatalog.Compare).</summary>
+public enum NaceFit { No, Partial, Yes }
+
 /// <summary>
 /// NACE Rev.2 bolumleri (2 haneli) ve kisimlari (harf). Veri Data/reference/nace-rev2-tr.json'dan
 /// okunur. Firmanin 4 haneli kodu AI'dan gelir; filtre ve ICP bolum (ilk 2 hane) duzeyindedir.
@@ -56,6 +59,8 @@ public static class NaceCatalog
     public static string? Normalize(string? code)
     {
         if (string.IsNullOrWhiteSpace(code)) return null;
+        // Tam 6 haneli kod ("27.51.08" / "275108") oldugu gibi korunur; serbest metinden yalniz ilk 4 hane alinir.
+        if (Regex.IsMatch(code.Trim(), @"^\d{2}\.?\d{2}\.?\d{2}$")) return NormalizeFull(code);
         var m = Regex.Match(code, @"(\d{2})\.?(\d{1,2})?");
         if (!m.Success) return null;
         return m.Groups[2].Success ? $"{m.Groups[1].Value}.{m.Groups[2].Value}" : m.Groups[1].Value;
@@ -67,7 +72,8 @@ public static class NaceCatalog
         var n = Normalize(code);
         if (n is null) return null;
         var d = Division(n);
-        return d is null ? n : $"{n} · {d.Name}";
+        var activity = Activity(n);
+        return activity is not null ? $"{n} · {activity}" : d is null ? n : $"{n} · {d.Name}";
     }
 
     /// <summary>
@@ -94,18 +100,27 @@ public static class NaceCatalog
     /// haneli (sinif) oldugundan karsilastirma en cok ilk 4 hanede yapilir. Firmanin kodu bilinmiyorsa
     /// ya da aranandan daha genelse (ör. yalnizca "27") elenmez: yalnizca acikca baska kodda olanlar elenir.
     /// </summary>
-    public static bool MatchesTarget(string? companyCode, string? targetCode)
+    public static bool MatchesTarget(string? companyCode, string? targetCode) =>
+        Compare(companyCode, targetCode) != NaceFit.No;
+
+    /// <summary>
+    /// Firma kodu ile aranan kod karsilastirmasi (6 haneye kadar, onek esasli):
+    /// No = acikca baska kod; Yes = firma kodu aranan kodla ayni ya da daha ayrintili; Partial = firma kodu aranandan daha
+    /// genel ve ayni dalda (ör. firma "27.51", aranan "27.51.08": alt faaliyeti ayrica belirlenmeli) ya da firma kodu bilinmiyor.
+    /// </summary>
+    public static NaceFit Compare(string? companyCode, string? targetCode)
     {
         var target = new string((targetCode ?? string.Empty).Where(char.IsDigit).ToArray());
-        if (target.Length < 2) return true;
-        if (target.Length > 4) target = target[..4];
+        if (target.Length < 2) return NaceFit.Yes;
+        if (target.Length > 6) target = target[..6];
 
         var company = new string((companyCode ?? string.Empty).Where(char.IsDigit).ToArray());
-        if (company.Length < 2) return true;
-        if (company.Length > 4) company = company[..4];
+        if (company.Length < 2) return NaceFit.Partial;
+        if (company.Length > 6) company = company[..6];
 
         var n = Math.Min(company.Length, target.Length);
-        return company[..n] == target[..n];
+        if (company[..n] != target[..n]) return NaceFit.No;
+        return company.Length >= target.Length ? NaceFit.Yes : NaceFit.Partial;
     }
 
     private static IReadOnlyDictionary<string, string> LoadSixDigit()

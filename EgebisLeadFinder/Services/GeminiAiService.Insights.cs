@@ -144,7 +144,7 @@ public partial class GeminiAiService : IInsightAi
                 name = new { type = "string", description = "Kısa Türkçe faaliyet adı (en fazla 12 kelime), yalnızca verilen resmî bilgiye dayanır" },
                 shortName = new { type = "string", description = "Bu faaliyeti anlatan 2-4 kelimelik sektör adı (ör. \"Beyaz eşya\", \"Plastik ambalaj\")" },
                 description = new { type = "string", description = "Bu kodun hangi faaliyetleri kapsadığı, 1-2 cümle, Türkçe" },
-                searchTerms = new { type = "array", items = new { type = "string" }, description = "Bu faaliyeti yapan firmaları Google'da bulmak için 3-5 Türkçe arama terimi" }
+                searchTerms = new { type = "array", items = new { type = "string" }, description = "Resmî bilgideki ürün/faaliyet adları, 3-5 adet, 1-3 kelime; 'üretici', 'imalat', 'fabrika' gibi kelimeler OLMADAN" }
             },
             required = new[] { "name", "shortName", "description", "searchTerms" }
         };
@@ -196,9 +196,10 @@ public partial class GeminiAiService : IInsightAi
         - shortName: aynı faaliyeti anlatan 2-4 kelimelik sektör adı (ör. "Beyaz eşya", "Plastik ambalaj").
         - description: resmî adı/listeyi AYNEN TEKRAR ETME (zaten gösteriliyor). Bu kodla çalışan firmaların kimler olduğunu
           (hangi tür üretici/işletme) 1-2 kısa cümleyle, resmî bilgideki ürünlere dayanarak özetle.
-        - searchTerms: bu faaliyeti yapan ÜRETİCİ/FAALİYET GÖSTEREN firmaları Google'da bulmaya yarayacak 3-5 kısa
-          Türkçe arama terimi (ör. "buzdolabı üreticisi"). Terimler resmî bilgideki ürün/faaliyete özgü olsun, genel
-          kelimelerden ("sanayi", "firma") kaçın. Her terim ayrı bir dizi elemanı olsun.
+        - searchTerms: resmî bilgideki ürün/faaliyetleri anlatan 3-5 kısa Türkçe terim; YALNIZCA ürün ya da faaliyet adı
+          (ör. "buzdolabı", "çamaşır makinesi", "bulaşık makinesi"). "üretici", "üreticisi", "imalat", "imalatı", "fabrika",
+          "firma", "sanayi" gibi kelimeleri EKLEME: uygulama bunları kendi arama kalıplarına ("{terim} üreticileri",
+          "{terim} fabrikası") zaten ekliyor ve tırnak içinde arıyor. En fazla 3 kelime; her terim ayrı bir dizi elemanı olsun.
         """;
 
     public static NaceMatchAiResult ParseNaceMatches(string json)

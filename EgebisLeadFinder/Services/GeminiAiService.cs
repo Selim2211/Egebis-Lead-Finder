@@ -1142,6 +1142,64 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         return result;
     }
 
+    public async Task<Dictionary<int, string>> ChooseNaceAsync(IReadOnlyList<(int Id, string Text)> companies,
+        IReadOnlyList<KeyValuePair<string, string>> options, CancellationToken ct = default)
+    {
+        var result = new Dictionary<int, string>();
+        if (companies.Count == 0 || options.Count == 0) return result;
+
+        var apiKey = await AiProviders.ActiveKeyAsync(_settings, ct);
+        if (string.IsNullOrWhiteSpace(apiKey)) throw new MissingApiKeyException("Gemini");
+
+        var optionLines = string.Join('\n', options.Select(o => $"{NaceCatalog.FormatSixDigit(o.Key)}: {o.Value}"));
+        var firmLines = string.Join('\n', companies.Select(c => $"[{c.Id}] {c.Text.Replace('\n', ' ')}"));
+        var url = $"{_options.GeminiEndpoint}/{await ModelAsync(ct)}:generateContent";
+        var payload = new
+        {
+            system_instruction = new { parts = new[] { new { text = NaceChoosePrompt } } },
+            contents = new[] { new { role = "user", parts = new[] { new { text = $"RESMÎ FAALİYET KODLARI:\n{optionLines}\n\nFİRMALAR:\n{firmLines}" } } } },
+            generationConfig = new
+            {
+                temperature = 0.0,
+                responseMimeType = "application/json",
+                responseSchema = new
+                {
+                    type = "array",
+                    items = new
+                    {
+                        type = "object",
+                        properties = new { id = new { type = "integer" }, naceCode = new { type = "string" } },
+                        required = new[] { "id", "naceCode" }
+                    }
+                }
+            }
+        };
+
+        var response = await SendWithRetryAsync(url, JsonSerializer.Serialize(payload), apiKey, ct);
+        if (response.Error is not null) throw new InvalidOperationException(response.Error);
+
+        var json = ExtractText(response.Content!);
+        if (json is null) return result;
+
+        using var doc = JsonDocument.Parse(json);
+        foreach (var item in doc.RootElement.EnumerateArray())
+        {
+            if (!item.TryGetProperty("id", out var idEl) || !idEl.TryGetInt32(out var id)) continue;
+            var code = item.TryGetProperty("naceCode", out var c) ? c.GetString() : null;
+            if (!string.IsNullOrWhiteSpace(code)) result[id] = code;
+        }
+        return result;
+    }
+
+    private const string NaceChoosePrompt = """
+        Önce RESMÎ faaliyet kodları listesi (kod: ad), sonra firmalar verilecek; her firmada köşeli parantez içinde numara
+        ve firma hakkında kısa bilgi (ad, sektör, ürünler, açıklama) var.
+
+        Her firma için ana faaliyetine EN UYGUN TEK kodu YALNIZCA bu listeden seç ve naceCode alanına "27.51.08" biçiminde yaz.
+        Hiçbir kod firmanın ana faaliyetine açıkça uymuyorsa (ör. perakende, servis, dernek, bayi) ya da bilgi yetersizse
+        naceCode alanını boş bırak. Listede olmayan kod YAZMA. Her firma için verilen numarayı id alanına aynen yaz.
+        """;
+
     private const string NaceSystemPrompt = """
         Her satırda köşeli parantez içinde firma numarası ve firma hakkında kısa bilgi
         (ad, sektör, ürünler, açıklama) var. Her firma için ana faaliyetine en uygun NACE

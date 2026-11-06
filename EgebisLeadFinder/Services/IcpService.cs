@@ -10,6 +10,12 @@ namespace EgebisLeadFinder.Services;
 public interface INaceClassifierAi
 {
     Task<Dictionary<int, string>> ClassifyNaceAsync(IReadOnlyList<(int Id, string Text)> companies, CancellationToken ct = default);
+
+    /// <summary>
+    /// Kapali liste secimi: her firma icin verilen RESMI 6 haneli kodlardan (kod -> ad) en uygun tekini secer; hicbiri
+    /// uymuyorsa firma sonucta yoktur. Serbest kod uretmez, dolayisiyla uydurma kod gelmez.
+    /// </summary>
+    Task<Dictionary<int, string>> ChooseNaceAsync(IReadOnlyList<(int Id, string Text)> companies, IReadOnlyList<KeyValuePair<string, string>> options, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -112,6 +118,47 @@ public class IcpService
             }
         }
         return new NaceAssignResult(filled, unresolved);
+    }
+
+    /// <summary>
+    /// 6 haneli NACE aramasinda: firma kodu aranan kodla ayni dalda ama daha genelse (ör. 27.51) ya da bilinmiyorsa, aranan
+    /// kodun resmi alt faaliyetleri arasindan firmanin 6 haneli kodu secilir ve firmaya yazilir. Yapay zeka sadece resmi
+    /// listeden secer. Donen: secim yapilamayan (hicbiri uymayan) firmalar; yapay zeka kesintisinde bos doner (kimse elenmesin).
+    /// </summary>
+    public async Task<List<Company>> RefineNaceAsync(IReadOnlyList<Company> companies, string targetCode, CancellationToken ct = default)
+    {
+        var unresolved = new List<Company>();
+        var digits = new string(targetCode.Where(char.IsDigit).ToArray());
+        if (digits.Length != 6 || companies.Count == 0) return unresolved;
+
+        // Aranan kodun sinifindaki (ilk 4 hane) tum resmi alt faaliyetler secenek olur: firma baska bir alt koda duserse de
+        // dogru kod secilir (sonra aranan kodla karsilastirilir).
+        var options = NaceCatalog.ActivitiesUnder(digits[..4]);
+        if (options.Count == 0) return unresolved;
+        var valid = options.Select(o => o.Key).ToHashSet();
+
+        foreach (var batch in companies.Chunk(NaceBatchSize))
+        {
+            var items = batch.Select((c, i) => (i + 1, NaceBrief(c.Name, c.Industry, c.Description, c.AiAnalysis))).ToList();
+            Dictionary<int, string> chosen;
+            try
+            {
+                chosen = await _naceAi.ChooseNaceAsync(items, options, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return new List<Company>();
+            }
+
+            for (var i = 0; i < batch.Length; i++)
+            {
+                chosen.TryGetValue(i + 1, out var raw);
+                var code = new string((raw ?? string.Empty).Where(char.IsDigit).ToArray());
+                if (!valid.Contains(code)) { unresolved.Add(batch[i]); continue; }   // listede olmayan kod = secim yok
+                batch[i].NaceCode = NaceCatalog.FormatSixDigit(code);
+            }
+        }
+        return unresolved;
     }
 
     /// <summary>Toplu NACE atamasinin sonucu: atanan sayisi ve yapay zekanin denedigi ama kod cikaramadigi firmalar.</summary>

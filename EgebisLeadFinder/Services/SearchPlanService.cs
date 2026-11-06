@@ -159,7 +159,7 @@ public class SearchPlanService
     /// <summary>NACE kodundan gelen terimler (akilli arama kapali ya da AI yoksa bile) arama terimlerine eklenir.</summary>
     private static void AddNaceTerms(List<string> terms, SearchCriteria criteria)
     {
-        foreach (var t in criteria.NaceTerms.Take(3))
+        foreach (var t in criteria.NaceTerms.Take(4))
             if (!terms.Contains(t, StringComparer.OrdinalIgnoreCase)) terms.Add(t);
     }
 

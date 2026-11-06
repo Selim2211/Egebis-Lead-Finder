@@ -268,11 +268,26 @@ public class LeadDiscoveryService
         {
             // Kodu bos kalanlara (dernek, rehber, eksik analiz) once toplu NACE atanir; yoksa kodu bilinmeyen firma sizardi.
             var assigned = await _icp.AssignMissingNaceAsync(result.Companies, ct);
-            if (assigned.Filled > 0) await db.SaveChangesAsync(ct);
+            var unresolved = assigned.Unresolved.ToHashSet();
+            var changed = assigned.Filled > 0;
+
+            // 6 haneli kod arandiysa: firma kodu daha genel (ör. 27.51) ya da yeni atandiysa, aranan kodun resmi alt
+            // faaliyetleri arasindan firmanin 6 haneli kodu secilir (yapay zeka yalniz resmi listeden secer). Hicbirine
+            // uymayanlar (perakende, servis...) "kod belirlenemedi" olarak elenir.
+            var digits = new string(criteria.NaceCode.Where(char.IsDigit).ToArray());
+            if (digits.Length == 6)
+            {
+                var toRefine = result.Companies
+                    .Where(c => !unresolved.Contains(c) && NaceCatalog.Compare(c.NaceCode, criteria.NaceCode) == NaceFit.Partial
+                                && (c.AiAnalysis != null || c.Industry != null || c.Description != null))
+                    .ToList();
+                foreach (var c in await _icp.RefineNaceAsync(toRefine, criteria.NaceCode, ct)) unresolved.Add(c);
+                changed |= toRefine.Count > 0;
+            }
+            if (changed) await db.SaveChangesAsync(ct);
 
             // Kodu acikca baska olanlar + yapay zekanin denedigi ama kod cikaramadigi (dernek, rehber...) firmalar elenir;
-            // hic bilgisi olmayan (site okunamamis) firmalar elenmez.
-            var unresolved = assigned.Unresolved.ToHashSet();
+            // hic bilgisi olmayan (site okunamamis) ya da yapay zeka kesintisinde bakilamayan firmalar elenmez.
             var kept = result.Companies
                 .Where(c => !unresolved.Contains(c) && NaceCatalog.MatchesTarget(c.NaceCode, criteria.NaceCode))
                 .ToList();
@@ -281,7 +296,7 @@ public class LeadDiscoveryService
             if (dropped.Count > 0)
             {
                 result.Companies = kept;
-                var names = string.Join(", ", dropped.Take(4).Select(c => $"{c.Name} ({(string.IsNullOrWhiteSpace(c.NaceCode) ? "kod belirlenemedi" : c.NaceCode)})"));
+                var names = string.Join(", ", dropped.Take(4).Select(c => $"{c.Name} ({(unresolved.Contains(c) || string.IsNullOrWhiteSpace(c.NaceCode) ? "uygun kod bulunamadı" : c.NaceCode)})"));
                 result.Warning = Join(result.Warning,
                     $"{dropped.Count} firma NACE {criteria.NaceCode} ile uyuşmadığı için listeden çıkarıldı: {names}{(dropped.Count > 4 ? " …" : "")}. Firma havuzuna yine de kaydedildi.");
             }
