@@ -573,17 +573,19 @@ public class CompanyController : Controller
         page = PagerModel.Clamp(page, total);
 
         // Il/ulke secimindeki sayilar: diger filtrelerden bagimsiz, tum firmalar uzerinden.
-        geo.CityCounts = await VisibleCompanies()
+        // Bu sayilar her sayfa acilisinda yeniden hesaplaniyordu; kullanici basina 30 sn onbellekte tutulur
+        // (yavas sunucuda sayfa basina 4 veritabani gidis-donusu az).
+        geo.CityCounts = await FacetAsync("city", () => VisibleCompanies()
             .Where(c => c.City != null)
             .GroupBy(c => c.City!)
             .Select(g => new { g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+            .ToDictionaryAsync(x => x.Key, x => x.Count, ct));
 
-        var countryRows = await VisibleCompanies()
+        var countryRows = await FacetAsync("country", () => VisibleCompanies()
             .Where(c => c.Country != null)
             .GroupBy(c => c.Country!)
             .Select(g => new { g.Key, Count = g.Count() })
-            .ToListAsync(ct);
+            .ToListAsync(ct));
 
         geo.CountryCounts = CountryCounts(countryRows.Select(r => ((string?)r.Key, r.Count)));
 
@@ -602,7 +604,7 @@ public class CompanyController : Controller
                 .Select(g => new { g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.Key, x => x.Count, ct),
             // Havuz sayilari yalnizca yoneticinin "Tumunu sil" onayinda kullanilir.
-            Pool = isAdmin ? await PoolCountsAsync(ct) : null,
+            Pool = isAdmin ? await FacetAsync("pool", () => PoolCountsAsync(ct)) : null,
             Search = search,
             MinScore = minScore,
             OnlyWithoutLead = onlyWithoutLead,
@@ -611,11 +613,11 @@ public class CompanyController : Controller
             Signal = signal,
             Nace = nace,
             Icp = icp,
-            NaceCounts = await VisibleCompanies()
+            NaceCounts = await FacetAsync("nace", () => VisibleCompanies()
                 .Where(c => c.NaceCode != null)
                 .GroupBy(c => c.NaceCode!.Substring(0, 2))
                 .Select(g => new { g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.Key, x => x.Count, ct),
+                .ToDictionaryAsync(x => x.Key, x => x.Count, ct)),
             IcpCount = counts?.Icp ?? 0,
             Sort = sort,
             Geo = geo,
@@ -928,6 +930,16 @@ public class CompanyController : Controller
         }
         var text = string.Join(" · ", parts);
         return profileName is null ? text : $"{text} (profil: {profileName})";
+    }
+
+    private async Task<T> FacetAsync<T>(string name, Func<Task<T>> load)
+    {
+        var cache = HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>();
+        var key = $"company-facet:{name}:{User.UserId()}";
+        if (Microsoft.Extensions.Caching.Memory.CacheExtensions.TryGetValue<T>(cache, key, out var hit) && hit is not null) return hit;
+        var value = await load();
+        Microsoft.Extensions.Caching.Memory.CacheExtensions.Set(cache, key, value, TimeSpan.FromSeconds(30));
+        return value;
     }
 
     internal async Task<PoolCounts> PoolCountsAsync(CancellationToken ct) => new(

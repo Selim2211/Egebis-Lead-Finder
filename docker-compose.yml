@@ -55,6 +55,11 @@ services:
     restart: unless-stopped
     mem_limit: 1536m
     memswap_limit: 1536m
+    # Seyir'de ayni ofis ag/VPN'inde bulunan sorunun cozumu: yol MTU'su dusukse buyuk yanitlar (HTML sayfasi)
+    # takilir, kucukler hizli gelir. MTU kesfi acilir, bosta kalan baglantida yavas baslangic kapatilir.
+    sysctls:
+      net.ipv4.tcp_mtu_probing: 1
+      net.ipv4.tcp_slow_start_after_idle: 0
     depends_on:
       db:
         condition: service_healthy
