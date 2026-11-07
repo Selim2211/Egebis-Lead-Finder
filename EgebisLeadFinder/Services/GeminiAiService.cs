@@ -1142,22 +1142,22 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         return result;
     }
 
-    public async Task<Dictionary<int, string>> ChooseNaceAsync(IReadOnlyList<(int Id, string Text)> companies,
-        IReadOnlyList<KeyValuePair<string, string>> options, CancellationToken ct = default)
+    public async Task<Dictionary<int, ProductVerdict>> MatchProductsAsync(IReadOnlyList<(int Id, string Text)> companies,
+        IReadOnlyList<string> products, CancellationToken ct = default)
     {
-        var result = new Dictionary<int, string>();
-        if (companies.Count == 0 || options.Count == 0) return result;
+        var result = new Dictionary<int, ProductVerdict>();
+        if (companies.Count == 0 || products.Count == 0) return result;
 
         var apiKey = await AiProviders.ActiveKeyAsync(_settings, ct);
         if (string.IsNullOrWhiteSpace(apiKey)) throw new MissingApiKeyException("Gemini");
 
-        var optionLines = string.Join('\n', options.Select(o => $"{NaceCatalog.FormatSixDigit(o.Key)}: {o.Value}"));
+        var productLines = string.Join('\n', products.Select(p => "- " + p));
         var firmLines = string.Join('\n', companies.Select(c => $"[{c.Id}] {c.Text.Replace('\n', ' ')}"));
         var url = $"{_options.GeminiEndpoint}/{await ModelAsync(ct)}:generateContent";
         var payload = new
         {
-            system_instruction = new { parts = new[] { new { text = NaceChoosePrompt } } },
-            contents = new[] { new { role = "user", parts = new[] { new { text = $"RESMÎ FAALİYET KODLARI:\n{optionLines}\n\nFİRMALAR:\n{firmLines}" } } } },
+            system_instruction = new { parts = new[] { new { text = ProductMatchPrompt } } },
+            contents = new[] { new { role = "user", parts = new[] { new { text = $"ÜRÜNLER:\n{productLines}\n\nFİRMALAR:\n{firmLines}" } } } },
             generationConfig = new
             {
                 temperature = 0.0,
@@ -1168,8 +1168,13 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
                     items = new
                     {
                         type = "object",
-                        properties = new { id = new { type = "integer" }, naceCode = new { type = "string" } },
-                        required = new[] { "id", "naceCode" }
+                        properties = new
+                        {
+                            id = new { type = "integer" },
+                            products = new { type = "array", items = new { type = "string" } },
+                            reason = new { type = "string", description = "Hiçbirini üretmiyorsa 2-5 kelimelik neden" }
+                        },
+                        required = new[] { "id", "products" }
                     }
                 }
             }
@@ -1179,27 +1184,36 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         if (response.Error is not null) throw new InvalidOperationException(response.Error);
 
         var json = ExtractText(response.Content!);
-        if (json is null) return result;
+        return json is null ? result : ParseProductVerdicts(json);
+    }
 
+    public static Dictionary<int, ProductVerdict> ParseProductVerdicts(string json)
+    {
+        var result = new Dictionary<int, ProductVerdict>();
         using var doc = JsonDocument.Parse(json);
+        if (doc.RootElement.ValueKind != JsonValueKind.Array) return result;
         foreach (var item in doc.RootElement.EnumerateArray())
         {
             if (!item.TryGetProperty("id", out var idEl) || !idEl.TryGetInt32(out var id)) continue;
-            var code = item.TryGetProperty("naceCode", out var c) ? c.GetString() : null;
-            if (!string.IsNullOrWhiteSpace(code)) result[id] = code;
+            var products = item.TryGetProperty("products", out var p) && p.ValueKind == JsonValueKind.Array
+                ? p.EnumerateArray().Select(x => x.GetString()?.Trim() ?? string.Empty).Where(x => x.Length > 0).ToList()
+                : new List<string>();
+            var reason = item.TryGetProperty("reason", out var r) ? r.GetString() : null;
+            result[id] = new ProductVerdict(products, string.IsNullOrWhiteSpace(reason) ? null : reason.Trim());
         }
         return result;
     }
 
-    private const string NaceChoosePrompt = """
-        Önce RESMÎ faaliyet kodları listesi (kod: ad), sonra firmalar verilecek; her firmada köşeli parantez içinde numara
-        ve firma hakkında kısa bilgi (ad, sektör, ürünler, açıklama) var.
+    private const string ProductMatchPrompt = """
+        Önce bir ÜRÜNLER listesi, sonra firmalar verilecek; her firmada köşeli parantez içinde numara ve firma hakkında kısa
+        bilgi (ad, sektör, ürünler, üretici olup olmadığı, açıklama) var.
 
-        Her firma için ana faaliyetine EN UYGUN TEK kodu YALNIZCA bu listeden seç ve naceCode alanına "27.51.08" biçiminde yaz.
-        Ürünü kendi adı/markasıyla üreten, ürettiren ya da tasarlayıp pazarlayan firmaları (marka sahibi) ilgili ÜRETİM koduna
-        dahil et; fason üretim yaptırmaları bunu değiştirmez. naceCode alanını YALNIZCA başkalarının markalarını satan
-        bayi/mağaza/e-ticaret sitesi, servis/tamir, dernek/kamu/rehber sitesi, ürünle hiç ilgisi olmayan firmalar ya da bilgi
-        yetersizse boş bırak. Listede olmayan kod YAZMA. Her firma için verilen numarayı id alanına aynen yaz.
+        Her firma için listedeki ürünlerden HANGİLERİNİ ÜRETTİĞİNİ products alanına yaz (listede yazdığı gibi). Üretmek:
+        kendi fabrikasında üretmek ya da kendi markasıyla ürettirip satmak (marka sahibi). Başkalarının markalarını satan
+        bayi/mağaza/e-ticaret, servis/tamir, yedek parça satıcısı, dernek, rehber ya da yalnızca bu ürünlerin PARÇASINI üreten
+        yan sanayi bu ürünleri ÜRETMİŞ sayılmaz: products boş olsun ve reason alanına 2-5 kelimelik neden yaz ("bayi", "servis",
+        "yan sanayi (parça)"). Bilgi yetersizse de products boş, reason "bilgi yetersiz". Listede olmayan ürün YAZMA.
+        Her firma için verilen numarayı id alanına aynen yaz.
         """;
 
     private const string NaceSystemPrompt = """

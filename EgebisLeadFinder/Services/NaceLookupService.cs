@@ -7,11 +7,83 @@ namespace EgebisLeadFinder.Services;
 /// <param name="ShortName">Sektor kutusunu doldurmak icin 2-4 kelimelik ad.</param>
 /// <param name="Official">Ad resmi TUIK/GIB listesinden mi (yoksa resmi alt faaliyetlerden yapay zekanin ozeti mi)?</param>
 /// <param name="Basis">Grup kodlari (27.51 gibi) icin yapay zekanin dayandigi resmi alt faaliyetlerden kisa bir ornek.</param>
+/// <param name="Products">Kodun resmi metninde sayilan urunler (resmi metinde gectigi dogrulanmis). NACE aramasi bu urunlerden
+/// en az birini URETEN firmalari arar.</param>
 public record NaceInfo(
     string Code, string? DivisionName, string? SectionName, string? Name, string? ShortName, string? Description,
     IReadOnlyList<string> SearchTerms, bool Official, string? Basis, string? Error)
 {
     public bool Ok => Error is null;
+    public IReadOnlyList<string> Products { get; init; } = Array.Empty<string>();
+}
+
+/// <summary>NACE kodunun urun listesi: resmi metne dayali dogrulama, yedek ayirma ve kullanicinin secimi.</summary>
+public static class NaceProducts
+{
+    private static readonly HashSet<string> Filler = new(StringComparer.Ordinal)
+    {
+        "ev", "tipi", "vb", "vs", "ve", "ile", "icin", "dahil", "haric", "olan", "olanlar", "imalati", "uretimi", "urunleri",
+        "diger", "benzeri", "turu", "turlu", "cesitli"
+    };
+
+    /// <summary>
+    /// Urun adinin anlamli her kelimesi (ilk 5 harfi) resmi metinde geciyor mu? Yapay zekanin metinde olmayan bir urun
+    /// eklemesini engeller ("derin dondurucu" resmi metinde yalnizca "dondurucu" ise reddedilir).
+    /// </summary>
+    public static bool IsGrounded(string product, string officialText)
+    {
+        var text = TurkishText.Normalize(officialText);
+        var words = Words(product);
+        return words.Count > 0 && words.All(w => text.Contains(w.Length > 5 ? w[..5] : w, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Yedek: resmi adi virgul ve "ve" ile parcalara ayirir ("Ev tipi buzdolabı, dondurucu, … vb. imalatı" -> "buzdolabı",
+    /// "dondurucu", …). Yapay zeka cevap veremezse kullanilir.
+    /// </summary>
+    public static List<string> Split(string? officialName)
+    {
+        if (string.IsNullOrWhiteSpace(officialName)) return new();
+        var text = System.Text.RegularExpressions.Regex.Replace(officialName, @"\([^)]*\)", " ");
+        return text.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .SelectMany(p => System.Text.RegularExpressions.Regex.Split(p, @"\s+ve\s+|\s+ile\s+"))
+            .Select(Clean)
+            .Where(p => p.Length is > 2 and <= 60)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(15)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Kullanicinin sectigi urunler (formdan virgullu) ile izin verilen liste kesisimi; secim yoksa ya da hicbiri
+    /// gecerli degilse tum liste. Liste disi urun aramaya giremez.
+    /// </summary>
+    public static List<string> Resolve(string? selectedCsv, IReadOnlyList<string> allowed)
+    {
+        var map = allowed.GroupBy(a => TurkishText.Normalize(a)).ToDictionary(g => g.Key, g => g.First());
+        var chosen = (selectedCsv ?? string.Empty)
+            .Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(s => map.GetValueOrDefault(TurkishText.Normalize(s)))
+            .OfType<string>()
+            .Distinct()
+            .ToList();
+        return chosen.Count > 0 ? chosen : allowed.ToList();
+    }
+
+    private static string Clean(string part)
+    {
+        var p = System.Text.RegularExpressions.Regex.Replace(part, @"\b(vb|vs)\.?", " ", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        p = System.Text.RegularExpressions.Regex.Replace(p, @"\b(imalatı|üretimi|imalatı\.?)\s*$", " ", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        p = System.Text.RegularExpressions.Regex.Replace(p, @"^\s*ev tipi\s+", " ", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        p = System.Text.RegularExpressions.Regex.Replace(p, @"\s+", " ").Trim().Trim('.', ' ');
+        return p.Length > 0 ? char.ToLower(p[0], new System.Globalization.CultureInfo("tr-TR")) + p[1..] : p;
+    }
+
+    private static List<string> Words(string product) =>
+        TurkishText.Normalize(product)
+            .Split(new[] { ' ', '-', '/', '.', ',' }, StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => w.Length >= 3 && !Filler.Contains(w))
+            .ToList();
 }
 
 /// <summary>
@@ -57,12 +129,14 @@ public class NaceLookupService
                 return Fail(code, $"{code} resmî NACE Rev.2 listesinde yok. Kodu kontrol edin (örn. {SuggestSibling(digits)}).");
 
             var ai = await DescribeAsync(code, $"Resmî faaliyet adı (TÜİK/GİB NACE Rev.2 Altılı): {official}", ct);
-            info = Build(code, division, official, ai, official: true, basis: null);
+            info = Build(code, division, official, ai, official: true, basis: null) with { Products = ProductsFrom(ai, official, NaceProducts.Split(official)) };
         }
         else if (digits.Length == 2)
         {
             var ai = await DescribeAsync(code, $"Resmî bölüm adı (NACE Rev.2): {division.Name} (kısım {division.SectionCode}: {division.SectionName})", ct);
             info = Build(code, division, division.Name, ai, official: true, basis: null);
+            // Bolumun resmi urun listesi yok: yapay zekanin (bolum adina dayali) urunleri kullanilir.
+            info = info with { Products = ai.Error is null && ai.Products.Count > 0 ? ai.Products.Take(10).ToList() : info.SearchTerms };
         }
         else
         {
@@ -75,12 +149,23 @@ public class NaceLookupService
             var ai = await DescribeAsync(code, $"Bu kodun kapsadığı resmî alt faaliyetler (TÜİK/GİB NACE Rev.2 Altılı, {subs.Count} adet):\n{string.Join('\n', lines)}", ct);
             var basis = string.Join("; ", subs.Take(3).Select(s => Short(s.Value, 70)));
             info = Build(code, division, null, ai, official: false, basis: basis + (subs.Count > 3 ? $" … (+{subs.Count - 3})" : string.Empty));
+            var subsText = string.Join(" ", subs.Select(s => s.Value));
+            info = info with { Products = ProductsFrom(ai, subsText, subs.SelectMany(s => NaceProducts.Split(s.Value)).Distinct(StringComparer.OrdinalIgnoreCase).Take(15).ToList()) };
             if (info.Name is null)
                 info = info with { Name = $"{code} sınıfı ({subs.Count} resmî alt faaliyet)", ShortName = division.Name };
         }
 
         _cache.Set(cacheKey, info, CacheFor);
         return info;
+    }
+
+    /// <summary>Yapay zekanin urunlerinden resmi metinde gercekten gecenler; hic kalmazsa resmi metnin ayrilmis hali.</summary>
+    private static List<string> ProductsFrom(NaceDescribeResult ai, string officialText, List<string> fallback)
+    {
+        var grounded = ai.Error is null
+            ? ai.Products.Where(p => NaceProducts.IsGrounded(p, officialText)).Take(15).ToList()
+            : new List<string>();
+        return grounded.Count > 0 ? grounded : fallback;
     }
 
     private async Task<NaceDescribeResult> DescribeAsync(string code, string context, CancellationToken ct)

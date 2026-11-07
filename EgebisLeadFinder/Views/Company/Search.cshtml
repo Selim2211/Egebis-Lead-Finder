@@ -156,6 +156,11 @@
                         <input class="form-control nace-input" id="basicNace" name="Criteria.NaceCode" value="@Model.Criteria.NaceCode"
                                placeholder="27.51.08" inputmode="decimal" autocomplete="off" maxlength="12" />
                         <div class="form-text nace-status" data-nace-status aria-live="polite">Çok spesifik arama için: kodu yazınca anlamı ve arama terimleri gelir.</div>
+                        <div class="nace-products" data-nace-products hidden>
+                            <div class="small text-muted-2 mb-1">Bu ürünlerden en az birini üreten firmalar aranır. Tıklayarak seçimi değiştirebilirsiniz:</div>
+                            <div class="nace-product-chips" data-nace-chips></div>
+                        </div>
+                        <input type="hidden" name="Criteria.NaceProducts" class="nace-products-sync" value="@Model.Criteria.NaceProducts" />
                     </div>
 
                     <div class="mb-3">
@@ -323,7 +328,7 @@
                         @if (result.NaceFiltered > 0)
                         {
                             <p class="text-muted-2 mb-0">
-                                Bulunan firmaların hiçbiri NACE koduyla eşleşmedi. Firma sayısını artırın ya da kodu veya sektörü değiştirip tekrar deneyin.
+                                Bulunan firmaların hiçbiri seçilen ürünleri üretmiyor. Firma sayısını artırın ya da ürün seçimini değiştirip tekrar deneyin.
                             </p>
                         }
                         else
@@ -359,6 +364,10 @@
                                                 <span class="tag tag-success run-tag">yeni</span>
                                             }
                                         </div>
+                                        @if (result.ProductMatches.TryGetValue(company.Id, out var made))
+                                        {
+                                            <div class="cell-sub nace-made">Üretiyor: @string.Join(", ", made)</div>
+                                        }
                                         <div class="cell-sub">
                                             @company.Domain
                                             @if (company.EvaluationStatus == EvaluationStatus.NotEvaluated && company.EvaluationNote is not null)
@@ -458,6 +467,11 @@
                             <input class="form-control nace-input" id="advNace" name="Criteria.NaceCode" value="@Model.Criteria.NaceCode"
                                    placeholder="27.51.08" inputmode="decimal" autocomplete="off" maxlength="12" />
                             <div class="form-text nace-status" data-nace-status aria-live="polite">Çok spesifik arama için: kodu yazınca anlamı ve arama terimleri gelir.</div>
+                            <div class="nace-products" data-nace-products hidden>
+                                <div class="small text-muted-2 mb-1">Bu ürünlerden en az birini üreten firmalar aranır. Tıklayarak seçimi değiştirebilirsiniz:</div>
+                                <div class="nace-product-chips" data-nace-chips></div>
+                            </div>
+                            <input type="hidden" name="Criteria.NaceProducts" class="nace-products-sync" value="@Model.Criteria.NaceProducts" />
                         </div>
 
                         <div class="mb-3">
@@ -519,7 +533,7 @@
                             {
                                 var mine = p.CanEdit(me, isAdmin);
                                 <button type="button" class="profile-item" data-id="@p.Id" data-name="@p.Name"
-                                        data-industry="@p.Industry" data-nace="@p.NaceCode" data-city="@p.City"
+                                        data-industry="@p.Industry" data-nace="@p.NaceCode" data-nace-products="@p.NaceProducts" data-city="@p.City"
                                         data-public="@(p.IsPublic ? "true" : "false")" data-mine="@(mine ? "true" : "false")"
                                         data-region="@SearchRegions.Get(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key).Key">
                                     <span class="profile-item-name">
@@ -849,6 +863,7 @@
                 f.status.classList.toggle('is-error', tone === 'error');
                 naceTip(f, tip);
             });
+            naceRenderProducts(info && info.ok ? info : (message || tone ? undefined : null));
         }
 
         function naceApplyIndustry(info) {
@@ -881,6 +896,63 @@
                     else naceRender(null, info.error || 'Kod çözülemedi.', 'error');
                 })
                 .catch(function () { if (seq === naceSeq) naceRender(null, 'Kod şu an çözülemedi; arama yine de yapılabilir.', 'error'); });
+        }
+
+        // NACE urunleri: kodun resmi metnindeki urunler etiket olarak gosterilir; secili olanlarla aranir ve sonucta bu
+        // urunlerden en az birini URETEN firmalar kalir. En az bir urun secili kalmali.
+        var naceProductSync = Array.prototype.slice.call(document.querySelectorAll('.nace-products-sync'));
+        var nacePending = naceProductSync.length ? naceProductSync[0].value : '';
+        var naceChipsCode = null, naceAllProducts = [], naceSelected = [];
+
+        function naceNorm(v) { return (v || '').toLocaleLowerCase('tr').trim(); }
+
+        function naceWriteSelection() {
+            var csv = naceSelected.join(', ');
+            naceProductSync.forEach(function (i) { i.value = csv; });
+            document.querySelectorAll('[data-nace-chips] .nace-chip').forEach(function (b) {
+                var on = naceSelected.some(function (x) { return naceNorm(x) === naceNorm(b.dataset.product); });
+                b.classList.toggle('is-on', on);
+                b.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+        }
+
+        function naceRenderProducts(info) {
+            var boxes = document.querySelectorAll('[data-nace-products]');
+            if (!info || !info.ok || !info.products || !info.products.length) {
+                boxes.forEach(function (b) { b.hidden = true; });
+                // null: kod silindi (secimi de temizle); undefined: yukleniyor/hata (yalnizca gizle).
+                if (info === null) { naceChipsCode = null; naceSelected = []; naceProductSync.forEach(function (i) { i.value = ''; }); }
+                return;
+            }
+            if (naceChipsCode !== info.code) {
+                naceAllProducts = info.products.slice();
+                var wanted = (nacePending || '').split(',').map(naceNorm).filter(Boolean);
+                naceSelected = wanted.length
+                    ? naceAllProducts.filter(function (pr) { return wanted.indexOf(naceNorm(pr)) >= 0; })
+                    : naceAllProducts.slice();
+                if (!naceSelected.length) naceSelected = naceAllProducts.slice();
+                nacePending = '';
+                naceChipsCode = info.code;
+                document.querySelectorAll('[data-nace-chips]').forEach(function (holder) {
+                    holder.textContent = '';
+                    naceAllProducts.forEach(function (pr) {
+                        var b = document.createElement('button');
+                        b.type = 'button';
+                        b.className = 'nace-chip';
+                        b.dataset.product = pr;
+                        b.textContent = pr;
+                        b.addEventListener('click', function () {
+                            var i = naceSelected.findIndex(function (x) { return naceNorm(x) === naceNorm(pr); });
+                            if (i >= 0) { if (naceSelected.length === 1) return; naceSelected.splice(i, 1); }
+                            else naceSelected.push(pr);
+                            naceWriteSelection();
+                        });
+                        holder.appendChild(b);
+                    });
+                });
+            }
+            boxes.forEach(function (b) { b.hidden = false; });
+            naceWriteSelection();
         }
 
         function naceSetValue(v) { naceFields.forEach(function (f) { f.input.value = v; }); naceRequired(); }
@@ -978,7 +1050,8 @@
             item.addEventListener('click', function () {
                 advName.value = item.getAttribute('data-name') || '';
                 advIndustry.value = item.getAttribute('data-industry') || '';
-                naceSetValue(item.getAttribute('data-nace') || ''); naceLookup(item.getAttribute('data-nace') || ''); // profilin NACE kodu (yoksa bos): onceki kod karismasin
+                nacePending = item.getAttribute('data-nace-products') || ''; naceChipsCode = null;
+                naceSetValue(item.getAttribute('data-nace') || ''); naceLookup(item.getAttribute('data-nace') || ''); // profilin NACE kodu ve urun secimi (yoksa bos)
                 var city = item.getAttribute('data-city') || '';
                 var list = city.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
                 setRegion(item.getAttribute('data-region') || 'TR');
@@ -1048,6 +1121,7 @@
             item.setAttribute('data-name', p.name);
             item.setAttribute('data-industry', p.industry || '');
             item.setAttribute('data-nace', p.naceCode || '');
+            item.setAttribute('data-nace-products', p.naceProducts || '');
             item.setAttribute('data-city', p.city || '');
             item.setAttribute('data-region', p.regionKey || 'TR');
             item.setAttribute('data-public', p.isPublic ? 'true' : 'false');

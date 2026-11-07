@@ -58,6 +58,9 @@ public class SearchPlanService
     /// <summary>Kullanicinin terimi dahil en fazla terim sayisi (Serper kredisini sinirlar).</summary>
     public const int MaxTerms = 4;
 
+    /// <summary>NACE (urun) aramasinda denenecek en fazla urun sayisi.</summary>
+    public const int MaxProductTerms = 8;
+
     /// <summary>Tek yapay zeka cagrisinda degerlendirilen aday sayisi.</summary>
     public const int ScreenBatchSize = 40;
 
@@ -96,6 +99,9 @@ public class SearchPlanService
 
         plan.Profile = BusinessProfileService.Parse(await _settings.GetAsync(SettingKeys.BusinessProfile, ct));
         ApplyProfile(criteria, plan.Profile);
+        // NACE (urun) aramasinin amaci urunu URETEN firmayi bulmak: profil "her tur firma" dese de uretici kaliplari
+        // ("{urun} üreticileri", "{urun} fabrikası") kullanilir.
+        if (criteria.ProductList.Count > 0) criteria.ManufacturerQueries = true;
         plan.Segment = string.IsNullOrWhiteSpace(criteria.SegmentId)
             ? null
             : plan.Profile.Segments.FirstOrDefault(s => s.Id == criteria.SegmentId);
@@ -111,6 +117,14 @@ public class SearchPlanService
         plan.Smart = true;
         criteria.CollectTarget = CollectTargetFor(criteria.MaxCompanies);
 
+        // NACE (urun) aramasi: terimler zaten kodun resmi urunleri; yapay zekadan ek terim istenmez (gereksiz cagri ve
+        // urun disina kayma olmasin). On eleme yine yapilir.
+        if (criteria.ProductList.Count > 0)
+        {
+            criteria.SearchTerms = plan.Terms.Skip(1).ToList();
+            return plan;
+        }
+
         var region = SearchRegions.Get(criteria.RegionKey ?? SearchRegions.ByCountry(criteria.Country)?.Key);
         var language = LanguageNames.GetValueOrDefault(region.PackCode, "İngilizce");
         var cacheKey = $"search-terms:{criteria.AiIndustry.Trim().ToLowerInvariant()}|{region.PackCode}|{plan.Segment?.Id}|{plan.Profile.UpdatedAt:O}";
@@ -123,7 +137,7 @@ public class SearchPlanService
                     new SearchTermRequest(criteria.AiIndustry.Trim(), plan.Segment, plan.Profile, region.Country, language, MaxTerms - 1), ct);
                 _cache.Set(cacheKey, suggested, TermCacheDuration);
             }
-            plan.Terms = MergeTerms(criteria.Industry, plan.Segment, criteria.NaceTerms.Concat(suggested));
+            plan.Terms = MergeTerms(criteria.Industry, plan.Segment, suggested);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -159,7 +173,8 @@ public class SearchPlanService
     /// <summary>NACE kodundan gelen terimler (akilli arama kapali ya da AI yoksa bile) arama terimlerine eklenir.</summary>
     private static void AddNaceTerms(List<string> terms, SearchCriteria criteria)
     {
-        foreach (var t in criteria.NaceTerms.Take(4))
+        // NACE aramasinda terimler kodun urunleridir; urun sayisi kadar (en fazla 8) aranir, MaxTerms siniri uygulanmaz.
+        foreach (var t in criteria.ProductList.Take(MaxProductTerms))
             if (!terms.Contains(t, StringComparer.OrdinalIgnoreCase)) terms.Add(t);
     }
 

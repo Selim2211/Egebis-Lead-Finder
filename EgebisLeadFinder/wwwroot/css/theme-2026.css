@@ -633,3 +633,18 @@ body { transition: background-color 200ms ease, color 200ms ease; }
 :root[data-theme="dark"] .nace-status.is-error { color: #ff8a80; }
 .nace-tip .tooltip-inner { max-width: 340px; text-align: left; white-space: pre-line; padding: .6rem .75rem; line-height: 1.45; }
 
+/* ---- NACE urun etiketleri ---- */
+.nace-products { margin-top: .5rem; }
+.nace-product-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+.nace-chip {
+    border: 1px solid var(--eg-border-strong); background: var(--eg-surface); color: var(--eg-text-muted);
+    border-radius: 999px; padding: .2rem .65rem; font-size: .8rem; line-height: 1.4; cursor: pointer;
+    transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+.nace-chip.is-on { background: var(--eg-ink-soft); color: var(--eg-ink-soft-text); border-color: var(--eg-ink); font-weight: 600; }
+.nace-chip:active { transform: scale(.97); }
+.nace-chip:focus-visible { outline: 2px solid var(--eg-amber); outline-offset: 2px; }
+:root[data-theme="dark"] .nace-chip { background: transparent; color: #b8c2d6; border-color: rgba(255, 255, 255, .18); }
+:root[data-theme="dark"] .nace-chip.is-on { background: rgba(245, 160, 11, .16); color: #ffd58a; border-color: rgba(245, 160, 11, .55); }
+.nace-made { color: #1f7a4d; font-weight: 600; }
+:root[data-theme="dark"] .nace-made { color: #5fd49a; }

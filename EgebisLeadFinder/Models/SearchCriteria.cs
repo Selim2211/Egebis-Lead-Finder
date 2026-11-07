@@ -58,9 +58,16 @@ public class SearchCriteria
     /// </summary>
     public string? NaceCode { get; set; }
 
-    /// <summary>NACE kodunun faaliyeti icin yapay zekanin urettigi arama terimleri. Formdan gelmez.</summary>
+    /// <summary>
+    /// Formdan: NACE kodunun urunlerinden kullanicinin sectikleri (virgullu, ör. "bulaşık makinesi, çamaşır makinesi").
+    /// Kontrolor resmi urun listesiyle kesistirip duzeltir; bossa tum urunler.
+    /// </summary>
+    public string? NaceProducts { get; set; }
+
+    /// <summary>Aranacak urunler (kodun resmi urunlerinden secilenler). Formdan gelmez. Arama bunlarla yapilir; sonucta bu
+    /// urunlerden en az birini URETEN firmalar kalir.</summary>
     [BindNever]
-    public List<string> NaceTerms { get; set; } = new();
+    public List<string> ProductList { get; set; } = new();
 
     /// <summary>"NACE 27.51.08: Elektrikli ev aletleri imalatı" gibi yapay zeka istemlerine eklenen baglam. Formdan gelmez.</summary>
     [BindNever]
@@ -75,7 +82,9 @@ public class SearchCriteria
     /// eleyebildiginden yalnizca kod eklenir.
     /// </summary>
     [BindNever]
-    public string ScreenIndustry => string.IsNullOrWhiteSpace(NaceCode) ? Industry : $"{Industry} (NACE {NaceCode})";
+    public string ScreenIndustry => ProductList.Count == 0
+        ? Industry
+        : $"{Industry} (şu ürünlerden en az birini üreten firmalar: {string.Join(", ", ProductList)})";
 
     /// <summary>Firma Ara'da tiklanan "Biz ne arıyoruz?" segmenti (BusinessProfile.Segments[].Id).</summary>
     public string? SegmentId { get; set; }

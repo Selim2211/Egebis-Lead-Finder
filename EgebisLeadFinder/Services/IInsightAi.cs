@@ -60,6 +60,9 @@ public class NaceDescribeResult
     public string? ShortName { get; set; }
     public string? Description { get; set; }
 
+    /// <summary>Resmi metinde sayilan urunler, tek tek (ör. "buzdolabı", "bulaşık makinesi"). Arama ve dogrulama bunlarla yapilir.</summary>
+    public List<string> Products { get; set; } = new();
+
     /// <summary>Bu faaliyeti yapan firmalari bulmak icin Turkce arama terimleri (ör. "elektrikli ev aleti üreticisi").</summary>
     public List<string> SearchTerms { get; set; } = new();
 

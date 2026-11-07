@@ -22,6 +22,10 @@ public class SearchProfile
     [MaxLength(12)]
     public string? NaceCode { get; set; }
 
+    /// <summary>NACE kodunun urunlerinden secilenler (virgullu); bossa kodun tum urunleri.</summary>
+    [MaxLength(1000)]
+    public string? NaceProducts { get; set; }
+
     public string? City { get; set; }
     public string? Country { get; set; }
 

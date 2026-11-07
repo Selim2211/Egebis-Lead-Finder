@@ -17,5 +17,8 @@
   "Kapsadığı resmî faaliyetlerden: ": "Official activities it covers: ",
   "Kod adı resmî TÜİK/GİB listesindendir; açıklama ve arama terimleri yapay zekâdır.": "The code name comes from the official TÜİK/GİB list; the description and search terms are AI-generated.",
   "Ad, resmî alt faaliyetlere dayanan yapay zekâ özetidir.": "The name is an AI summary based on the official sub-activities.",
-  "Bulunan firmaların hiçbiri NACE koduyla eşleşmedi. Firma sayısını artırın ya da kodu veya sektörü değiştirip tekrar deneyin.": "None of the companies found matched the NACE code. Increase the number of companies or change the code or sector and try again."
+  "Bu ürünlerden en az birini üreten firmalar aranır. Tıklayarak seçimi değiştirebilirsiniz:": "Companies that make at least one of these products are searched. Click to change the selection:",
+  "Üretiyor:": "Makes:",
+  "Bulunan firmaların hiçbiri seçilen ürünleri üretmiyor. Firma sayısını artırın ya da ürün seçimini değiştirip tekrar deneyin.": "None of the companies found makes the selected products. Increase the number of companies or change the product selection and try again.",
+  "Firmaların hangi ürünleri ürettiği şu an kontrol edilemedi (yapay zekâ); sonuçlar ürüne göre süzülmedi.": "Could not check which products the companies make right now (AI); results were not filtered by product."
 }

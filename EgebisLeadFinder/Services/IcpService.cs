@@ -12,11 +12,14 @@ public interface INaceClassifierAi
     Task<Dictionary<int, string>> ClassifyNaceAsync(IReadOnlyList<(int Id, string Text)> companies, CancellationToken ct = default);
 
     /// <summary>
-    /// Kapali liste secimi: her firma icin verilen RESMI 6 haneli kodlardan (kod -> ad) en uygun tekini secer; hicbiri
-    /// uymuyorsa firma sonucta yoktur. Serbest kod uretmez, dolayisiyla uydurma kod gelmez.
+    /// Urun eslestirme: her firma icin verilen urun listesinden HANGILERINI urettigini (kendi uretimi ya da kendi markasi)
+    /// dondurur; hicbirini uretmiyorsa bos liste ve kisa neden. Liste disi urun yazilmaz (cagiran ayrica dogrular).
     /// </summary>
-    Task<Dictionary<int, string>> ChooseNaceAsync(IReadOnlyList<(int Id, string Text)> companies, IReadOnlyList<KeyValuePair<string, string>> options, CancellationToken ct = default);
+    Task<Dictionary<int, ProductVerdict>> MatchProductsAsync(IReadOnlyList<(int Id, string Text)> companies, IReadOnlyList<string> products, CancellationToken ct = default);
 }
+
+/// <summary>Bir firmanin urettigi (listedeki) urunler; bossa neden ("bayi", "servis"...).</summary>
+public record ProductVerdict(List<string> Products, string? Reason);
 
 /// <summary>
 /// Ideal musteri profilini (ICP) okur/yazar ve firma puanini ICP'ye gore gunceller.
@@ -84,85 +87,51 @@ public class IcpService
     }
 
     /// <summary>
-    /// NACE kodlu aramada: kodu bos kalan firmalara (dernek, rehber, analizi eksik olanlar) kayitli analizden toplu NACE atar,
-    /// boylece kodu bilinmeyen firma sizmasin. Yalniz bellekteki varliklara yazar (kaydetmek cagiranin isi); site taranmaz.
+    /// NACE (urun) aramasinda: her firmaya "bu urunlerden hangilerini uretiyorsun?" diye sorulur (site analizindeki urunler,
+    /// sektor, uretici bilgisi uzerinden; site yeniden okunmaz). Yalniz verilen listedeki urunler kabul edilir. Yapay zeka
+    /// kesintisinde Ok=false doner: cagiran o zaman kimseyi elemez.
     /// </summary>
-    public async Task<NaceAssignResult> AssignMissingNaceAsync(IReadOnlyList<Company> companies, CancellationToken ct = default)
+    public async Task<ProductMatchResult> MatchProductsAsync(IReadOnlyList<Company> companies, IReadOnlyList<string> products, CancellationToken ct = default)
     {
-        var missing = companies
-            .Where(c => string.IsNullOrWhiteSpace(c.NaceCode) && (c.AiAnalysis != null || c.Industry != null || c.Description != null))
-            .ToList();
-        var filled = 0;
-        var unresolved = new List<Company>();
-        foreach (var batch in missing.Chunk(NaceBatchSize))
-        {
-            var items = batch.Select((c, i) => (i + 1, NaceBrief(c.Name, c.Industry, c.Description, c.AiAnalysis))).ToList();
-            Dictionary<int, string> codes;
-            try
-            {
-                codes = await _naceAi.ClassifyNaceAsync(items, ct);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                // Yapay zeka kesintisi: kodu bos kalanlar "belirlenemedi" sayilmaz (yanlislikla elenmesin).
-                return new NaceAssignResult(filled, unresolved);
-            }
-
-            for (var i = 0; i < batch.Length; i++)
-            {
-                codes.TryGetValue(i + 1, out var raw);
-                var code = NaceCatalog.Normalize(raw);
-                if (code is null || !NaceCatalog.Exists(code)) { unresolved.Add(batch[i]); continue; }   // uydurma kod = belirlenemedi
-                batch[i].NaceCode = code;
-                filled++;
-            }
-        }
-        return new NaceAssignResult(filled, unresolved);
-    }
-
-    /// <summary>
-    /// 4 ya da 6 haneli NACE aramasinda: aranan kodun sinifindaki (ilk 4 hane) resmi alt faaliyetler arasindan firmanin 6 haneli
-    /// kodu secilir ve firmaya yazilir (firmanin eski/serbest tahmin kodu kullanilmaz). Yapay zeka sadece resmi
-    /// listeden secer. Donen: secim yapilamayan (hicbiri uymayan) firmalar; yapay zeka kesintisinde bos doner (kimse elenmesin).
-    /// </summary>
-    public async Task<List<Company>> RefineNaceAsync(IReadOnlyList<Company> companies, string targetCode, CancellationToken ct = default)
-    {
-        var unresolved = new List<Company>();
-        var digits = new string(targetCode.Where(char.IsDigit).ToArray());
-        if (digits.Length < 4 || companies.Count == 0) return unresolved;
-
-        // Aranan kodun sinifindaki (ilk 4 hane) tum resmi alt faaliyetler secenek olur: firma baska bir alt koda duserse de
-        // dogru kod secilir (sonra aranan kodla karsilastirilir).
-        var options = NaceCatalog.ActivitiesUnder(digits[..4]);
-        if (options.Count == 0) return unresolved;
-        var valid = options.Select(o => o.Key).ToHashSet();
+        var result = new ProductMatchResult();
+        if (companies.Count == 0 || products.Count == 0) return result;
+        var allowed = products.ToDictionary(p => TurkishText.Normalize(p), p => p);
 
         foreach (var batch in companies.Chunk(NaceBatchSize))
         {
             var items = batch.Select((c, i) => (i + 1, NaceBrief(c.Name, c.Industry, c.Description, c.AiAnalysis))).ToList();
-            Dictionary<int, string> chosen;
+            Dictionary<int, ProductVerdict> verdicts;
             try
             {
-                chosen = await _naceAi.ChooseNaceAsync(items, options, ct);
+                verdicts = await _naceAi.MatchProductsAsync(items, products, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                return new List<Company>();
+                return new ProductMatchResult { Ok = false };
             }
 
             for (var i = 0; i < batch.Length; i++)
             {
-                chosen.TryGetValue(i + 1, out var raw);
-                var code = new string((raw ?? string.Empty).Where(char.IsDigit).ToArray());
-                if (!valid.Contains(code)) { unresolved.Add(batch[i]); continue; }   // listede olmayan kod = secim yok
-                batch[i].NaceCode = NaceCatalog.FormatSixDigit(code);
+                verdicts.TryGetValue(i + 1, out var v);
+                var made = (v?.Products ?? new List<string>())
+                    .Select(p => allowed.GetValueOrDefault(TurkishText.Normalize(p)))
+                    .OfType<string>()
+                    .Distinct()
+                    .ToList();
+                if (made.Count > 0) result.Matches[batch[i]] = made;
+                else result.Reasons[batch[i]] = string.IsNullOrWhiteSpace(v?.Reason) ? "bu ürünleri üretmiyor" : v!.Reason!.Trim();
             }
         }
-        return unresolved;
+        return result;
     }
 
-    /// <summary>Toplu NACE atamasinin sonucu: atanan sayisi ve yapay zekanin denedigi ama kod cikaramadigi firmalar.</summary>
-    public record NaceAssignResult(int Filled, List<Company> Unresolved);
+    /// <summary>Urun eslestirme sonucu: ureten firmalar (hangi urunler) ve uretmeyenlerin nedeni.</summary>
+    public class ProductMatchResult
+    {
+        public bool Ok { get; set; } = true;
+        public Dictionary<Company, List<string>> Matches { get; } = new();
+        public Dictionary<Company, string> Reasons { get; } = new();
+    }
 
     public static string NaceBrief(string name, string? industry, string? description, string? aiAnalysis)
     {

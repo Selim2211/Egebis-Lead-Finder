@@ -262,49 +262,40 @@ public class LeadDiscoveryService
             .OrderByDescending(c => c.Score)
             .ToList();
 
-        // NACE kodlu aramada: firmanin (yapay zekanin atadigi) kodu aranan kodla acikca uyusmuyorsa listeden
-        // cikarilir. Firmalar yine de havuza kaydedildi; kodu bilinmeyenler/daha genel olanlar elenmez.
-        if (!string.IsNullOrWhiteSpace(criteria.NaceCode))
+        // NACE (urun) aramasi: amac kod eslestirmek degil, kodun resmi urunlerinden EN AZ BIRINI URETEN firmayi bulmak.
+        // Her firmaya "bu urunlerden hangilerini uretiyorsun?" sorulur (yalniz listedeki urunler kabul edilir). Hicbirini
+        // uretmeyenler (bayi, servis, yan sanayi, dernek...) listeden cikar; bilgisi olmayan (site okunamamis) firmalar ve
+        // yapay zeka kesintisinde kimse elenmez.
+        if (criteria.ProductList.Count > 0)
         {
-            // Kodu bos kalanlara (dernek, rehber, eksik analiz) once toplu NACE atanir; yoksa kodu bilinmeyen firma sizardi.
-            var digits = new string(criteria.NaceCode.Where(char.IsDigit).ToArray());
-            var unresolved = new HashSet<Company>();
-            bool changed;
-            if (digits.Length >= 4)
+            var candidates = result.Companies
+                .Where(c => c.AiAnalysis != null || c.Industry != null || c.Description != null)
+                .ToList();
+            var match = await _icp.MatchProductsAsync(candidates, criteria.ProductList, ct);
+            if (!match.Ok)
             {
-                // 4/6 haneli kodda karar KAPALI RESMI LISTEDEN verilir: yapay zeka her firma icin aranan sinifin resmi alt
-                // faaliyetlerinden birini secer ya da "hicbiri" der. Firmanin eski serbest tahmin kodu (yanlis/uydurma olabiliyor,
-                // ör. Arcelik'e 28.32) hesaba katilmaz; daha once 6 haneli kod almis firmalar yeniden sorulmaz. Hicbiri
-                // olmayanlar (perakende, servis, dernek...) elenir; bilgisi olmayan (site okunamamis) firmalar elenmez.
-                var toRefine = result.Companies
-                    .Where(c => (c.AiAnalysis != null || c.Industry != null || c.Description != null)
-                                && new string((c.NaceCode ?? string.Empty).Where(char.IsDigit).ToArray()).Length != 6)
-                    .ToList();
-                foreach (var c in await _icp.RefineNaceAsync(toRefine, criteria.NaceCode, ct)) unresolved.Add(c);
-                changed = toRefine.Count > 0;
+                result.Warning = Join(result.Warning, "Firmaların hangi ürünleri ürettiği şu an kontrol edilemedi (yapay zekâ); sonuçlar ürüne göre süzülmedi.");
             }
             else
             {
-                // 2 haneli (bolum) arama: kodu bos kalanlara toplu kod atanir (yalniz resmi listede var olanlar).
-                var assigned = await _icp.AssignMissingNaceAsync(result.Companies, ct);
-                foreach (var c in assigned.Unresolved) unresolved.Add(c);
-                changed = assigned.Filled > 0;
-            }
-            if (changed) await db.SaveChangesAsync(ct);
+                foreach (var (company, products) in match.Matches)
+                {
+                    result.ProductMatches[company.Id] = products;
+                    // Bu urunlerden birini uretmek kodun tanimidir: kodu bos firmaya aranan kod yazilir (var olan kod degismez).
+                    if (string.IsNullOrWhiteSpace(company.NaceCode) && !string.IsNullOrWhiteSpace(criteria.NaceCode))
+                        company.NaceCode = criteria.NaceCode;
+                }
+                if (match.Matches.Count > 0) await db.SaveChangesAsync(ct);
 
-            // Kodu acikca baska olanlar + yapay zekanin denedigi ama kod cikaramadigi (dernek, rehber...) firmalar elenir;
-            // hic bilgisi olmayan (site okunamamis) ya da yapay zeka kesintisinde bakilamayan firmalar elenmez.
-            var kept = result.Companies
-                .Where(c => !unresolved.Contains(c) && NaceCatalog.MatchesTarget(c.NaceCode, criteria.NaceCode))
-                .ToList();
-            var dropped = result.Companies.Except(kept).ToList();
-            result.NaceFiltered = dropped.Count;
-            if (dropped.Count > 0)
-            {
-                result.Companies = kept;
-                var names = string.Join(", ", dropped.Take(4).Select(c => $"{c.Name} ({(unresolved.Contains(c) || string.IsNullOrWhiteSpace(c.NaceCode) ? "uygun kod bulunamadı" : c.NaceCode)})"));
-                result.Warning = Join(result.Warning,
-                    $"{dropped.Count} firma NACE {criteria.NaceCode} ile uyuşmadığı için listeden çıkarıldı: {names}{(dropped.Count > 4 ? " …" : "")}. Firma havuzuna yine de kaydedildi.");
+                var dropped = result.Companies.Where(c => match.Reasons.ContainsKey(c)).ToList();
+                result.NaceFiltered = dropped.Count;
+                if (dropped.Count > 0)
+                {
+                    result.Companies = result.Companies.Except(dropped).ToList();
+                    var names = string.Join(", ", dropped.Take(4).Select(c => $"{c.Name} ({match.Reasons[c]})"));
+                    result.Warning = Join(result.Warning,
+                        $"{dropped.Count} firma bu ürünlerden hiçbirini üretmediği için listeden çıkarıldı: {names}{(dropped.Count > 4 ? " …" : "")}. Firma havuzuna yine de kaydedildi.");
+                }
             }
         }
 
@@ -479,8 +470,14 @@ public class DiscoveryResult
     /// <summary>Arama durmadi ama kismen etkilendi (ör. kota bir kisim sorgudan sonra doldu).</summary>
     public string? Warning { get; set; }
 
-    /// <summary>NACE kodu aranan kodla uyusmadigi icin listeden cikarilan firma sayisi.</summary>
+    /// <summary>NACE (urun) aramasinda urunlerden hicbirini uretmedigi icin listeden cikarilan firma sayisi.</summary>
     public int NaceFiltered { get; set; }
+
+    /// <summary>Aramanin kriterleri (sonuc sayfasinda formu yeniden doldurmak icin).</summary>
+    public SearchCriteria? Criteria { get; set; }
+
+    /// <summary>NACE (urun) aramasinda firmanin urettigi urunler (firma Id -> urunler); sonuc tablosunda gosterilir.</summary>
+    public Dictionary<int, List<string>> ProductMatches { get; } = new();
 
     /// <summary>Akilli aramada kullanilan terimler (ilk: kullanicinin yazdigi).</summary>
     public List<string> SearchTerms { get; set; } = new();

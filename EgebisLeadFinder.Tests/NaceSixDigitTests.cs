@@ -38,75 +38,6 @@ public class NaceSixDigitTests
         Assert.Contains("buzdolabı", label);
     }
 
-    private sealed class FakeChooser : INaceClassifierAi
-    {
-        public Dictionary<int, string> Answer = new();
-        public bool Fail;
-        public IReadOnlyList<KeyValuePair<string, string>>? Options;
-        public Task<Dictionary<int, string>> ClassifyNaceAsync(IReadOnlyList<(int Id, string Text)> c, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<Dictionary<int, string>> ChooseNaceAsync(IReadOnlyList<(int Id, string Text)> c, IReadOnlyList<KeyValuePair<string, string>> options, CancellationToken ct = default)
-        {
-            if (Fail) throw new InvalidOperationException("AI kesintisi");
-            Options = options;
-            return Task.FromResult(Answer);
-        }
-    }
-
-    private static Company Firm(string name, string? nace = "27.51") => new() { Name = name, NaceCode = nace, Industry = "Beyaz eşya" };
-
-    [Fact]
-    public async Task Refine_picks_from_the_official_class_list_and_writes_the_six_digit_code()
-    {
-        var ai = new FakeChooser { Answer = { [1] = "27.51.08", [2] = "27.51.02", [3] = "" } };
-        var icp = new IcpService(null!, null!, null!, ai);
-        var a = Firm("Beyaz esya fabrikasi"); var b = Firm("Su isitici fabrikasi"); var c = Firm("Bayi");
-
-        var unresolved = await icp.RefineNaceAsync(new[] { a, b, c }, "27.51.08");
-
-        Assert.Equal("27.51.08", a.NaceCode);
-        Assert.Equal("27.51.02", b.NaceCode);               // baska alt faaliyet: yazilir, sonra aranan kodla eslesmez
-        Assert.Equal(NaceFit.No, NaceCatalog.Compare(b.NaceCode, "27.51.08"));
-        Assert.Equal(new[] { c }, unresolved);              // hicbiri uymadi
-        Assert.All(ai.Options!, o => Assert.StartsWith("2751", o.Key));   // secenekler yalniz aranan sinifin resmi alt kodlari
-    }
-
-    [Fact]
-    public async Task Refine_ignores_codes_outside_the_official_options()
-    {
-        var ai = new FakeChooser { Answer = { [1] = "27.51.99", [2] = "22.19.01" } };   // uydurma / baska sinif
-        var icp = new IcpService(null!, null!, null!, ai);
-        var a = Firm("A"); var b = Firm("B");
-
-        var unresolved = await icp.RefineNaceAsync(new[] { a, b }, "27.51.08");
-
-        Assert.Equal(2, unresolved.Count);
-        Assert.Equal("27.51", a.NaceCode);                  // degismedi
-    }
-
-    [Fact]
-    public async Task Refine_does_not_drop_anyone_when_the_ai_is_down()
-    {
-        var icp = new IcpService(null!, null!, null!, new FakeChooser { Fail = true });
-        var a = Firm("A");
-        Assert.Empty(await icp.RefineNaceAsync(new[] { a }, "27.51.08"));
-        Assert.Equal("27.51", a.NaceCode);
-    }
-
-    [Fact]
-    public async Task Refine_runs_for_class_and_six_digit_targets_but_not_for_a_whole_division()
-    {
-        var ai = new FakeChooser { Answer = { [1] = "27.51.08" } };
-        var icp = new IcpService(null!, null!, null!, ai);
-
-        var a = Firm("A", nace: "28.32");                   // eski yanlis/uydurma tahmin kod: hesaba katilmaz
-        Assert.Empty(await icp.RefineNaceAsync(new[] { a }, "27.51"));
-        Assert.Equal("27.51.08", a.NaceCode);               // 4 haneli aramada da resmi listeden secilir
-
-        ai.Options = null;
-        Assert.Empty(await icp.RefineNaceAsync(new[] { Firm("B") }, "27"));
-        Assert.Null(ai.Options);                            // bolum (2 hane) icin yapay zeka cagrilmaz
-    }
-
     [Theory]
     [InlineData("27.51", true)]
     [InlineData("27.51.08", true)]
@@ -114,10 +45,118 @@ public class NaceSixDigitTests
     [InlineData("27", true)]
     [InlineData("20.22", false)]    // gercek hata: kozmetik firmasina atanmisti, Rev.2'de yok
     [InlineData("28.32", false)]    // gercek hata: Arcelik Kurutucu/Elektrik Motorlari'na atanmisti
-    [InlineData("81.20", false)]    // gercek hata: derneğe atanmisti
+    [InlineData("81.20", false)]    // gercek hata: dernege atanmisti
     [InlineData("27.51.99", false)]
     [InlineData("99", true)]
     [InlineData("1", false)]
     public void Exists_rejects_made_up_classes(string code, bool expected) =>
         Assert.Equal(expected, NaceCatalog.Exists(code));
+
+    // ---------------- Urun listesi
+
+    private static string Official2751_08 => NaceCatalog.Activity("27.51.08")!;
+
+    [Fact]
+    public void Split_turns_the_official_text_into_single_products()
+    {
+        var products = NaceProducts.Split(Official2751_08);
+        Assert.Contains("buzdolabı", products);
+        Assert.Contains("bulaşık makinesi", products);
+        Assert.Contains("çamaşır makinesi", products);
+        Assert.Contains("mikrodalga fırın", products);
+        Assert.DoesNotContain(products, p => p.Contains("imalatı") || p.Contains("vb") || p.StartsWith("ev tipi", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
+    [InlineData("bulaşık makinesi", true)]
+    [InlineData("Bulaşık Makineleri", true)]   // cogul / buyuk harf: kok ayni
+    [InlineData("dondurucu", true)]
+    [InlineData("derin dondurucu", false)]     // resmi metinde "derin" yok
+    [InlineData("televizyon", false)]          // metinde yok: yapay zeka eklemis
+    [InlineData("ev tipi", false)]             // yalniz dolgu kelime
+    public void IsGrounded_accepts_only_products_written_in_the_official_text(string product, bool expected) =>
+        Assert.Equal(expected, NaceProducts.IsGrounded(product, Official2751_08));
+
+    [Fact]
+    public void Resolve_keeps_only_allowed_products_and_falls_back_to_all()
+    {
+        var allowed = new[] { "buzdolabı", "bulaşık makinesi", "çamaşır makinesi" };
+        Assert.Equal(new[] { "bulaşık makinesi" }, NaceProducts.Resolve("Bulaşık Makinesi, televizyon", allowed));
+        Assert.Equal(allowed, NaceProducts.Resolve(null, allowed));
+        Assert.Equal(allowed, NaceProducts.Resolve("televizyon", allowed));   // liste disi secim: tum liste
+    }
+
+    // ---------------- Urun eslestirme (firma bu urunlerden hangilerini uretiyor?)
+
+    private sealed class FakeMatcher : INaceClassifierAi
+    {
+        public Dictionary<int, ProductVerdict> Answer = new();
+        public bool Fail;
+        public IReadOnlyList<string>? Products;
+        public Task<Dictionary<int, string>> ClassifyNaceAsync(IReadOnlyList<(int Id, string Text)> c, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Dictionary<int, ProductVerdict>> MatchProductsAsync(IReadOnlyList<(int Id, string Text)> c, IReadOnlyList<string> products, CancellationToken ct = default)
+        {
+            if (Fail) throw new InvalidOperationException("AI kesintisi");
+            Products = products;
+            return Task.FromResult(Answer);
+        }
+    }
+
+    private static Company Firm(string name) => new() { Name = name, Industry = "Beyaz eşya" };
+    private static readonly string[] WhiteGoods = { "buzdolabı", "bulaşık makinesi", "çamaşır makinesi" };
+
+    [Fact]
+    public async Task MatchProducts_keeps_makers_of_at_least_one_product_and_gives_reasons_for_the_rest()
+    {
+        var ai = new FakeMatcher
+        {
+            Answer =
+            {
+                [1] = new(new() { "bulaşık makinesi" }, null),
+                [2] = new(new() { "Çamaşır Makinesi", "buzdolabı" }, null),
+                [3] = new(new(), "bayi"),
+                [4] = new(new() { "televizyon" }, null)          // liste disi urun: sayilmaz
+            }
+        };
+        var icp = new IcpService(null!, null!, null!, ai);
+        var a = Firm("Bulasik fabrikasi"); var b = Firm("Beyaz esya markasi"); var c = Firm("Bayi"); var d = Firm("TV");
+
+        var r = await icp.MatchProductsAsync(new[] { a, b, c, d }, WhiteGoods);
+
+        Assert.True(r.Ok);
+        Assert.Equal(new[] { "bulaşık makinesi" }, r.Matches[a]);
+        Assert.Equal(new[] { "çamaşır makinesi", "buzdolabı" }, r.Matches[b]);   // listedeki yazimla
+        Assert.Equal("bayi", r.Reasons[c]);
+        Assert.False(r.Matches.ContainsKey(d));
+        Assert.True(r.Reasons.ContainsKey(d));
+        Assert.Equal(WhiteGoods, ai.Products);
+    }
+
+    [Fact]
+    public async Task MatchProducts_reports_failure_instead_of_dropping_everyone_when_the_ai_is_down()
+    {
+        var icp = new IcpService(null!, null!, null!, new FakeMatcher { Fail = true });
+        var r = await icp.MatchProductsAsync(new[] { Firm("A") }, WhiteGoods);
+        Assert.False(r.Ok);
+        Assert.Empty(r.Reasons);
+    }
+
+    [Fact]
+    public void ParseProductVerdicts_reads_products_and_reason()
+    {
+        var v = GeminiAiService.ParseProductVerdicts("""
+            [{"id":1,"products":["bulaşık makinesi"," buzdolabı "]},{"id":2,"products":[],"reason":"yan sanayi (parça)"}]
+            """);
+        Assert.Equal(new[] { "bulaşık makinesi", "buzdolabı" }, v[1].Products);
+        Assert.Empty(v[2].Products);
+        Assert.Equal("yan sanayi (parça)", v[2].Reason);
+    }
+
+    [Fact]
+    public void Screen_text_names_the_products_to_be_made()
+    {
+        var c = new SearchCriteria { Industry = "Beyaz eşya", ProductList = { "bulaşık makinesi", "buzdolabı" } };
+        Assert.Contains("bulaşık makinesi, buzdolabı", c.ScreenIndustry);
+        Assert.Equal("Otomotiv", new SearchCriteria { Industry = "Otomotiv" }.ScreenIndustry);
+    }
 }

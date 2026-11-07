@@ -144,9 +144,10 @@ public partial class GeminiAiService : IInsightAi
                 name = new { type = "string", description = "Kısa Türkçe faaliyet adı (en fazla 12 kelime), yalnızca verilen resmî bilgiye dayanır" },
                 shortName = new { type = "string", description = "Bu faaliyeti anlatan 2-4 kelimelik sektör adı (ör. \"Beyaz eşya\", \"Plastik ambalaj\")" },
                 description = new { type = "string", description = "Bu kodun hangi faaliyetleri kapsadığı, 1-2 cümle, Türkçe" },
-                searchTerms = new { type = "array", items = new { type = "string" }, description = "Resmî bilgideki ürün/faaliyet adları, 3-5 adet, 1-3 kelime; 'üretici', 'imalat', 'fabrika' gibi kelimeler OLMADAN" }
+                searchTerms = new { type = "array", items = new { type = "string" }, description = "Resmî bilgideki ürün/faaliyet adları, 3-5 adet, 1-3 kelime; 'üretici', 'imalat', 'fabrika' gibi kelimeler OLMADAN" },
+                products = new { type = "array", items = new { type = "string" }, description = "Resmî metinde sayılan ürünlerin HER BİRİ ayrı eleman olarak, metindeki kelimelerle (ör. \"buzdolabı\", \"bulaşık makinesi\")" }
             },
-            required = new[] { "name", "shortName", "description", "searchTerms" }
+            required = new[] { "name", "shortName", "description", "searchTerms", "products" }
         };
 
         var (json, error) = await AskJsonAsync(NaceDescribePrompt, $"NACE kodu: {code}\n{officialContext}", schema, 0.1, ct, localize: false); // ad/terimler arayuz dilinden bagimsiz Turkce kalir (Turkiye'de aranir)
@@ -170,6 +171,13 @@ public partial class GeminiAiService : IInsightAi
                     .Where(x => x.Length is > 2 and <= 60)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .Take(5)
+                    .ToList();
+            if (root.TryGetProperty("products", out var pr) && pr.ValueKind == JsonValueKind.Array)
+                result.Products = pr.EnumerateArray()
+                    .SelectMany(x => SplitJoinedTerms(x.GetString()))
+                    .Where(x => x.Length is > 2 and <= 60)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Take(15)
                     .ToList();
             if (string.IsNullOrWhiteSpace(result.Name)) result.Error = "Yapay zekâ kodun adını veremedi.";
         }
@@ -200,6 +208,10 @@ public partial class GeminiAiService : IInsightAi
           (ör. "buzdolabı", "çamaşır makinesi", "bulaşık makinesi"). "üretici", "üreticisi", "imalat", "imalatı", "fabrika",
           "firma", "sanayi" gibi kelimeleri EKLEME: uygulama bunları kendi arama kalıplarına ("{terim} üreticileri",
           "{terim} fabrikası") zaten ekliyor ve tırnak içinde arıyor. En fazla 3 kelime; her terim ayrı bir dizi elemanı olsun.
+        - products: resmî metinde sayılan ürünlerin HER BİRİNİ ayrı eleman olarak yaz (ör. resmî metin "Ev tipi buzdolabı,
+          dondurucu, çamaşır makinesi … vb. imalatı" ise: "buzdolabı", "dondurucu", "çamaşır makinesi" …). Metindeki kelimeleri
+          kullan, metinde olmayan ürün EKLEME; "ev tipi", "vb.", "imalatı", "üretimi" gibi ekleri at. Ürün sayılmıyorsa
+          (yalnızca faaliyet adı varsa) faaliyetin konusu olan 1-3 ürünü yaz.
         """;
 
     public static NaceMatchAiResult ParseNaceMatches(string json)

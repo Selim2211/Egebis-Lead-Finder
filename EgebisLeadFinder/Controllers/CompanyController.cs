@@ -83,6 +83,7 @@ public class CompanyController : Controller
             code = info.Code,
             name = info.Name,
             shortName = info.ShortName,
+            products = info.Products,
             description = info.Description,
             division = info.DivisionName is null ? null : $"{info.Code[..2]} · {info.DivisionName}",
             terms = info.SearchTerms,
@@ -187,7 +188,7 @@ public class CompanyController : Controller
         c.CompanyName = null;
 
         // NACE kodu: gecerliyse kodun adi/arama terimleri cozulur; sektor bossa kodun adi sektor olur.
-        c.NaceTerms.Clear();
+        c.ProductList.Clear();
         c.NaceContext = null;
         if (!string.IsNullOrWhiteSpace(c.NaceCode))
         {
@@ -195,7 +196,8 @@ public class CompanyController : Controller
             if (!info.Ok) return info.Error;
 
             c.NaceCode = info.Code;
-            c.NaceTerms = info.SearchTerms.ToList();
+            c.ProductList = NaceProducts.Resolve(c.NaceProducts, info.Products.Count > 0 ? info.Products : info.SearchTerms);
+            c.NaceProducts = string.Join(", ", c.ProductList);
             c.NaceContext = string.IsNullOrWhiteSpace(info.Description)
                 ? $"NACE {info.Code}: {info.Name}"
                 : $"NACE {info.Code}: {info.Name} — {info.Description}";
@@ -208,6 +210,7 @@ public class CompanyController : Controller
         else
         {
             c.NaceCode = null;
+            c.NaceProducts = null;
         }
 
         if (string.IsNullOrWhiteSpace(c.Industry))
@@ -321,6 +324,7 @@ public class CompanyController : Controller
 
         profile.Industry = criteria.Industry;
         profile.NaceCode = criteria.NaceCode;
+        profile.NaceProducts = criteria.NaceProducts;
         profile.City = criteria.City;
         profile.Country = criteria.Country;
         profile.RegionKey = criteria.RegionKey;
@@ -333,6 +337,7 @@ public class CompanyController : Controller
     private static bool SameCriteria(SearchProfile p, SearchCriteria c) =>
         string.Equals(p.Industry?.Trim(), c.Industry?.Trim(), StringComparison.OrdinalIgnoreCase)
         && string.Equals(p.NaceCode ?? "", c.NaceCode ?? "", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(p.NaceProducts ?? "", c.NaceProducts ?? "", StringComparison.OrdinalIgnoreCase)
         && string.Equals(p.City ?? "", c.City ?? "", StringComparison.OrdinalIgnoreCase)
         && string.Equals(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key, c.RegionKey, StringComparison.OrdinalIgnoreCase);
 
@@ -353,6 +358,7 @@ public class CompanyController : Controller
             name = profile.Name,
             industry = profile.Industry,
             naceCode = profile.NaceCode,
+            naceProducts = profile.NaceProducts,
             city = profile.City,
             regionKey = profile.RegionKey,
             regionName = SearchRegions.Get(profile.RegionKey).Name,
@@ -425,6 +431,7 @@ public class CompanyController : Controller
             {
                 var result = await discovery.RunAsync(criteria, job.Token, reporter);
                 result.RunId = run.Id;
+                result.Criteria = criteria;
                 if (profile is not null)
                 {
                     result.ProfileId = profile.Id;
@@ -505,7 +512,8 @@ public class CompanyController : Controller
         if (job?.Payload is not DiscoveryResult result)
             return RedirectToAction(nameof(Search));
 
-        var model = new CompanySearchViewModel { Result = result };
+        // Sonuc sayfasinda form aramanin kriterleriyle dolar (sektor, NACE kodu ve secilen urunler korunur).
+        var model = new CompanySearchViewModel { Result = result, Criteria = result.Criteria ?? new SearchCriteria() };
         await FillSearchPageAsync(model, ct);
         model.FavoriteIds = await HttpContext.RequestServices.GetRequiredService<FavoriteService>()
             .FavoriteIdsAsync(User.UserId(), result.Companies.Select(c => c.Id), ct);
