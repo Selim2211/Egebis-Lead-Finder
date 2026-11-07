@@ -113,6 +113,9 @@ public static class SettingKeys
     public const string ImapLastCheck = "Imap:LastCheck";
     public const string ImapLastError = "Imap:LastError";
 
+    /// <summary>Mesajlar ozelligi gelince gelen kutusu son 30 gun icin bir kez yeniden taranir (eski cevaplar da sohbete girsin).</summary>
+    public const string ImapInboxBackfill = "Imap:InboxBackfill";
+
     // --- Salesforce CRM entegrasyonu. Username-Password OAuth flow: sunucu
     // taraflı, kullanici etkilesimi gerektirmez. Anahtarlar appsettings
     // "Salesforce" bolumuyle ayni. ---
@@ -166,7 +169,7 @@ public static class SettingKeys
         SalesforceConsumerKey, SalesforceConsumerSecret, SalesforceUsername, SalesforcePassword,
         SalesforceSecurityToken, SalesforceLoginUrl, SalesforceRefreshToken, SalesforceInstanceUrl,
         SalesforcePublicBaseUrl, SequenceDailyCap, ImapHost, ImapPort, ImapUsername, ImapPassword,
-        ImapCursor, ImapLastCheck, ImapLastError, AuditRetentionDays, GeminiMonthlyLimit, ApolloCreditLimit,
+        ImapCursor, ImapLastCheck, ImapLastError, ImapInboxBackfill, AuditRetentionDays, GeminiMonthlyLimit, ApolloCreditLimit,
         GeneratedTemplateIds
     };
 

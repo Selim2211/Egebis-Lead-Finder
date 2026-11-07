@@ -1,0 +1,174 @@
+@model EgebisLeadFinder.Controllers.InboxViewModel
+@using EgebisLeadFinder.Services.Inbox
+@{
+    ViewData["Title"] = "Mesajlar";
+    string When(DateTime utc)
+    {
+        var local = utc.ToLocalTime();
+        var today = DateTime.Now.Date;
+        return local.Date == today ? local.ToString("HH:mm")
+            : local.Date == today.AddDays(-1) ? "dün " + local.ToString("HH:mm")
+            : local.ToString("dd.MM.yyyy");
+    }
+    string Tab(string f) => Model.Filter == f ? "is-active" : "";
+    var thread = Model.Thread;
+}
+
+<div class="page-head">
+    <div>
+        <h1>Mesajlar</h1>
+        <div class="page-sub">Mail attığınız herkes ve gelen cevaplar. Gelen kutusu 5 dakikada bir otomatik okunur.</div>
+    </div>
+    <form method="post" asp-action="Check" class="d-flex align-items-center gap-2">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="lead" value="@thread?.LeadId" />
+        <input type="hidden" name="filter" value="@Model.Filter" />
+        <button type="submit" class="btn btn-outline-secondary">Şimdi kontrol et</button>
+    </form>
+</div>
+
+@if (TempData["InboxSuccess"] is string ok)
+{
+    <div class="alert alert-success" data-flash="success">@ok</div>
+}
+@if (TempData["InboxError"] is string err)
+{
+    <div class="alert alert-danger" data-flash="error">@err</div>
+}
+
+@if (!Model.ImapConfigured)
+{
+    <div class="alert alert-warning">
+        <strong>Cevapları görebilmek için gelen kutusu bağlantısı gerekli.</strong>
+        Ayarlar'daki e-posta bölümüne SMTP bilgilerini girin; IMAP sunucusu boşsa aynı sunucu kullanılır.
+        <a asp-controller="Settings" asp-action="Index">Ayarlar'a git</a>
+    </div>
+}
+else
+{
+    <div class="inbox-status small text-muted-2 mb-3">
+        Son kontrol: <strong>@(Model.LastCheck is { } lc ? lc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "henüz yapılmadı")</strong>
+        @if (!string.IsNullOrWhiteSpace(Model.LastError))
+        {
+            <span class="text-danger ms-2">· Son hata: @Model.LastError</span>
+        }
+    </div>
+}
+
+<div class="inbox @(thread is not null ? "has-thread" : "")">
+    <aside class="inbox-list card" aria-label="Konuşmalar">
+        <div class="inbox-tabs" role="tablist">
+            <a class="inbox-tab @Tab(InboxFilters.All)" asp-action="Index" asp-route-filter="@InboxFilters.All" asp-route-q="@Model.Search">Tümü</a>
+            <a class="inbox-tab @Tab(InboxFilters.Replied)" asp-action="Index" asp-route-filter="@InboxFilters.Replied" asp-route-q="@Model.Search">Cevap gelenler</a>
+            <a class="inbox-tab @Tab(InboxFilters.Waiting)" asp-action="Index" asp-route-filter="@InboxFilters.Waiting" asp-route-q="@Model.Search">Cevap bekleyenler</a>
+        </div>
+        <form method="get" asp-action="Index" class="inbox-search">
+            <input type="hidden" name="filter" value="@Model.Filter" />
+            <input class="form-control form-control-sm" type="search" name="q" value="@Model.Search" placeholder="Firma ya da kişi ara" aria-label="Firma ya da kişi ara" />
+        </form>
+
+        @if (Model.Conversations.Count == 0)
+        {
+            <div class="inbox-empty small text-muted-2">
+                @(Model.Filter == InboxFilters.All && string.IsNullOrEmpty(Model.Search)
+                    ? "Henüz kimseye mail atılmadı. Bir lead'e mail attığınızda burada görünür."
+                    : "Bu süzgece uyan konuşma yok.")
+            </div>
+        }
+        <div class="inbox-items">
+            @foreach (var c in Model.Conversations)
+            {
+                <a class="inbox-item @(thread?.LeadId == c.LeadId ? "is-active" : "") @(c.Unread > 0 ? "is-unread" : "")"
+                   asp-action="Index" asp-route-lead="@c.LeadId" asp-route-filter="@Model.Filter" asp-route-q="@Model.Search">
+                    <div class="inbox-item-top">
+                        <span class="inbox-item-company">@c.CompanyName</span>
+                        <time>@When(c.LastAt)</time>
+                    </div>
+                    <div class="inbox-item-person">
+                        @(c.ContactName ?? "Kişi yok")@if (!string.IsNullOrWhiteSpace(c.ContactTitle)) {<span> · @c.ContactTitle</span>}
+                    </div>
+                    <div class="inbox-item-snippet">
+                        @if (c.LastFromThem)
+                        {
+                            <span class="inbox-item-dir is-theirs">Cevap:</span>
+                        }
+                        else
+                        {
+                            <span class="inbox-item-dir">Siz:</span>
+                        }
+                        @c.LastSnippet
+                    </div>
+                    @if (c.Unread > 0)
+                    {
+                        <span class="inbox-item-badge" aria-label="@c.Unread okunmamış cevap">@c.Unread</span>
+                    }
+                    else if (c.HasReply)
+                    {
+                        <span class="inbox-item-replied" title="Cevap verdi">✓</span>
+                    }
+                </a>
+            }
+        </div>
+    </aside>
+
+    <section class="inbox-thread card" aria-label="Sohbet">
+        @if (thread is null)
+        {
+            <div class="inbox-empty text-muted-2">Soldan bir konuşma seçin.</div>
+        }
+        else
+        {
+            <header class="inbox-thread-head">
+                <div>
+                    <div class="inbox-thread-company">@thread.CompanyName</div>
+                    <div class="small text-muted-2">
+                        @(thread.ContactName ?? "Kişi yok")@if (!string.IsNullOrWhiteSpace(thread.ContactTitle)) {<span> · @thread.ContactTitle</span>}
+                        @if (!string.IsNullOrWhiteSpace(thread.ContactEmail)) {<span translate="no"> · @thread.ContactEmail</span>}
+                    </div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-sm btn-outline-secondary" asp-controller="Lead" asp-action="Details" asp-route-id="@thread.LeadId">Lead</a>
+                    <a class="btn btn-sm btn-outline-secondary" asp-controller="Company" asp-action="Details" asp-route-id="@thread.CompanyId">Firma</a>
+                    <a class="btn btn-sm btn-accent" asp-controller="Email" asp-action="Compose" asp-route-leadId="@thread.LeadId">Yeni e-posta</a>
+                </div>
+            </header>
+            <div class="inbox-messages" id="inboxMessages">
+                @foreach (var m in thread.Messages)
+                {
+                    <article class="msg @(m.Ours ? "is-ours" : "is-theirs") @(m.AutoReply ? "is-auto" : "") @(m.Unread ? "is-new" : "")">
+                        @if (!string.IsNullOrWhiteSpace(m.Subject))
+                        {
+                            <div class="msg-subject">@m.Subject</div>
+                        }
+                        <div class="msg-body" translate="no">@m.Body</div>
+                        <div class="msg-meta">
+                            @if (m.AutoReply)
+                            {
+                                <span class="msg-flag">Otomatik yanıt</span>
+                            }
+                            else if (m.Unread)
+                            {
+                                <span class="msg-flag is-new">Yeni</span>
+                            }
+                            <span translate="no">@m.Meta</span> · <time>@m.At.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</time>
+                        </div>
+                    </article>
+                }
+                @if (!thread.Messages.Any(m => !m.Ours))
+                {
+                    <div class="inbox-waiting small text-muted-2">Henüz cevap gelmedi. Cevap gelince burada görünür ve sağ üstteki zilden bildirim alırsınız.</div>
+                }
+            </div>
+        }
+    </section>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            // Sohbet en son mesajdan baslasin.
+            var box = document.getElementById('inboxMessages');
+            if (box) box.scrollTop = box.scrollHeight;
+        })();
+    </script>
+}

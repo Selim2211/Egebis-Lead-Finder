@@ -688,6 +688,61 @@ namespace EgebisLeadFinder.Migrations
                     b.ToTable("GeminiTokenDailies");
                 });
 
+            modelBuilder.Entity("EgebisLeadFinder.Models.InboundEmail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("FromAddress")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("FromName")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LeadId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("MessageId")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("SentEmailId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MessageId");
+
+                    b.HasIndex("ReadAt");
+
+                    b.HasIndex("SentEmailId");
+
+                    b.HasIndex("LeadId", "ReceivedAt");
+
+                    b.ToTable("InboundEmails");
+                });
+
             modelBuilder.Entity("EgebisLeadFinder.Models.Lead", b =>
                 {
                     b.Property<int>("Id")
@@ -807,6 +862,48 @@ namespace EgebisLeadFinder.Migrations
                     b.HasIndex("Status", "NextSendAt");
 
                     b.ToTable("LeadSequences");
+                });
+
+            modelBuilder.Entity("EgebisLeadFinder.Models.Notification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CompanyName")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int?>("LeadId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PersonName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Preview")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "ReadAt");
+
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("EgebisLeadFinder.Models.SearchProfile", b =>
@@ -1169,6 +1266,24 @@ namespace EgebisLeadFinder.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("EgebisLeadFinder.Models.InboundEmail", b =>
+                {
+                    b.HasOne("EgebisLeadFinder.Models.Lead", "Lead")
+                        .WithMany()
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EgebisLeadFinder.Models.SentEmail", "SentEmail")
+                        .WithMany()
+                        .HasForeignKey("SentEmailId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Lead");
+
+                    b.Navigation("SentEmail");
+                });
+
             modelBuilder.Entity("EgebisLeadFinder.Models.Lead", b =>
                 {
                     b.HasOne("EgebisLeadFinder.Models.Company", "Company")
@@ -1218,6 +1333,17 @@ namespace EgebisLeadFinder.Migrations
                     b.Navigation("Lead");
 
                     b.Navigation("Sequence");
+                });
+
+            modelBuilder.Entity("EgebisLeadFinder.Models.Notification", b =>
+                {
+                    b.HasOne("EgebisLeadFinder.Models.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("EgebisLeadFinder.Models.SearchProfile", b =>

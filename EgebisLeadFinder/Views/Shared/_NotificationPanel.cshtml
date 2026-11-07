@@ -1,0 +1,39 @@
+@model List<EgebisLeadFinder.Models.Notification>
+@{
+    string Ago(DateTime utc)
+    {
+        var d = DateTime.UtcNow - utc;
+        return d.TotalMinutes < 1 ? "az önce"
+            : d.TotalMinutes < 60 ? $"{(int)d.TotalMinutes} dk önce"
+            : d.TotalHours < 24 ? $"{(int)d.TotalHours} sa önce"
+            : utc.ToLocalTime().ToString("dd.MM.yyyy HH:mm");
+    }
+}
+<div class="notif-head">
+    <span>Bildirimler</span>
+    @if (Model.Any(n => n.ReadAt is null))
+    {
+        <button type="button" class="btn btn-link btn-sm p-0" data-notif-readall>Tümünü okundu say</button>
+    }
+</div>
+@if (Model.Count == 0)
+{
+    <div class="notif-empty">Henüz bildirim yok. Bir lead mailinize cevap verince burada görünür.</div>
+}
+@foreach (var n in Model)
+{
+    <a class="notif-item @(n.ReadAt is null ? "is-unread" : "")" href="@Url.Action("Open", "Notifications", new { id = n.Id })">
+        <span class="notif-dot" aria-hidden="true"></span>
+        <span class="notif-body">
+            <span class="notif-text">
+                <strong class="notif-company">@n.CompanyName</strong> firmasındaki <strong class="notif-person">@n.PersonName</strong> mailinize cevap verdi
+            </span>
+            @if (!string.IsNullOrWhiteSpace(n.Preview))
+            {
+                <span class="notif-preview" translate="no">“@n.Preview”</span>
+            }
+            <time class="notif-time">@Ago(n.CreatedAt)</time>
+        </span>
+    </a>
+}
+<a class="notif-all" asp-controller="Inbox" asp-action="Index">Tüm mesajlar</a>

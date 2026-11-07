@@ -251,6 +251,8 @@ builder.Services.AddScoped<CompanyComparisonService>();
 builder.Services.AddScoped<SectorAnalysisService>();
 builder.Services.AddScoped<EgebisLeadFinder.Services.Sequences.SequenceService>();
 builder.Services.AddScoped<EgebisLeadFinder.Services.Sequences.ReplyDetectionService>();
+builder.Services.AddScoped<EgebisLeadFinder.Services.Inbox.NotificationService>();
+builder.Services.AddScoped<EgebisLeadFinder.Services.Inbox.InboxService>();
 builder.Services.AddHostedService<EgebisLeadFinder.Services.Sequences.SequenceSenderWorker>();
 builder.Services.AddHostedService<EgebisLeadFinder.Services.Sequences.ReplyDetectionWorker>();
 

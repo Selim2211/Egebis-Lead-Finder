@@ -648,3 +648,90 @@ body { transition: background-color 200ms ease, color 200ms ease; }
 :root[data-theme="dark"] .nace-chip.is-on { background: rgba(245, 160, 11, .16); color: #ffd58a; border-color: rgba(245, 160, 11, .55); }
 .nace-made { color: #1f7a4d; font-weight: 600; }
 :root[data-theme="dark"] .nace-made { color: #5fd49a; }
+
+/* ---- Ust menu: Mesajlar ve zil rozetleri ---- */
+.nav-link-icon { position: relative; }
+.nav-count {
+    position: absolute; top: 2px; right: 0; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px;
+    background: var(--eg-ink); color: #fff; font-size: .66rem; font-weight: 700; line-height: 17px; text-align: center;
+    box-shadow: 0 0 0 2px var(--eg-surface);
+}
+.nav-count.is-hot { background: #d92d20; }
+.nav-count[hidden] { display: none; }
+@media (max-width: 991.98px) { .nav-count { position: static; margin-left: .35rem; box-shadow: none; } }
+.nav-bell { border: 0; background: none; }
+
+/* ---- Bildirim paneli ---- */
+.notif-menu { width: min(380px, calc(100vw - 32px)); padding: 0; overflow: hidden; }
+.notif-head { display: flex; justify-content: space-between; align-items: center; padding: .7rem .9rem; font-weight: 700; border-bottom: 1px solid var(--eg-border); }
+.notif-empty { padding: 1rem .9rem; color: var(--eg-text-muted); font-size: .88rem; }
+.notif-item { display: flex; gap: .6rem; padding: .7rem .9rem; color: var(--eg-text); text-decoration: none; border-bottom: 1px solid var(--eg-border); }
+.notif-item:hover { background: var(--eg-surface-alt); color: var(--eg-text); }
+.notif-dot { flex: 0 0 8px; height: 8px; margin-top: .45rem; border-radius: 50%; background: transparent; }
+.notif-item.is-unread { background: var(--eg-amber-soft); }
+.notif-item.is-unread .notif-dot { background: #d92d20; }
+.notif-body { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+.notif-text { font-size: .88rem; line-height: 1.35; }
+.notif-item.is-unread .notif-company { color: #b42318; }
+.notif-item.is-unread .notif-person { color: var(--eg-ink); }
+.notif-preview { font-size: .8rem; color: var(--eg-text-muted); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.notif-time { font-size: .74rem; color: var(--eg-text-faint); }
+.notif-all { display: block; padding: .6rem .9rem; text-align: center; font-weight: 600; font-size: .86rem; }
+:root[data-theme="dark"] .notif-item.is-unread { background: rgba(245, 160, 11, .1); }
+:root[data-theme="dark"] .notif-item.is-unread .notif-company { color: #ff8a80; }
+:root[data-theme="dark"] .notif-item.is-unread .notif-person { color: #ffd58a; }
+
+/* ---- Mesajlar (sohbet) ---- */
+.inbox { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 1rem; align-items: start; }
+@media (max-width: 991.98px) { .inbox { grid-template-columns: 1fr; } .inbox.has-thread .inbox-list { max-height: 260px; } }
+.inbox-list { display: flex; flex-direction: column; max-height: calc(100vh - 220px); min-height: 320px; overflow: hidden; }
+.inbox-tabs { display: flex; gap: .25rem; padding: .6rem .6rem 0; flex-wrap: wrap; }
+.inbox-tab { padding: .3rem .6rem; border-radius: 999px; font-size: .8rem; color: var(--eg-text-muted); text-decoration: none; }
+.inbox-tab.is-active { background: var(--eg-ink-soft); color: var(--eg-ink-soft-text); font-weight: 600; }
+.inbox-search { padding: .6rem; border-bottom: 1px solid var(--eg-border); }
+.inbox-items { overflow-y: auto; }
+.inbox-empty { padding: 1.2rem; }
+.inbox-item { position: relative; display: block; padding: .7rem 2.2rem .7rem .9rem; border-bottom: 1px solid var(--eg-border); color: var(--eg-text); text-decoration: none; }
+.inbox-item:hover { background: var(--eg-surface-alt); color: var(--eg-text); }
+.inbox-item.is-active { background: var(--eg-ink-soft); }
+.inbox-item-top { display: flex; justify-content: space-between; gap: .5rem; }
+.inbox-item-company { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-item.is-unread .inbox-item-company { font-weight: 800; }
+.inbox-item-top time { flex: 0 0 auto; font-size: .74rem; color: var(--eg-text-faint); }
+.inbox-item-person { font-size: .8rem; color: var(--eg-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-item-snippet { font-size: .8rem; color: var(--eg-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-item-dir { font-weight: 600; }
+.inbox-item-dir.is-theirs { color: #1f7a4d; }
+.inbox-item-badge { position: absolute; right: .8rem; top: 50%; transform: translateY(-50%); min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #d92d20; color: #fff; font-size: .72rem; font-weight: 700; line-height: 20px; text-align: center; }
+.inbox-item-replied { position: absolute; right: .9rem; top: 50%; transform: translateY(-50%); color: #1f7a4d; font-weight: 700; }
+.inbox-thread { display: flex; flex-direction: column; max-height: calc(100vh - 220px); min-height: 320px; }
+.inbox-thread-head { display: flex; justify-content: space-between; align-items: center; gap: .75rem; flex-wrap: wrap; padding: .8rem 1rem; border-bottom: 1px solid var(--eg-border); }
+.inbox-thread-company { font-weight: 700; font-size: 1.05rem; }
+.inbox-messages { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .75rem; background: var(--eg-surface-alt); }
+.msg { max-width: min(78%, 680px); padding: .65rem .85rem; border-radius: 14px; box-shadow: var(--eg-shadow-sm); }
+.msg.is-ours { align-self: flex-end; background: var(--eg-ink); color: #fff; border-bottom-right-radius: 4px; }
+.msg.is-theirs { align-self: flex-start; background: var(--eg-surface); color: var(--eg-text); border: 1px solid var(--eg-border); border-bottom-left-radius: 4px; }
+.msg.is-theirs.is-new { border-color: #d92d20; box-shadow: 0 0 0 2px rgba(217, 45, 32, .15); }
+.msg.is-auto { opacity: .75; font-style: italic; }
+.msg-subject { font-weight: 700; font-size: .85rem; margin-bottom: .25rem; }
+.msg-body { white-space: pre-wrap; word-break: break-word; font-size: .9rem; line-height: 1.5; }
+.msg-meta { margin-top: .35rem; font-size: .72rem; opacity: .75; }
+.msg-flag { display: inline-block; margin-right: .35rem; padding: 0 .4rem; border-radius: 999px; background: rgba(0, 0, 0, .08); font-weight: 700; }
+.msg-flag.is-new { background: #d92d20; color: #fff; }
+.inbox-waiting { align-self: center; padding: .5rem 1rem; text-align: center; }
+:root[data-theme="dark"] .msg.is-ours { background: #24406f; }
+:root[data-theme="dark"] .inbox-item-dir.is-theirs, :root[data-theme="dark"] .inbox-item-replied { color: #5fd49a; }
+
+
+/* Mesajlar + zil ikonlari eklenince dar masaustunde sag grup sigsin: aralik ve ikon dolgusu biraz daralir */
+@media (min-width: 992px) and (max-width: 1460px) {
+    .eg-navbar .navbar-nav.gap-lg-2 { gap: .1rem !important; }
+    .eg-navbar .navbar-nav.gap-lg-2 .nav-link-icon { padding-left: .42rem !important; padding-right: .42rem !important; }
+    .eg-navbar .navbar-nav.gap-lg-2 .theme-toggle { width: 2.05rem; height: 2.05rem; }
+}
+/* Uzun menu adi dar masaustunde kisalir ("Taslak Düzenleyici" -> "Taslaklar") */
+.nav-label-short { display: none; }
+@media (min-width: 992px) and (max-width: 1260px) {
+    .nav-label-long { display: none; }
+    .nav-label-short { display: inline; }
+}

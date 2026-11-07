@@ -36,6 +36,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<SearchRun> SearchRuns => Set<SearchRun>();
     public DbSet<SearchRunCompany> SearchRunCompanies => Set<SearchRunCompany>();
     public DbSet<FavoriteCompany> FavoriteCompanies => Set<FavoriteCompany>();
+    public DbSet<InboundEmail> InboundEmails => Set<InboundEmail>();
+    public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<SectorReport> SectorReports => Set<SectorReport>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -136,6 +138,26 @@ public class ApplicationDbContext : DbContext
         {
             e.Property(x => x.Email).HasConversion(Encrypted).HasColumnType("text");
             e.Property(x => x.FullName).HasConversion(Encrypted).HasColumnType("text");
+        });
+
+        // Gelen cevaplar ve bildirimler: kisisel veri (adres, ad, metin) sifreli.
+        b.Entity<InboundEmail>(e =>
+        {
+            e.Property(x => x.FromAddress).HasConversion(EncryptedRequired).HasColumnType("text");
+            e.Property(x => x.FromName).HasConversion(Encrypted).HasColumnType("text");
+            e.Property(x => x.Body).HasConversion(EncryptedRequired).HasColumnType("text");
+            e.HasOne(x => x.Lead).WithMany().HasForeignKey(x => x.LeadId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.SentEmail).WithMany().HasForeignKey(x => x.SentEmailId).OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(x => new { x.LeadId, x.ReceivedAt });
+            e.HasIndex(x => x.MessageId);
+            e.HasIndex(x => x.ReadAt);
+        });
+        b.Entity<Notification>(e =>
+        {
+            e.Property(x => x.PersonName).HasConversion(Encrypted).HasColumnType("text");
+            e.Property(x => x.Preview).HasConversion(Encrypted).HasColumnType("text");
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.UserId, x.ReadAt });
         });
 
         b.Entity<LeadSequence>().HasIndex(x => new { x.Status, x.NextSendAt });

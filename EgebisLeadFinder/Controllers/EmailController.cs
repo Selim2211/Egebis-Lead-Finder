@@ -123,8 +123,8 @@ public class EmailController : Controller
         {
             await RecordAsync(leadId, templateId, result.FromAddress, toAddress!, subject, body, html,
                 images, SentEmailMethod.Smtp, ct, result.MessageId);
-            TempData["LeadSuccess"] = $"E-posta {toAddress} adresine gönderildi ve lead geçmişine kaydedildi.";
-            return RedirectToAction("Details", "Lead", new { id = leadId });
+            TempData["InboxSuccess"] = $"E-posta {toAddress} adresine gönderildi. Cevap gelince burada görünür ve bildirim alırsınız.";
+            return RedirectToAction("Index", "Inbox", new { lead = leadId });
         }
 
         model.StatusMessage = result.Error;

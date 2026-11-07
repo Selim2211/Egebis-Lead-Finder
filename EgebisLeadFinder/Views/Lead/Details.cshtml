@@ -247,6 +247,10 @@
                 <span>E-posta geçmişi</span>
                 <span class="d-flex align-items-center gap-2">
                     <span class="tag tag-muted">@lead.SentEmails.Count e-posta</span>
+                    @if (lead.SentEmails.Count > 0)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-controller="Inbox" asp-action="Index" asp-route-lead="@lead.Id">Mesajlarda aç</a>
+                    }
                     @if (hasEmail)
                     {
                         <a class="btn btn-sm btn-outline-primary" asp-controller="Email" asp-action="Compose" asp-route-leadId="@lead.Id">Yeni e-posta</a>

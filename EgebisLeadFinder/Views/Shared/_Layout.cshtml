@@ -2,6 +2,8 @@
 @inject EgebisLeadFinder.Services.UsageService LayoutUsage
 @inject EgebisLeadFinder.Services.ISettingsService LayoutSettings
 @inject Microsoft.Extensions.Caching.Memory.IMemoryCache LayoutCache
+@inject EgebisLeadFinder.Services.Inbox.NotificationService LayoutNotifications
+@inject EgebisLeadFinder.Services.Inbox.InboxService LayoutInbox
 @{
     var controller = ViewContext.RouteData.Values["controller"]?.ToString();
     var action = ViewContext.RouteData.Values["action"]?.ToString();
@@ -42,6 +44,22 @@
         if (signedIn)
             profileConfigured = EgebisLeadFinder.Services.BusinessProfileService
                 .Parse(await LayoutSettings.GetAsync(SettingKeys.BusinessProfile)).IsConfigured;
+    }
+    catch
+    {
+        // Kozmetik.
+    }
+
+    // Zil (okunmamis bildirim) ve Mesajlar (okunmamis cevap) rozetleri.
+    var notifCount = 0;
+    var unreadReplies = 0;
+    try
+    {
+        if (signedIn)
+        {
+            notifCount = await LayoutNotifications.UnreadCountAsync(EgebisLeadFinder.Services.Auth.ClaimsPrincipalExtensions.UserId(User) ?? 0);
+            unreadReplies = await LayoutInbox.UnreadRepliesAsync();
+        }
     }
     catch
     {
@@ -144,7 +162,7 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link @(controller == "Template" ? "active" : "")"
-                           asp-controller="Template" asp-action="Index">Taslak Düzenleyici</a>
+                           asp-controller="Template" asp-action="Index"><span class="nav-label-long">Taslak Düzenleyici</span><span class="nav-label-short">Taslaklar</span></a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link @(controller == "Sequence" ? "active" : "")"
@@ -163,6 +181,29 @@
                                 <span class="nav-alert-dot is-warning" aria-label="Tanımlı değil"></span>
                             }
                         </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link nav-link-icon nav-inbox @(controller == "Inbox" ? "active" : "")"
+                           asp-controller="Inbox" asp-action="Index" title="Mesajlar" aria-label="Mesajlar">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                            </svg>
+                            <span class="d-lg-none">Mesajlar</span>
+                            <span class="nav-count" data-count="messages" @(unreadReplies == 0 ? "hidden" : "")>@unreadReplies</span>
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <button type="button" class="nav-link nav-link-icon nav-bell" data-bs-toggle="dropdown" data-bs-auto-close="outside"
+                                aria-expanded="false" title="Bildirimler" aria-label="Bildirimler">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                            </svg>
+                            <span class="d-lg-none">Bildirimler</span>
+                            <span class="nav-count is-hot" data-count="notifications" @(notifCount == 0 ? "hidden" : "")>@notifCount</span>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end notif-menu" data-notif-panel data-url="@Url.Action("Panel", "Notifications")">
+                            <div class="notif-empty">Yükleniyor…</div>
+                        </div>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link nav-link-icon nav-usage @(controller == "Usage" ? "active" : "")"
@@ -267,6 +308,44 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     @if (signedIn)
     {
+        <form id="notifReadAllForm" method="post" action="@Url.Action("ReadAll", "Notifications")" hidden>@Html.AntiForgeryToken()</form>
+        <script>
+            // Zil: acilinca son bildirimler yuklenir; rozetler sayfa acikken dakikada bir yenilenir.
+            (function () {
+                var panel = document.querySelector('[data-notif-panel]');
+                var countUrl = '@Url.Action("Count", "Notifications")';
+                function setCount(kind, n) {
+                    document.querySelectorAll('[data-count="' + kind + '"]').forEach(function (b) {
+                        b.textContent = n > 99 ? '99+' : String(n);
+                        b.hidden = !n;
+                    });
+                }
+                function loadPanel() {
+                    if (!panel) return;
+                    fetch(panel.dataset.url, { credentials: 'same-origin', cache: 'no-store' })
+                        .then(function (r) { return r.ok ? r.text() : ''; })
+                        .then(function (html) {
+                            if (!html) return;
+                            panel.innerHTML = html;
+                            var all = panel.querySelector('[data-notif-readall]');
+                            if (all) all.addEventListener('click', function () {
+                                fetch(document.getElementById('notifReadAllForm').action, { method: 'POST', credentials: 'same-origin', body: new FormData(document.getElementById('notifReadAllForm')) })
+                                    .then(function () { setCount('notifications', 0); loadPanel(); });
+                            });
+                        });
+                }
+                if (panel) panel.parentElement.addEventListener('show.bs.dropdown', loadPanel);
+                function refresh() {
+                    if (document.visibilityState !== 'visible') return;
+                    fetch(countUrl, { credentials: 'same-origin', cache: 'no-store' })
+                        .then(function (r) { return r.ok ? r.json() : null; })
+                        .then(function (c) { if (c) { setCount('notifications', c.notifications); setCount('messages', c.messages); } })
+                        .catch(function () { });
+                }
+                setInterval(refresh, 60000);
+                document.addEventListener('visibilitychange', refresh);
+            })();
+        </script>
         <div id="apiStatusAlertHost" data-url="@Url.Action("StartupAlert", "Usage")"></div>
         <script>
             // Acilis uyarisi: API'lere canli erisim kontrolu sunucuda yapilir (5 dk onbellek); sayfa
