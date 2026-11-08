@@ -156,6 +156,9 @@ public static class SettingKeys
     /// <summary>Profilden otomatik uretilen e-posta taslaklarinin kimlikleri (virgullu).</summary>
     public const string GeneratedTemplateIds = "Templates:GeneratedIds";
 
+    /// <summary>Kalite Olcumu olcu seti (JSON): NACE kodu basina bilinen ureticiler / uretici olmayanlar.</summary>
+    public const string QualityGold = "Quality:Gold";
+
     public const int DefaultSearchMaxCompanies = 100;
     public const int SearchMaxCompaniesUpperLimit = 200;
     public const string DefaultSearchCountry = "Türkiye";
@@ -170,7 +173,7 @@ public static class SettingKeys
         SalesforceSecurityToken, SalesforceLoginUrl, SalesforceRefreshToken, SalesforceInstanceUrl,
         SalesforcePublicBaseUrl, SequenceDailyCap, ImapHost, ImapPort, ImapUsername, ImapPassword,
         ImapCursor, ImapLastCheck, ImapLastError, ImapInboxBackfill, AuditRetentionDays, GeminiMonthlyLimit, ApolloCreditLimit,
-        GeneratedTemplateIds
+        GeneratedTemplateIds, QualityGold
     };
 
     /// <summary>Deger gizlenmeli mi? API anahtarlari ve e-posta sifresi ekranda maskeli gosterilir.</summary>

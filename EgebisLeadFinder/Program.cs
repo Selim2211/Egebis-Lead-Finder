@@ -200,6 +200,7 @@ builder.Services.AddHttpClient<IWebScraperService, WebScraperService>(c =>
 
 builder.Services.AddScoped<LeadScoringService>();
 builder.Services.AddScoped<LeadDiscoveryService>();
+builder.Services.AddSingleton<EgebisLeadFinder.Services.Quality.QualityRunner>();
 builder.Services.AddScoped<EmailTemplateService>();
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddHttpClient<IGeminiModelCatalog, GeminiModelCatalog>(c => c.Timeout = TimeSpan.FromSeconds(10));
