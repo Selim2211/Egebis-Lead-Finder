@@ -8,6 +8,12 @@ public class ScrapedSite
     /// <summary>Temizlenmis, AI'a gonderilmeye hazir duz metin.</summary>
     public string Text { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Okunan sayfalarin kirpilmamis (ama MaxEvidenceChars ile sinirli) metni. AI'a gonderilmez; yalniz kural katmaninin
+    /// uretici/bayi kanitini aramasi icin kullanilir (uretim sayfalari ilk 8000 karakterin disinda kalabilir).
+    /// </summary>
+    public string FullText { get; set; } = string.Empty;
+
     public List<string> Emails { get; set; } = new();
     public List<string> Phones { get; set; } = new();
 

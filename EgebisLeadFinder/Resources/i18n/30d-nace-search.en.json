@@ -20,5 +20,8 @@
   "Bu ürünlerden en az birini üreten firmalar aranır. Tıklayarak seçimi değiştirebilirsiniz:": "Companies that make at least one of these products are searched. Click to change the selection:",
   "Üretiyor:": "Makes:",
   "Bulunan firmaların hiçbiri seçilen ürünleri üretmiyor. Firma sayısını artırın ya da ürün seçimini değiştirip tekrar deneyin.": "None of the companies found makes the selected products. Increase the number of companies or change the product selection and try again.",
-  "Firmaların hangi ürünleri ürettiği şu an kontrol edilemedi (yapay zekâ); sonuçlar ürüne göre süzülmedi.": "Could not check which products the companies make right now (AI); results were not filtered by product."
+  "Firmaların hangi ürünleri ürettiği şu an kontrol edilemedi (yapay zekâ); sonuçlar ürüne göre süzülmedi.": "Could not check which products the companies make right now (AI); results were not filtered by product.",
+  "Firmaların hangi ürünleri ürettiği şu an kontrol edilemedi (yapay zekâ); yalnızca sitesinde açıkça bayi olduğu görülenler elendi.": "Could not check which products the companies make right now (AI); only companies whose own site clearly shows they are dealers were removed.",
+  "Kanıt:": "Evidence:",
+  "Firmanın kendi sitesinden alınan cümle": "Sentence taken from the company's own website"
 }

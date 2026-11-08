@@ -91,7 +91,8 @@ public class IcpService
     /// sektor, uretici bilgisi uzerinden; site yeniden okunmaz). Yalniz verilen listedeki urunler kabul edilir. Yapay zeka
     /// kesintisinde Ok=false doner: cagiran o zaman kimseyi elemez.
     /// </summary>
-    public async Task<ProductMatchResult> MatchProductsAsync(IReadOnlyList<Company> companies, IReadOnlyList<string> products, CancellationToken ct = default)
+    public async Task<ProductMatchResult> MatchProductsAsync(IReadOnlyList<Company> companies, IReadOnlyList<string> products, CancellationToken ct = default,
+        IReadOnlyDictionary<Company, ProducerEvidence>? proof = null)
     {
         var result = new ProductMatchResult();
         if (companies.Count == 0 || products.Count == 0) return result;
@@ -99,7 +100,7 @@ public class IcpService
 
         foreach (var batch in companies.Chunk(NaceBatchSize))
         {
-            var items = batch.Select((c, i) => (i + 1, NaceBrief(c.Name, c.Industry, c.Description, c.AiAnalysis))).ToList();
+            var items = batch.Select((c, i) => (i + 1, NaceBrief(c.Name, c.Industry, c.Description, c.AiAnalysis) + EvidenceBrief(proof, c))).ToList();
             Dictionary<int, ProductVerdict> verdicts;
             try
             {
@@ -123,6 +124,20 @@ public class IcpService
             }
         }
         return result;
+    }
+
+    /// <summary>
+    /// Sitenin kendi metninden alinan uretim / bayi kanitlari, yapay zekaya gonderilen firma ozetine eklenir. Alintilar aynen
+    /// sitedendir (kural katmani cikarir); yapay zeka bunlara dayanir, kendi bilgisinden "uretir" demez.
+    /// </summary>
+    public static string EvidenceBrief(IReadOnlyDictionary<Company, ProducerEvidence>? proof, Company company)
+    {
+        if (proof is null || !proof.TryGetValue(company, out var e)) return string.Empty;
+        var parts = new List<string>();
+        if (e.ProducerQuotes.Count > 0) parts.Add("Sitede üretim kanıtı: " + string.Join(" / ", e.ProducerQuotes.Select(q => "«" + q + "»")));
+        if (e.TraderQuotes.Count > 0) parts.Add("Sitede bayi/ticaret işareti: " + string.Join(" / ", e.TraderQuotes.Select(q => "«" + q + "»")));
+        if (parts.Count == 0) parts.Add("Sitede somut üretim kanıtı bulunamadı");
+        return " | " + string.Join(" | ", parts).Replace('\n', ' ');
     }
 
     /// <summary>Urun eslestirme sonucu: ureten firmalar (hangi urunler) ve uretmeyenlerin nedeni.</summary>

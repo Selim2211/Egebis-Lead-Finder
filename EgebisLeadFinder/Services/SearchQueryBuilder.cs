@@ -11,6 +11,16 @@ namespace EgebisLeadFinder.Services;
 /// </summary>
 public static class SearchQueryBuilder
 {
+    /// <summary>Uretimin yogunlastigi iller (Haritalar sorgusunu bolmek icin).</summary>
+    public static readonly string[] IndustrialCities =
+    {
+        "İstanbul", "Kocaeli", "Bursa", "İzmir", "Manisa", "Ankara",
+        "Konya", "Kayseri", "Gaziantep", "Denizli", "Tekirdağ", "Sakarya", "Eskişehir"
+    };
+
+    /// <summary>Sehre bolunen sorgularda en fazla bu kadar terim (kullanicinin terimi + ilk urunler) kullanilir.</summary>
+    public const int MaxTermsForCitySplit = 3;
+
     /// <summary>
     /// Google Haritalar (Places) icin sorgu uretir. Haritalar bir isletme dizinidir,
     /// web sayfasi metni degil: tirnakli tam ifade veya "üreticileri" gibi kaliplar
@@ -68,6 +78,16 @@ public static class SearchQueryBuilder
 
             if (!places && !string.IsNullOrWhiteSpace(c.TargetPosition))
                 queries.Add($"\"{c.TargetPosition}\" \"{industry}\" {location}");
+        }
+
+        // Haritalar tek sorguda en fazla ~120 sonuc doner. Sehir verilmediyse uretici aramasi sanayi illerine bolunur
+        // (arastirma: Istanbul, Kocaeli, Bursa, Izmir...); bunlar ulusal sorgulardan SONRA gelir, yani hedef dolduysa
+        // hic calismaz ve kredi harcamaz.
+        if (places && c.ManufacturerQueries && cities.All(string.IsNullOrWhiteSpace) && region.Key == SearchRegions.DefaultKey)
+        {
+            foreach (var term in terms.Take(MaxTermsForCitySplit))
+                foreach (var city in IndustrialCities)
+                    queries.Add($"{term} fabrikası {city} {country}");
         }
 
         return queries

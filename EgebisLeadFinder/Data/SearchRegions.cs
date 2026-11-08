@@ -37,7 +37,10 @@ public static class SearchRegions
             "\"{0} üreticileri\" {1}",
             "\"{0} yan sanayi\" {1} firma",
             "{0} fabrikası {1}",
+            "{0} imalatı {1}",
             "{0} üretim tesisi {1}",
+            "fason {0} üretimi {1}",
+            "{0} manufacturer {1}",
             "\"organize sanayi\" {0} {1} üretici",
             "{0} imalat sanayi {1} \"A.Ş.\"",
             "\"SAP\" kariyer {0} {1} fabrika"

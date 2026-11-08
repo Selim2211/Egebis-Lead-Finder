@@ -67,7 +67,7 @@ public class WebScraperService : IWebScraperService
         foreach (var path in _options.CandidatePaths)
         {
             if (pagesRead >= _options.MaxPagesPerSite) break;
-            if (textBuilder.Length >= _options.MaxTextChars) break;
+            if (textBuilder.Length >= Math.Max(_options.MaxTextChars, _options.MaxEvidenceChars)) break;
             if (consecutiveTimeouts >= maxConsecutiveTimeouts)
             {
                 _logger.LogDebug("Ardışık zaman aşımı nedeniyle siteden vazgeçildi: {Url}", baseUri);
@@ -148,6 +148,9 @@ public class WebScraperService : IWebScraperService
         // AI'a gonderilecek metin token maliyeti icin kirpilir.
         result.Text = full.Length > _options.MaxTextChars
             ? full[.._options.MaxTextChars]
+            : full;
+        result.FullText = full.Length > _options.MaxEvidenceChars
+            ? full[.._options.MaxEvidenceChars]
             : full;
 
         AttachEmailsToPeople(result);

@@ -101,7 +101,12 @@ public class SearchPlanService
         ApplyProfile(criteria, plan.Profile);
         // NACE (urun) aramasinin amaci urunu URETEN firmayi bulmak: profil "her tur firma" dese de uretici kaliplari
         // ("{urun} üreticileri", "{urun} fabrikası") kullanilir.
-        if (criteria.ProductList.Count > 0) criteria.ManufacturerQueries = true;
+        // "SAP kariyer" gibi satici profiline ozgu sorgular da urun aramasinda anlamsiz: kredi harcar, uretici getirmez.
+        if (criteria.ProductList.Count > 0)
+        {
+            criteria.ManufacturerQueries = true;
+            criteria.SapQueries = false;
+        }
         plan.Segment = string.IsNullOrWhiteSpace(criteria.SegmentId)
             ? null
             : plan.Profile.Segments.FirstOrDefault(s => s.Id == criteria.SegmentId);
@@ -207,15 +212,22 @@ public class SearchPlanService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+        // NACE (urun) aramasi: amac urunu URETEN firma. Baslik/ozeti acikca bayi ya da ilan olan adaylar siteleri okunmadan elenir.
+        var productMode = criteria.ProductList.Count > 0;
+
         var afterRules = new List<SearchResult>();
         foreach (var c in candidates)
         {
             var hit = RuleHit(c, excludes);
-            if (hit is null) afterRules.Add(c);
-            else result.Dropped.Add(new ScreenedOut(c.Domain, c.Title, $"eleme kelimesi: {hit}", StageRule));
+            var retail = hit is null && productMode ? ProducerSignals.RetailListingHint(c.Title, c.Snippet) : null;
+            if (hit is not null) result.Dropped.Add(new ScreenedOut(c.Domain, c.Title, $"eleme kelimesi: {hit}", StageRule));
+            else if (retail is not null) result.Dropped.Add(new ScreenedOut(c.Domain, c.Title, $"üretici değil: {retail}", StageRule));
+            else afterRules.Add(c);
         }
 
-        if (!plan.Smart)
+        // Urun aramasinda toplu yapay zeka on elemesi YAPILMAZ: satici profili (ör. boru satan firma) ayni urunu ureten
+        // firmalari "rakip" sayip eliyordu. Uretici olup olmadigina sitenin kanitiyla sonradan karar verilir.
+        if (!plan.Smart || productMode)
         {
             result.Kept = afterRules;
             return result;

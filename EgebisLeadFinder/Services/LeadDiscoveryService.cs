@@ -150,6 +150,9 @@ public class LeadDiscoveryService
         // Kota bitince kalan firmalar islenmez; o ana kadarkiler yine kaydedilir.
         var quotaHit = 0;
 
+        // Sitenin kendi metninden cikarilan uretici/bayi kaniti (firma -> kanit); urun aramasinda karar ve sonuc ekrani icin.
+        var proof = new System.Collections.Concurrent.ConcurrentDictionary<Company, ProducerEvidence>();
+
         var tasks = toProcess.Select(async Task<Company?> (searchResult) =>
         {
             if (Volatile.Read(ref quotaHit) == 1 || ct.IsCancellationRequested) return null;
@@ -159,7 +162,7 @@ public class LeadDiscoveryService
             {
                 // Iptal istendiyse siradaki firmalar baslatilmaz; bitenler yine kaydedilir.
                 if (ct.IsCancellationRequested) return null;
-                return await ProcessCompanyAsync(searchResult, criteria, ct);
+                return await ProcessCompanyAsync(searchResult, criteria, ct, proof);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -271,10 +274,18 @@ public class LeadDiscoveryService
             var candidates = result.Companies
                 .Where(c => c.AiAnalysis != null || c.Industry != null || c.Description != null)
                 .ToList();
-            var match = await _icp.MatchProductsAsync(candidates, criteria.ProductList, ct);
+            // Sitesinde acik bayi / ithalatci kaniti olup hic uretim kaniti bulunmayan firmalar yapay zekaya sorulmadan elenir
+            // (kural katmani; birinci tekil ticaret kaliplari: "yetkili bayisiyiz", "ithal ediyoruz", "markalarimiz"...).
+            var traders = candidates
+                .Where(c => proof.TryGetValue(c, out var e) && e.Kind == ProducerKind.Trader)
+                .ToList();
+            var reasons = traders.ToDictionary(c => c, c => $"bayi/ticaret sitesi: «{proof[c].BestQuote}»");
+            var toAsk = candidates.Except(traders).ToList();
+
+            var match = await _icp.MatchProductsAsync(toAsk, criteria.ProductList, ct, proof);
             if (!match.Ok)
             {
-                result.Warning = Join(result.Warning, "Firmaların hangi ürünleri ürettiği şu an kontrol edilemedi (yapay zekâ); sonuçlar ürüne göre süzülmedi.");
+                result.Warning = Join(result.Warning, "Firmaların hangi ürünleri ürettiği şu an kontrol edilemedi (yapay zekâ); yalnızca sitesinde açıkça bayi olduğu görülenler elendi.");
             }
             else
             {
@@ -286,17 +297,23 @@ public class LeadDiscoveryService
                         company.NaceCode = criteria.NaceCode;
                 }
                 if (match.Matches.Count > 0) await db.SaveChangesAsync(ct);
-
-                var dropped = result.Companies.Where(c => match.Reasons.ContainsKey(c)).ToList();
-                result.NaceFiltered = dropped.Count;
-                if (dropped.Count > 0)
-                {
-                    result.Companies = result.Companies.Except(dropped).ToList();
-                    var names = string.Join(", ", dropped.Take(4).Select(c => $"{c.Name} ({match.Reasons[c]})"));
-                    result.Warning = Join(result.Warning,
-                        $"{dropped.Count} firma bu ürünlerden hiçbirini üretmediği için listeden çıkarıldı: {names}{(dropped.Count > 4 ? " …" : "")}. Firma havuzuna yine de kaydedildi.");
-                }
+                foreach (var (company, reason) in match.Reasons) reasons[company] = reason;
             }
+
+            var dropped = result.Companies.Where(c => reasons.ContainsKey(c)).ToList();
+            result.NaceFiltered = dropped.Count;
+            if (dropped.Count > 0)
+            {
+                result.Companies = result.Companies.Except(dropped).ToList();
+                var names = string.Join(", ", dropped.Take(4).Select(c => $"{c.Name} ({reasons[c]})"));
+                result.Warning = Join(result.Warning,
+                    $"{dropped.Count} firma bu ürünlerden hiçbirini üretmediği için listeden çıkarıldı: {names}{(dropped.Count > 4 ? " …" : "")}. Firma havuzuna yine de kaydedildi.");
+            }
+
+            // Listede kalan firmalarin sitesinden alinan uretim kaniti (sonuc ekraninda "Kanit" olarak gosterilir).
+            foreach (var company in result.Companies)
+                if (proof.TryGetValue(company, out var e) && e.Kind == ProducerKind.Producer && e.BestQuote is { } quote)
+                    result.ProducerProof[company.Id] = quote;
         }
 
         _logger.LogInformation(
@@ -309,7 +326,8 @@ public class LeadDiscoveryService
     private static string Join(string? first, string second) =>
         string.IsNullOrWhiteSpace(first) ? second : $"{first} {second}";
 
-    private async Task<Company> ProcessCompanyAsync(SearchResult searchResult, SearchCriteria criteria, CancellationToken ct)
+    private async Task<Company> ProcessCompanyAsync(SearchResult searchResult, SearchCriteria criteria, CancellationToken ct,
+        System.Collections.Concurrent.ConcurrentDictionary<Company, ProducerEvidence>? proof = null)
     {
         var company = new Company
         {
@@ -333,6 +351,10 @@ public class LeadDiscoveryService
                 company.MarkNotEvaluated($"Site okunamadı: {site.Error}");
                 return company;
             }
+
+            // Urun aramasinda: sitedeki somut uretim / bayi kanitlari (yalnizca kurallar, ek maliyet yok).
+            if (proof is not null && criteria.ProductList.Count > 0)
+                proof[company] = ProducerSignals.Analyze(string.IsNullOrEmpty(site.FullText) ? site.Text : site.FullText);
 
             var aiResult = await _ai.AnalyzeCompanyAsync(site.Text, ct);
 
@@ -478,6 +500,9 @@ public class DiscoveryResult
 
     /// <summary>NACE (urun) aramasinda firmanin urettigi urunler (firma Id -> urunler); sonuc tablosunda gosterilir.</summary>
     public Dictionary<int, List<string>> ProductMatches { get; } = new();
+
+    /// <summary>Urun aramasinda firmanin kendi sitesinden alinan uretim kaniti (firma Id -> aynen alinti).</summary>
+    public Dictionary<int, string> ProducerProof { get; } = new();
 
     /// <summary>Akilli aramada kullanilan terimler (ilk: kullanicinin yazdigi).</summary>
     public List<string> SearchTerms { get; set; } = new();

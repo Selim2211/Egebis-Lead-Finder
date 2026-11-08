@@ -368,6 +368,10 @@
                                         {
                                             <div class="cell-sub nace-made">Üretiyor: @string.Join(", ", made)</div>
                                         }
+                                        @if (result.ProducerProof.TryGetValue(company.Id, out var proofQuote))
+                                        {
+                                            <div class="cell-sub text-muted" title="Firmanın kendi sitesinden alınan cümle">Kanıt: «@proofQuote»</div>
+                                        }
                                         <div class="cell-sub">
                                             @company.Domain
                                             @if (company.EvaluationStatus == EvaluationStatus.NotEvaluated && company.EvaluationNote is not null)

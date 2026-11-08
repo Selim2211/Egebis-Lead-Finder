@@ -73,6 +73,9 @@ public class ScraperOptions
     public int TimeoutSeconds { get; set; } = 10;
     public int MaxPagesPerSite { get; set; } = 6;
     public int MaxTextChars { get; set; } = 8000;
+
+    /// <summary>Okunan sayfa metninin toplam ust siniri (uretici/bayi kanit aramasi icin; AI'a MaxTextChars kadari gider).</summary>
+    public int MaxEvidenceChars { get; set; } = 32000;
     public string UserAgent { get; set; } = "EgebisLeadFinder/1.0";
     public int DelayBetweenRequestsMs { get; set; } = 500;
     public bool RespectRobotsTxt { get; set; } = true;

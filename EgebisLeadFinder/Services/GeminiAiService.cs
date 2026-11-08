@@ -1214,6 +1214,13 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         yan sanayi bu ürünleri ÜRETMİŞ sayılmaz: products boş olsun ve reason alanına 2-5 kelimelik neden yaz ("bayi", "servis",
         "yan sanayi (parça)"). Bilgi yetersizse de products boş, reason "bilgi yetersiz". Listede olmayan ürün YAZMA.
         Her firma için verilen numarayı id alanına aynen yaz.
+
+        Bazı firmalarda «...» içinde firmanın KENDİ SİTESİNDEN alınmış aynen alıntılar var: "Sitede üretim kanıtı" (m² kapalı
+        alan, üretim kapasitesi, makine parkı, "üretiyoruz" gibi) ve "Sitede bayi/ticaret işareti" ("yetkili bayisiyiz",
+        "ithal ediyoruz", "markalarımız" gibi). Karar verirken en çok bunlara güven. Üretim kanıtı varsa ve firmanın ürünleri
+        listedekilerle uyuşuyorsa products'a yaz. Yalnızca bayi/ticaret işareti varsa products boş, reason "bayi/ithalatçı".
+        "Sitede somut üretim kanıtı bulunamadı" yazıyorsa ve diğer bilgiler de üretimi göstermiyorsa products boş,
+        reason "üretim kanıtı yok". ISO, CE, ihracat ya da OSB adresi tek başına üretim kanıtı DEĞİLDİR.
         """;
 
     private const string NaceSystemPrompt = """

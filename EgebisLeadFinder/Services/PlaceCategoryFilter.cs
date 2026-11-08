@@ -26,6 +26,8 @@ public static class PlaceCategoryFilter
         "yedek parca satis", "dealer", "store", "shop", "rental", "kiralama",
         "arac kiralama", "rent a car", "otopark", "parking", "benzin", "akaryakit",
         "petrol", "gas station",
+        // Toptan / ithalat: uretici degil, ticaret (kategorinde "uretici" yoksa elenir)
+        "toptanci", "wholesaler", "distribut", "ithalatci", "importer",
 
         // Hizmet / diger
         "restoran", "cafe", "otel", "hastane", "eczane", "okul", "universite",
