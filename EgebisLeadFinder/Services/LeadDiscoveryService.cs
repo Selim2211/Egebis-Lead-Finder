@@ -298,6 +298,8 @@ public class LeadDiscoveryService
                 }
                 if (match.Matches.Count > 0) await db.SaveChangesAsync(ct);
                 foreach (var (company, reason) in match.Reasons) reasons[company] = reason;
+                foreach (var (company, kind) in match.Kinds) result.FirmKinds[company.Id] = kind;
+                foreach (var (company, quote) in match.Quotes) result.ProducerProof[company.Id] = quote;
             }
 
             var dropped = result.Companies.Where(c => reasons.ContainsKey(c)).ToList();
@@ -311,9 +313,24 @@ public class LeadDiscoveryService
             }
 
             // Listede kalan firmalarin sitesinden alinan uretim kaniti (sonuc ekraninda "Kanit" olarak gosterilir).
+            // Yapay zekanin dogrulanmis alintisi varsa o kalir; yoksa kural katmaninin buldugu cumle.
             foreach (var company in result.Companies)
-                if (proof.TryGetValue(company, out var e) && e.Kind == ProducerKind.Producer && e.BestQuote is { } quote)
+                if (!result.ProducerProof.ContainsKey(company.Id)
+                    && proof.TryGetValue(company, out var e) && e.Kind == ProducerKind.Producer && e.BestQuote is { } quote)
                     result.ProducerProof[company.Id] = quote;
+
+            // "Emin degil" firmalar listeden atilmaz ama kesinlesenlerden sonra gelir.
+            if (result.FirmKinds.Count > 0)
+            {
+                bool Uncertain(Company c) => result.FirmKinds.TryGetValue(c.Id, out var k) && k == FirmKind.Uncertain;
+                var unsure = result.Companies.Where(Uncertain).ToList();
+                if (unsure.Count > 0)
+                {
+                    result.Companies = result.Companies.Where(c => !Uncertain(c)).Concat(unsure).ToList();
+                    result.Warning = Join(result.Warning,
+                        $"{unsure.Count} firmanın üretici olduğu sitesinden gösterilebilir bir cümleyle kanıtlanamadı; \"emin değil\" etiketiyle listenin sonunda.");
+                }
+            }
         }
 
         _logger.LogInformation(
@@ -503,6 +520,9 @@ public class DiscoveryResult
 
     /// <summary>Urun aramasinda firmanin kendi sitesinden alinan uretim kaniti (firma Id -> aynen alinti).</summary>
     public Dictionary<int, string> ProducerProof { get; } = new();
+
+    /// <summary>Urun aramasinda listede kalan firmanin turu: uretici / fason / emin degil (firma Id -> tur).</summary>
+    public Dictionary<int, FirmKind> FirmKinds { get; } = new();
 
     /// <summary>Akilli aramada kullanilan terimler (ilk: kullanicinin yazdigi).</summary>
     public List<string> SearchTerms { get; set; } = new();

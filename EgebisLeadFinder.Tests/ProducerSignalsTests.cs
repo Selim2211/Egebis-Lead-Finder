@@ -144,6 +144,137 @@ public class ProducerSignalsTests
         Assert.Equal(string.Empty, IcpService.EvidenceBrief(new Dictionary<Company, ProducerEvidence>(), company));
     }
 
+    // ---- Adim 5: 4'lu sonuc (uretici / fason / bayi-yan sanayi / emin degil) ve zorunlu alinti
+
+    private sealed class FakeAi : INaceClassifierAi
+    {
+        public Dictionary<int, ProductVerdict> Answer = new();
+        public Task<Dictionary<int, string>> ClassifyNaceAsync(IReadOnlyList<(int Id, string Text)> c, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Dictionary<int, ProductVerdict>> MatchProductsAsync(IReadOnlyList<(int Id, string Text)> c, IReadOnlyList<string> products, CancellationToken ct = default) => Task.FromResult(Answer);
+    }
+
+    private static readonly string[] Products = { "bulaşık makinesi", "çamaşır makinesi" };
+
+    private static Company Firm(string name) => new() { Name = name, Industry = "Beyaz eşya" };
+
+    [Theory]
+    [InlineData("«35.000 m² kapalı alanda üretim yapıyoruz.»", true)]
+    [InlineData("35.000 M² KAPALI ALANDA ÜRETİM YAPIYORUZ", true)]             // buyuk/kucuk harf ve tirnak farki
+    [InlineData("35.000   m² kapalı alanda\nüretim yapıyoruz.…", true)]         // bosluk ve uc nokta farki
+    [InlineData("Yılda 1 milyon adet bulaşık makinesi üretiyoruz.", false)]    // ozette yok: uydurma
+    [InlineData("kısa", false)]
+    [InlineData(null, false)]
+    public void VerifyQuote_accepts_only_text_that_is_really_in_the_brief(string? evidence, bool expected)
+    {
+        var brief = "Ornek A.Ş. | Sitede üretim kanıtı: «35.000 m² kapalı alanda üretim yapıyoruz.»";
+        Assert.Equal(expected, IcpService.VerifyQuote(evidence, brief) is not null);
+    }
+
+    [Fact]
+    public async Task Producer_without_a_verifiable_quote_becomes_uncertain_not_producer()
+    {
+        var withQuote = Firm("Kanitli"); var invented = Firm("Uydurma"); var fason = Firm("Fason");
+        var proof = new Dictionary<Company, ProducerEvidence>
+        {
+            [withQuote] = ProducerSignals.Analyze("35.000 m² kapalı alanda üretim yapıyoruz."),
+            [invented] = ProducerEvidence.None,
+            [fason] = ProducerSignals.Analyze("Başkaları adına fason üretim yapıyoruz. 20.000 m² kapalı alan.")
+        };
+        var ai = new FakeAi
+        {
+            Answer =
+            {
+                [1] = new(new() { "bulaşık makinesi" }, null, "uretici", "35.000 m² kapalı alanda üretim yapıyoruz."),
+                [2] = new(new() { "bulaşık makinesi" }, null, "uretici", "Yılda 1 milyon adet bulaşık makinesi üretiyoruz."),   // ozette yok
+                [3] = new(new() { "çamaşır makinesi" }, null, "fason", null)                                                   // alinti yok ama kural katmani kaniti var
+            }
+        };
+
+        var r = await new IcpService(null!, null!, null!, ai).MatchProductsAsync(new[] { withQuote, invented, fason }, Products, default, proof);
+
+        Assert.Equal(FirmKind.Producer, r.Kinds[withQuote]);
+        Assert.Equal("35.000 m² kapalı alanda üretim yapıyoruz.", r.Quotes[withQuote]);
+
+        Assert.Equal(FirmKind.Uncertain, r.Kinds[invented]);        // uydurma alinti kabul edilmez
+        Assert.False(r.Quotes.ContainsKey(invented));
+        Assert.Equal(new[] { "bulaşık makinesi" }, r.Matches[invented]);   // yine de listeden atilmaz
+
+        Assert.Equal(FirmKind.Contract, r.Kinds[fason]);
+        Assert.Contains("20.000 m²", r.Quotes[fason]);               // kural katmaninin cumlesi
+        Assert.Empty(r.Reasons);
+    }
+
+    [Fact]
+    public async Task Dealer_and_parts_maker_are_dropped_and_unsure_is_kept()
+    {
+        var dealer = Firm("Bayi"); var parts = Firm("Parca"); var unsure = Firm("Belirsiz"); var legacy = Firm("Eski bicim");
+        var ai = new FakeAi
+        {
+            Answer =
+            {
+                [1] = new(new(), "yetkili bayi", "bayi"),
+                [2] = new(new(), null, "yan_sanayi"),
+                [3] = new(new(), "bilgi yetersiz", "emin_degil"),
+                [4] = new(new() { "bulaşık makinesi" }, null)      // tur yok: eski davranis
+            }
+        };
+
+        var r = await new IcpService(null!, null!, null!, ai).MatchProductsAsync(new[] { dealer, parts, unsure, legacy }, Products);
+
+        Assert.Equal("yetkili bayi", r.Reasons[dealer]);
+        Assert.Equal("yan sanayi (parça)", r.Reasons[parts]);
+        Assert.False(r.Reasons.ContainsKey(unsure));
+        Assert.Equal(FirmKind.Uncertain, r.Kinds[unsure]);
+        Assert.False(r.Kinds.ContainsKey(legacy));
+        Assert.Equal(new[] { "bulaşık makinesi" }, r.Matches[legacy]);
+    }
+
+    [Fact]
+    public void ParseProductVerdicts_reads_kind_and_evidence()
+    {
+        var v = GeminiAiService.ParseProductVerdicts("""
+            [{"id":1,"kind":"uretici","products":["bulaşık makinesi"],"evidence":" 35.000 m² kapalı alan "},
+             {"id":2,"kind":"bayi","products":[],"reason":"bayi"}]
+            """);
+        Assert.Equal("uretici", v[1].Kind);
+        Assert.Equal("35.000 m² kapalı alan", v[1].Evidence);
+        Assert.Equal("bayi", v[2].Kind);
+        Assert.Null(v[2].Evidence);
+    }
+
+    // ---- Adim 4: dizinlerden aday toplama (Google "site:" basliklarindan firma adi)
+
+    [Theory]
+    [InlineData("ARÇELİK A.Ş. - İstanbul - Bulaşık makineleri | Europages", "ARÇELİK A.Ş.")]
+    [InlineData("Vestel Beyaz Eşya San. ve Tic. A.Ş. | OSTİM", "Vestel Beyaz Eşya San. ve Tic. A.Ş.")]
+    [InlineData("Plastik Ambalaj Sanayi ve Ticaret A.Ş. - Gebze", "Plastik Ambalaj Sanayi ve Ticaret A.Ş.")]
+    [InlineData("Girişim Makina Ltd. Şti. – Bursa", "Girişim Makina Ltd. Şti.")]
+    [InlineData("Bulaşık makineleri - Türkiye tedarikçileri | Europages", null)]   // kategori sayfasi
+    [InlineData("Tedarikçiler: bulaşık makinesi Türkiye", null)]                   // liste sayfasi
+    [InlineData("OSB Firma Listesi | GOSB", null)]
+    [InlineData("AB", null)]
+    [InlineData(null, null)]
+    public void Directory_titles_give_company_names_but_not_list_pages(string? title, string? expected)
+    {
+        Assert.Equal(expected, DirectoryCandidates.ExtractName(title, "bulaşık makinesi"));
+    }
+
+    [Fact]
+    public void Directory_query_is_a_plain_site_search()
+    {
+        Assert.Equal("site:europages.com.tr bulaşık makinesi", DirectoryCandidates.Query("europages.com.tr", "bulaşık makinesi"));
+        Assert.Contains("europages.com.tr", DirectoryCandidates.TurkishDirectories);
+    }
+
+    [Fact]
+    public void Directories_are_never_candidates_themselves()
+    {
+        // Dizin sitelerinin kendisi firma gibi islenmesin: engel listesinde olmalilar.
+        var json = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "EgebisLeadFinder", "appsettings.json"));
+        Assert.Contains("\"europages\"", json);
+        Assert.Contains("\"org.tr\"", json);   // ostim.org.tr, gosb.org.tr gibi
+    }
+
     [Fact]
     public void Turkish_manufacturer_queries_use_production_wording_and_no_shopping_words()
     {

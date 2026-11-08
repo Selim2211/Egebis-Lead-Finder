@@ -26,6 +26,15 @@ public class SearchOptions
     /// </summary>
     public bool UsePlaces { get; set; } = true;
 
+    /// <summary>
+    /// Urun (NACE) aramasinda dizinlerden (Europages, OSB listeleri) aday toplansin mi? Dizin sitelerine gidilmez;
+    /// Google'in "site:" sonuc basliklarindan firma adi okunur (bkz. DirectoryCandidates). Her bulunan ad ~1 Serper kredisi.
+    /// </summary>
+    public bool UseDirectories { get; set; } = true;
+
+    /// <summary>Bir aramada dizinlerden cozulecek en fazla firma adi (kredi tavani).</summary>
+    public int DirectoryMaxNames { get; set; } = 12;
+
     public string SerperPlacesEndpoint { get; set; } = "https://google.serper.dev/places";
 
     /// <summary>

@@ -102,6 +102,10 @@ public class SerperSearchService : ISearchService
         // 3 sayfada 30 firma (29'unda web sitesi).
         try
         {
+            // Urun aramasi: once dizinlerden (Europages "uretici" etiketi, OSB listeleri) birkac aday; Haritalar/organik sonra doldurur.
+            if (_options.UseDirectories && criteria.ProductList.Count > 0 && _region.Key == SearchRegions.DefaultKey)
+                await CollectFromDirectoriesAsync(criteria, found, apiKey, ct);
+
             if (_options.UsePlaces)
                 await CollectFromPlacesAsync(criteria, found, apiKey, ct);
 
@@ -281,6 +285,79 @@ public class SerperSearchService : ISearchService
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Dizinlerden aday toplar: "site:europages.com.tr {urun}" gibi sorgularin sonuc BASLIKLARINDAN firma adi okunur (dizin
+    /// sitesine istek atilmaz), sonra her ad icin firmanin kendi sitesi aranir. Kredi tavani: DirectoryMaxNames ad; toplanan aday
+    /// sayisi hedefin ucte biriyle sinirlidir ki Haritalar/organik sonuclara da yer kalsin.
+    /// </summary>
+    private async Task CollectFromDirectoriesAsync(
+        SearchCriteria criteria, Dictionary<string, SearchResult> found, string apiKey, CancellationToken ct)
+    {
+        var limit = Math.Min(_options.DirectoryMaxNames, Math.Max(3, criteria.EffectiveCollectTarget / 3));
+        var terms = criteria.SearchTerms.Prepend(criteria.Industry).Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct(StringComparer.OrdinalIgnoreCase).Take(2).ToList();
+
+        // Ad -> hangi dizinden geldigi. Ayni ad birden fazla sorguda cikabilir.
+        var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var term in terms)
+        {
+            foreach (var site in DirectoryCandidates.TurkishDirectories)
+            {
+                if (names.Count >= limit) break;
+                ct.ThrowIfCancellationRequested();
+                try
+                {
+                    foreach (var hit in await QueryAsync(DirectoryCandidates.Query(site, term), apiKey, ct))
+                    {
+                        var name = DirectoryCandidates.ExtractName(hit.Title, term);
+                        if (name is not null && names.Count < limit) names.TryAdd(name, site);
+                    }
+                }
+                catch (Exception ex) when (IsQueryLocal(ex))
+                {
+                    _logger.LogWarning(ex, "Dizin sorgusu başarısız: {Site} {Term}", site, term);
+                }
+            }
+        }
+
+        var resolved = 0;
+        foreach (var (name, site) in names)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                // Firmanin KENDI sitesi: alan adi firma adini tasiyan ilk engellenmemis sonuc. Eslesme yoksa atlanir
+                // (yanlis siteyi incelemektense adayi kaybetmek yeglenir).
+                // "ABC Plastik Sanayi" icin "plastik" gibi genel kelime degil, ayirt edici ilk kelime ("abc") alan adinda gecmeli.
+                var brand = TurkishText.Normalize(name).Split(new[] { ' ', '.', ',', '-' }, StringSplitOptions.RemoveEmptyEntries)
+                    .FirstOrDefault(t => t.Length >= 3) ?? string.Empty;
+                var best = (await QueryAsync($"\"{name}\"", apiKey, ct))
+                    .Select(o => (Organic: o, Domain: DomainHelper.ExtractDomain(o.Link)))
+                    .Where(x => x.Domain is not null && !DomainHelper.IsBlocked(x.Domain, _blocked))
+                    .Select(x => (x.Organic, Domain: x.Domain!, Score: NameRelevance(new SearchResult { Domain = x.Domain!, Title = x.Organic.Title ?? string.Empty }, name)))
+                    .Where(x => x.Score >= 10 && brand.Length > 0 && TurkishText.Normalize(x.Domain).Contains(brand))
+                    .OrderByDescending(x => x.Score)
+                    .FirstOrDefault();
+                if (best.Domain is null || found.ContainsKey(best.Domain)) continue;
+
+                found[best.Domain] = new SearchResult
+                {
+                    Domain = best.Domain,
+                    Url = $"https://{best.Domain}",
+                    Title = name,
+                    Snippet = $"Dizinde listeli: {site}"
+                };
+                resolved++;
+            }
+            catch (Exception ex) when (IsQueryLocal(ex))
+            {
+                _logger.LogWarning(ex, "Dizin firması çözülemedi: {Name}", name);
+            }
+        }
+
+        _logger.LogInformation("Dizinlerden {Names} firma adı, {Resolved} firma sitesi bulundu.", names.Count, resolved);
     }
 
     /// <summary>Klasik organik web aramasi ile firma toplar.</summary>

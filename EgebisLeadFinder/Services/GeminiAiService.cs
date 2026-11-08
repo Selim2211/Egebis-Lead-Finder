@@ -1171,10 +1171,17 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
                         properties = new
                         {
                             id = new { type = "integer" },
+                            kind = new
+                            {
+                                type = "string",
+                                @enum = new[] { "uretici", "fason", "yan_sanayi", "bayi", "emin_degil" },
+                                description = "Firmanın bu ürünlerle ilişkisi"
+                            },
                             products = new { type = "array", items = new { type = "string" } },
-                            reason = new { type = "string", description = "Hiçbirini üretmiyorsa 2-5 kelimelik neden" }
+                            evidence = new { type = "string", description = "Firma bilgisindeki «...» alıntılardan biri, AYNEN; yoksa boş" },
+                            reason = new { type = "string", description = "Üretici değilse 2-5 kelimelik neden" }
                         },
-                        required = new[] { "id", "products" }
+                        required = new[] { "id", "kind", "products" }
                     }
                 }
             }
@@ -1198,8 +1205,11 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
             var products = item.TryGetProperty("products", out var p) && p.ValueKind == JsonValueKind.Array
                 ? p.EnumerateArray().Select(x => x.GetString()?.Trim() ?? string.Empty).Where(x => x.Length > 0).ToList()
                 : new List<string>();
-            var reason = item.TryGetProperty("reason", out var r) ? r.GetString() : null;
-            result[id] = new ProductVerdict(products, string.IsNullOrWhiteSpace(reason) ? null : reason.Trim());
+            var reason = item.TryGetProperty("reason", out var r) && r.ValueKind == JsonValueKind.String ? r.GetString() : null;
+            var kind = item.TryGetProperty("kind", out var k) && k.ValueKind == JsonValueKind.String ? k.GetString() : null;
+            var evidence = item.TryGetProperty("evidence", out var ev) && ev.ValueKind == JsonValueKind.String ? ev.GetString() : null;
+            result[id] = new ProductVerdict(products, string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(),
+                string.IsNullOrWhiteSpace(kind) ? null : kind.Trim(), string.IsNullOrWhiteSpace(evidence) ? null : evidence.Trim());
         }
         return result;
     }
@@ -1208,19 +1218,26 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         Önce bir ÜRÜNLER listesi, sonra firmalar verilecek; her firmada köşeli parantez içinde numara ve firma hakkında kısa
         bilgi (ad, sektör, ürünler, üretici olup olmadığı, açıklama) var.
 
-        Her firma için listedeki ürünlerden HANGİLERİNİ ÜRETTİĞİNİ products alanına yaz (listede yazdığı gibi). Üretmek:
-        kendi fabrikasında üretmek ya da kendi markasıyla ürettirip satmak (marka sahibi). Başkalarının markalarını satan
-        bayi/mağaza/e-ticaret, servis/tamir, yedek parça satıcısı, dernek, rehber ya da yalnızca bu ürünlerin PARÇASINI üreten
-        yan sanayi bu ürünleri ÜRETMİŞ sayılmaz: products boş olsun ve reason alanına 2-5 kelimelik neden yaz ("bayi", "servis",
-        "yan sanayi (parça)"). Bilgi yetersizse de products boş, reason "bilgi yetersiz". Listede olmayan ürün YAZMA.
+        Her firma için kind alanına şu 5 değerden BİRİNİ yaz:
+        - "uretici": listedeki ürünlerden en az birini kendi fabrikasında üretiyor ya da kendi markasıyla ürettirip satıyor
+          (marka sahibi).
+        - "fason": listedeki ürünleri başkaları için sözleşmeli/fason üretiyor (kendi markası olmayabilir).
+        - "yan_sanayi": yalnızca bu ürünlerin PARÇASINI/bileşenini üretiyor; ürünün kendisini değil.
+        - "bayi": başkalarının ürünlerini satan bayi, mağaza, e-ticaret, ithalatçı, servis/tamir, yedek parça satıcısı,
+          dernek, rehber.
+        - "emin_degil": verilen bilgiyle karar veremiyorsun.
+        "uretici" ve "fason" için products alanına listedeki ürünlerden hangilerini ürettiğini yaz (listede yazdığı gibi,
+        listede olmayan ürün YAZMA). Diğer türlerde products boş olsun ve reason alanına 2-5 kelimelik neden yaz.
         Her firma için verilen numarayı id alanına aynen yaz.
 
         Bazı firmalarda «...» içinde firmanın KENDİ SİTESİNDEN alınmış aynen alıntılar var: "Sitede üretim kanıtı" (m² kapalı
         alan, üretim kapasitesi, makine parkı, "üretiyoruz" gibi) ve "Sitede bayi/ticaret işareti" ("yetkili bayisiyiz",
-        "ithal ediyoruz", "markalarımız" gibi). Karar verirken en çok bunlara güven. Üretim kanıtı varsa ve firmanın ürünleri
-        listedekilerle uyuşuyorsa products'a yaz. Yalnızca bayi/ticaret işareti varsa products boş, reason "bayi/ithalatçı".
-        "Sitede somut üretim kanıtı bulunamadı" yazıyorsa ve diğer bilgiler de üretimi göstermiyorsa products boş,
-        reason "üretim kanıtı yok". ISO, CE, ihracat ya da OSB adresi tek başına üretim kanıtı DEĞİLDİR.
+        "ithal ediyoruz", "markalarımız" gibi). Karar verirken en çok bunlara güven.
+        evidence alanı ZORUNLU KURAL: "uretici" ya da "fason" dersen, üretimini gösteren «...» alıntılarından birini evidence
+        alanına AYNEN kopyala (değiştirme, kısaltma, çeviri yapma). Alıntı yoksa ya da hiçbiri üretimi göstermiyorsa
+        "uretici"/"fason" YAZMA, kind="emin_degil" ve evidence boş olsun. Kendi bilginden alıntı uydurma.
+        "Sitede somut üretim kanıtı bulunamadı" yazıyorsa ve diğer bilgiler de üretimi göstermiyorsa kind "emin_degil".
+        Yalnızca bayi/ticaret işareti varsa kind "bayi". ISO, CE, ihracat ya da OSB adresi tek başına üretim kanıtı DEĞİLDİR.
         """;
 
     private const string NaceSystemPrompt = """

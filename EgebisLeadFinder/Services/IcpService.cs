@@ -18,8 +18,24 @@ public interface INaceClassifierAi
     Task<Dictionary<int, ProductVerdict>> MatchProductsAsync(IReadOnlyList<(int Id, string Text)> companies, IReadOnlyList<string> products, CancellationToken ct = default);
 }
 
-/// <summary>Bir firmanin urettigi (listedeki) urunler; bossa neden ("bayi", "servis"...).</summary>
-public record ProductVerdict(List<string> Products, string? Reason);
+/// <summary>
+/// Bir firmanin urettigi (listedeki) urunler; bossa neden ("bayi", "servis"...).
+/// Kind: "uretici" | "fason" | "yan_sanayi" | "bayi" | "emin_degil" (bos = eski bicim). Evidence: firma ozetindeki «alintilardan» biri.
+/// </summary>
+public record ProductVerdict(List<string> Products, string? Reason, string? Kind = null, string? Evidence = null);
+
+/// <summary>Listede kalan firmanin turu (sonuc ekraninda etiket olarak gosterilir).</summary>
+public enum FirmKind
+{
+    /// <summary>Kendi fabrikasinda / kendi markasiyla uretiyor, sitesinden alinti ile kanitli.</summary>
+    Producer,
+
+    /// <summary>Baskalari icin fason (sozlesmeli) uretim yapiyor, sitesinden alinti ile kanitli.</summary>
+    Contract,
+
+    /// <summary>Uretici gibi duruyor ama sitesinden gosterilebilir bir kanit yok: "emin degil".</summary>
+    Uncertain
+}
 
 /// <summary>
 /// Ideal musteri profilini (ICP) okur/yazar ve firma puanini ICP'ye gore gunceller.
@@ -101,6 +117,7 @@ public class IcpService
         foreach (var batch in companies.Chunk(NaceBatchSize))
         {
             var items = batch.Select((c, i) => (i + 1, NaceBrief(c.Name, c.Industry, c.Description, c.AiAnalysis) + EvidenceBrief(proof, c))).ToList();
+            var briefs = items.ToDictionary(x => x.Item1, x => x.Item2);
             Dictionary<int, ProductVerdict> verdicts;
             try
             {
@@ -114,16 +131,79 @@ public class IcpService
             for (var i = 0; i < batch.Length; i++)
             {
                 verdicts.TryGetValue(i + 1, out var v);
+                var company = batch[i];
                 var made = (v?.Products ?? new List<string>())
                     .Select(p => allowed.GetValueOrDefault(TurkishText.Normalize(p)))
                     .OfType<string>()
                     .Distinct()
                     .ToList();
-                if (made.Count > 0) result.Matches[batch[i]] = made;
-                else result.Reasons[batch[i]] = string.IsNullOrWhiteSpace(v?.Reason) ? "bu ürünleri üretmiyor" : v!.Reason!.Trim();
+                var reason = string.IsNullOrWhiteSpace(v?.Reason) ? null : v!.Reason!.Trim();
+
+                switch (NormalizeKind(v?.Kind))
+                {
+                    case "bayi":
+                        result.Reasons[company] = reason ?? "bayi / satıcı";
+                        break;
+
+                    case "yan_sanayi":
+                        result.Reasons[company] = reason ?? "yan sanayi (parça)";
+                        break;
+
+                    case "emin_degil":
+                        // Karar verilemedi: listeden atilmaz, "emin degil" etiketiyle sona konur.
+                        if (made.Count > 0) result.Matches[company] = made;
+                        result.Kinds[company] = FirmKind.Uncertain;
+                        break;
+
+                    case "uretici" or "fason":
+                        if (made.Count == 0)
+                        {
+                            result.Reasons[company] = reason ?? "bu ürünleri üretmiyor";
+                            break;
+                        }
+                        result.Matches[company] = made;
+                        // "Uretiyor" demek icin sitenin kendi cumlesi gosterilmeli: yapay zekanin dondurdugu alinti ozette
+                        // gercekten varsa o; yoksa kural katmaninin buldugu uretim kaniti. Hicbiri yoksa "emin degil".
+                        var quote = VerifyQuote(v?.Evidence, briefs[i + 1]) ?? RuleQuote(proof, company);
+                        if (quote is null)
+                        {
+                            result.Kinds[company] = FirmKind.Uncertain;
+                        }
+                        else
+                        {
+                            result.Kinds[company] = NormalizeKind(v?.Kind) == "fason" ? FirmKind.Contract : FirmKind.Producer;
+                            result.Quotes[company] = quote;
+                        }
+                        break;
+
+                    default:   // eski bicim (tur yok): urun listesi doluysa uretici, degilse neden
+                        if (made.Count > 0) result.Matches[company] = made;
+                        else result.Reasons[company] = reason ?? "bu ürünleri üretmiyor";
+                        break;
+                }
             }
         }
         return result;
+    }
+
+    private static string? NormalizeKind(string? kind) => string.IsNullOrWhiteSpace(kind) ? null : TurkishText.Normalize(kind).Trim().Replace(' ', '_').Replace('-', '_');
+
+    private static string? RuleQuote(IReadOnlyDictionary<Company, ProducerEvidence>? proof, Company company) =>
+        proof is not null && proof.TryGetValue(company, out var e) && e.Kind == ProducerKind.Producer ? e.ProducerQuotes.FirstOrDefault() : null;
+
+    /// <summary>
+    /// Yapay zekanin "alinti" diye dondurdugu metin firma ozetinde AYNEN geciyor mu? Gecmiyorsa uydurmadir: null.
+    /// Karsilastirma Turkce harf, bosluk ve tirnak farklarini yok sayar; cok kisa metin kanit sayilmaz.
+    /// </summary>
+    public static string? VerifyQuote(string? evidence, string brief)
+    {
+        if (string.IsNullOrWhiteSpace(evidence)) return null;
+
+        var cleaned = System.Text.RegularExpressions.Regex.Replace(evidence.Trim().Trim('«', '»', '"', '“', '”', '…', ' '), @"\s+", " ");
+        if (cleaned.Length < 12) return null;
+
+        var haystack = System.Text.RegularExpressions.Regex.Replace(TurkishText.Normalize(brief), @"\s+", " ");
+        return haystack.Contains(TurkishText.Normalize(cleaned), StringComparison.Ordinal) ? cleaned : null;
     }
 
     /// <summary>
@@ -146,6 +226,12 @@ public class IcpService
         public bool Ok { get; set; } = true;
         public Dictionary<Company, List<string>> Matches { get; } = new();
         public Dictionary<Company, string> Reasons { get; } = new();
+
+        /// <summary>Listede kalan firmanin turu: uretici / fason / emin degil. Yalniz tur bildiren yapay zeka yanitlarinda dolar.</summary>
+        public Dictionary<Company, FirmKind> Kinds { get; } = new();
+
+        /// <summary>Uretim iddiasini destekleyen, firma sitesinden aynen alinmis cumle.</summary>
+        public Dictionary<Company, string> Quotes { get; } = new();
     }
 
     public static string NaceBrief(string name, string? industry, string? description, string? aiAnalysis)

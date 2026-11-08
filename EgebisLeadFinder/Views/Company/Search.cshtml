@@ -363,6 +363,21 @@
                                             {
                                                 <span class="tag tag-success run-tag">yeni</span>
                                             }
+                                            @if (result.FirmKinds.TryGetValue(company.Id, out var firmKind))
+                                            {
+                                                @switch (firmKind)
+                                                {
+                                                    case FirmKind.Producer:
+                                                        <span class="tag tag-success run-tag" title="Üretici olduğu sitesinden alınan cümleyle kanıtlandı">Üretici</span>
+                                                        break;
+                                                    case FirmKind.Contract:
+                                                        <span class="tag tag-info run-tag" title="Başkaları için fason üretim yapıyor">Fason üretici</span>
+                                                        break;
+                                                    default:
+                                                        <span class="tag tag-muted run-tag" title="Üretici gibi duruyor ama sitesinden gösterilebilir bir kanıt bulunamadı">Emin değil</span>
+                                                        break;
+                                                }
+                                            }
                                         </div>
                                         @if (result.ProductMatches.TryGetValue(company.Id, out var made))
                                         {
