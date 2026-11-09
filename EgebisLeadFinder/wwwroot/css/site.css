@@ -4434,6 +4434,12 @@ a.pager-btn:hover { border-color: var(--eg-mailed-border); background: var(--eg-
 .run-picker-item { display: flex; flex-direction: column; padding: .5rem .65rem; border-radius: 8px; color: var(--eg-text); text-decoration: none; }
 .run-picker-item:hover { background: var(--eg-surface-alt); }
 .run-picker-item.is-active { background: var(--eg-surface-alt); box-shadow: inset 3px 0 0 var(--eg-accent, #f59e0b); }
+.run-picker-row { display: flex; align-items: center; border-radius: 8px; }
+.run-picker-row:hover { background: var(--eg-surface-alt); }
+.run-picker-row.is-active { background: var(--eg-surface-alt); box-shadow: inset 3px 0 0 var(--eg-accent, #f59e0b); }
+.run-picker-row > .run-picker-item { flex: 1 1 auto; min-width: 0; background: transparent; box-shadow: none; }
+.run-picker-del { flex: 0 0 auto; width: 1.9rem; height: 1.9rem; margin-right: .35rem; border: 0; border-radius: 6px; background: transparent; color: var(--eg-text-muted); font-size: 1.25rem; line-height: 1; cursor: pointer; }
+.run-picker-del:hover, .run-picker-del:focus-visible { background: rgba(220, 38, 38, .12); color: #dc2626; }
 .run-picker-empty { padding: .6rem; font-size: .85rem; color: var(--eg-text-muted); }
 .run-tag { font-size: .68rem; margin-left: .3rem; vertical-align: middle; }
 .stage-chip.chip-unknown.is-active { background: var(--eg-warning-bg); border-color: #fcd34d; color: #92400e; }

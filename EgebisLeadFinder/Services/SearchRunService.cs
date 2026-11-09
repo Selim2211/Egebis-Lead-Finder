@@ -102,6 +102,20 @@ public class SearchRunService
     public Task<bool> CanViewAsync(int runId, int? userId, bool isAdmin, CancellationToken ct = default) =>
         _db.SearchRuns.AsNoTracking().VisibleTo(userId, isAdmin).AnyAsync(r => r.Id == runId, ct);
 
+    /// <summary>
+    /// Arama kaydini gecmisten siler. Bulunan firmalara, kisilere ve lead'lere dokunmaz; yalnizca
+    /// "bu arama su firmalari buldu" baglantisi gider. Sürmekte olan arama silinmez.
+    /// </summary>
+    public async Task<bool> DeleteAsync(int runId, int? userId, bool isAdmin, CancellationToken ct = default)
+    {
+        var run = await _db.SearchRuns.VisibleTo(userId, isAdmin).FirstOrDefaultAsync(r => r.Id == runId, ct);
+        if (run is null || (run.Status == SearchRunStatus.Running && !run.IsStale(DateTime.UtcNow))) return false;
+
+        await _db.SearchRunCompanies.Where(x => x.SearchRunId == runId).ExecuteDeleteAsync(ct);
+        await _db.SearchRuns.Where(r => r.Id == runId).ExecuteDeleteAsync(ct);
+        return true;
+    }
+
     private static string? Trim(string? value, int max)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;

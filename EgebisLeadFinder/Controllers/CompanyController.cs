@@ -944,6 +944,19 @@ public class CompanyController : Controller
         return RedirectToLocal(returnUrl);
     }
 
+    /// <summary>Arama gecmisinden bir arama kaydini siler (firmalar kalir).</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteRun(int id, string? current, CancellationToken ct)
+    {
+        var uid = Services.Auth.ClaimsPrincipalExtensions.UserId(User);
+        var ok = await HttpContext.RequestServices.GetRequiredService<SearchRunService>().DeleteAsync(id, uid, User.IsInRole(nameof(UserRole.Admin)), ct);
+        if (ok) AuditActionFilter.SetAuditSummary(HttpContext, $"Arama kaydı silindi (#{id})");
+        // Bakilan arama silindiyse tum firmalara don; baska bir arama silindiyse bakilan aramada kal.
+        var stay = ok && current != id.ToString() && !string.IsNullOrEmpty(current) ? current : "all";
+        return RedirectToAction(nameof(Index), new { run = stay });
+    }
+
     /// <summary>
     /// Tum firmalari ve bagli kayitlari (kisiler, lead'ler, gonderilen mailler, dizi kayitlari,
     /// profil baglari) siler. Geri alinamaz; arayuzde "SİL" yazilarak onaylanir. Salesforce'a

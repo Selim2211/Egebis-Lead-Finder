@@ -114,10 +114,21 @@
             }
             @foreach (var r in Model.Runs)
             {
-                <a class="run-picker-item @(Model.RunId == r.Id ? "is-active" : "")" href="@RunUrl(r.Id.ToString())">
-                    <span class="run-picker-title">@RunLabel(r)</span>
-                    <span class="run-picker-sub">@RunStats(r)</span>
-                </a>
+                var runBusy = r.Status == SearchRunStatus.Running && !r.IsStale(nowUtc);
+                <div class="run-picker-row @(Model.RunId == r.Id ? "is-active" : "")">
+                    <a class="run-picker-item" href="@RunUrl(r.Id.ToString())">
+                        <span class="run-picker-title">@RunLabel(r)</span>
+                        <span class="run-picker-sub">@RunStats(r)</span>
+                    </a>
+                    @if (!runBusy)
+                    {
+                        <form method="post" asp-action="DeleteRun" class="m-0">
+                            <input type="hidden" name="id" value="@r.Id" />
+                            <input type="hidden" name="current" value="@(Model.RunId?.ToString())" />
+                            <button type="submit" class="run-picker-del" title="Bu arama kaydını sil (firmalar silinmez)" aria-label="Arama kaydını sil">×</button>
+                        </form>
+                    }
+                </div>
             }
         </div>
     </details>
