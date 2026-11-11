@@ -26,9 +26,20 @@
     var repliedCount = Model.Funnel.FirstOrDefault(f => f.Label == "Cevap geldi")?.Count ?? 0;
 }
 
+@{
+    // Turkiye saatine gore selam (UTC+3).
+    var trHour = DateTime.UtcNow.AddHours(3).Hour;
+    var english = EgebisLeadFinder.Localization.Loc.IsEnglish;
+    var hello = trHour < 6 ? (english ? "Good night" : "İyi geceler")
+        : trHour < 12 ? (english ? "Good morning" : "Günaydın")
+        : trHour < 18 ? (english ? "Good afternoon" : "İyi günler")
+        : (english ? "Good evening" : "İyi akşamlar");
+    var userName = EgebisLeadFinder.Services.Auth.ClaimsPrincipalExtensions.DisplayName(User);
+    var firstName = (userName ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
+}
 <div class="page-head">
     <div>
-        <h1>Panel</h1>
+        <h1>@hello@(firstName.Length > 0 ? ", " + firstName : "")</h1>
         <div class="page-sub">Satış hunisi, bugünün işleri ve son hareketler</div>
     </div>
     <a class="btn btn-accent" asp-controller="Company" asp-action="Search">

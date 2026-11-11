@@ -15,26 +15,40 @@
 
     // ---- Kenar cubugu: daralt / ac ----
     var collapseBtn = document.getElementById('egSideCollapse');
-    if (store('get', 'eg-side') === 'collapsed' && window.matchMedia('(min-width: 992px)').matches) {
-        body.classList.add('side-collapsed');
+    var burger = document.getElementById('egBurger');
+    var isDesktop = function () { return window.matchMedia('(min-width: 992px)').matches; };
+
+    function setCollapsed(on) {
+        body.classList.toggle('side-collapsed', on);
+        store('set', 'eg-side', on ? 'collapsed' : 'open');
+        var label = on ? 'Menüyü genişlet' : 'Menüyü daralt';
+        if (collapseBtn) { collapseBtn.setAttribute('aria-label', label); collapseBtn.title = label; }
+        if (burger && isDesktop()) { burger.setAttribute('aria-expanded', on ? 'false' : 'true'); burger.setAttribute('aria-label', label); }
+        // Gosterge, genislik animasyonu bitince yeniden hizalanir.
+        setTimeout(function () { if (window.egPlaceIndicator) window.egPlaceIndicator(); }, 260);
     }
-    if (collapseBtn) {
-        collapseBtn.addEventListener('click', function () {
-            var on = body.classList.toggle('side-collapsed');
-            store('set', 'eg-side', on ? 'collapsed' : 'open');
-            collapseBtn.setAttribute('aria-label', on ? 'Menüyü genişlet' : 'Menüyü daralt');
-        });
-    }
+    if (store('get', 'eg-side') === 'collapsed' && isDesktop()) body.classList.add('side-collapsed');
+    if (collapseBtn) collapseBtn.addEventListener('click', function () { setCollapsed(true); });
 
     // ---- Mobil cekmece ----
-    var burger = document.getElementById('egBurger');
     var backdrop = document.getElementById('egSideBackdrop');
     function setDrawer(open) {
         body.classList.toggle('nav-open', open);
         if (burger) burger.setAttribute('aria-expanded', open ? 'true' : 'false');
         if (backdrop) backdrop.hidden = !open;
     }
-    if (burger) burger.addEventListener('click', function () { setDrawer(!body.classList.contains('nav-open')); });
+    if (burger) burger.addEventListener('click', function () {
+        if (isDesktop()) setCollapsed(!body.classList.contains('side-collapsed'));
+        else setDrawer(!body.classList.contains('nav-open'));
+    });
+    // Ctrl+B: menuyu ac / kapat
+    document.addEventListener('keydown', function (e) {
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b' && burger) {
+            var t = e.target;
+            if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+            e.preventDefault(); burger.click();
+        }
+    });
     if (backdrop) backdrop.addEventListener('click', function () { setDrawer(false); });
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && body.classList.contains('nav-open')) setDrawer(false);
@@ -60,6 +74,7 @@
         ind.classList.add('is-on');
         session('set', 'eg-ind-y', String(y));
     }
+    window.egPlaceIndicator = function () { if (ind) ind.style.transition = ''; placeIndicator(); };
     placeIndicator();
     window.addEventListener('resize', function () { if (ind) { ind.style.transition = 'none'; placeIndicator(); } });
 

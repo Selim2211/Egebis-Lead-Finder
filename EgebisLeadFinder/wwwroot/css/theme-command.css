@@ -160,7 +160,7 @@ body.has-side.side-collapsed .eg-side { width: var(--side-w-collapsed); }
 .eg-top-brand small { font-weight: 500; color: var(--eg-text-muted); }
 .eg-top-brand .eg-brand-mark img { width: 28px; height: 28px; }
 .eg-top-actions { margin-left: auto; display: flex; align-items: center; gap: .35rem; }
-.eg-burger { display: none; }
+.eg-burger { display: inline-grid; }
 
 .tb-btn {
     position: relative; width: 38px; height: 38px; display: inline-grid; place-items: center;
@@ -309,15 +309,30 @@ main.container > *:nth-child(n+6) { animation-delay: 300ms; }
     .eg-side-link { height: 46px; }
 }
 
-/* ---------- Daraltilmis kenar cubugu (masaustu) ---------- */
+/* ---------- Daraltilmis kenar cubugu (masaustu) ----------
+   Simgeler yerinde kalir (dikey kayma yok); yalniz genislik ve yazilarin opakligi degisir.
+   Daralmisken fareyle ustune gelince 150 ms sonra gecici olarak genisler (icerigi itmez). */
+.eg-side { overflow: hidden; }
+.eg-side-label, .eg-side-brand-text, .eg-side-title, .eg-side-link .nav-badge {
+    transition: opacity var(--m-panel) var(--m-ease), transform var(--m-slide) var(--m-ease);
+}
+.eg-side .eg-side-link { padding-left: 14px; }
+.eg-side-head { padding-left: 1rem; }
+.eg-burger { display: inline-grid; }
 @media (min-width: 992px) {
-    body.side-collapsed .eg-side-brand-text, body.side-collapsed .eg-side-label, body.side-collapsed .eg-side-title { display: none; }
-    body.side-collapsed .eg-side-head { justify-content: center; padding: 0; flex-direction: column; height: auto; gap: .4rem; padding: .6rem 0; }
-    body.side-collapsed .eg-side-collapse { transform: rotate(180deg); }
-    body.side-collapsed .eg-side-link { justify-content: center; padding: 0; }
-    body.side-collapsed .eg-side-link .nav-badge, body.side-collapsed .eg-side-link .nav-alert-dot { position: absolute; top: 4px; right: 6px; margin: 0; }
-    body.side-collapsed .eg-side-link.is-active::before { left: -.6rem; }
-    body.side-collapsed .eg-side-group + .eg-side-group { margin-top: .5rem; border-top: 1px solid var(--side-line); padding-top: .5rem; }
+    :root { --side-w-collapsed: 66px; }
+    .eg-side-collapse { opacity: 0; pointer-events: none; }
+    .eg-side:hover .eg-side-collapse, .eg-side-collapse:focus-visible { opacity: 1; pointer-events: auto; }
+    body.side-collapsed .eg-side-collapse { display: none; }
+    body.side-collapsed .eg-side:not(:hover) .eg-side-label,
+    body.side-collapsed .eg-side:not(:hover) .eg-side-brand-text,
+    body.side-collapsed .eg-side:not(:hover) .eg-side-title,
+    body.side-collapsed .eg-side:not(:hover) .eg-side-link .nav-badge { opacity: 0; transform: translateX(-8px); pointer-events: none; }
+    body.side-collapsed .eg-side:not(:hover) .eg-side-link .nav-badge { position: absolute; top: 6px; left: 34px; opacity: 1; transform: none; transform-origin: center; font-size: .6rem; padding: 0 .3rem; min-width: 1rem; }
+    body.side-collapsed .eg-side:not(:hover) .eg-side-link .nav-alert-dot { position: absolute; top: 9px; left: 36px; margin: 0; }
+    body.side-collapsed .eg-side:not(:hover) .eg-side-link.is-active::before { left: -.6rem; }
+    /* Gecici genisleme (peek) */
+    body.side-collapsed .eg-side:hover { width: var(--side-w); transition-delay: 150ms; box-shadow: 8px 0 32px rgba(0, 0, 0, .28); }
 }
 
 /* Eski ust menu artik yok; basilan sayfada gizli kalsin */

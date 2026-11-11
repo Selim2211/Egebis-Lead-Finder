@@ -300,7 +300,10 @@
         btn.addEventListener('click', function () {
             var root = document.documentElement;
             var dark = root.getAttribute('data-theme') !== 'dark';
+            // Renkler 200 ms yumusak gecer (hareketi azaltan kullanicida CSS gecisi kapali).
+            root.classList.add('theme-fade');
             root.setAttribute('data-theme', dark ? 'dark' : 'light');
+            setTimeout(function () { root.classList.remove('theme-fade'); }, 260);
             try { localStorage.setItem('eg-theme', dark ? 'dark' : 'light'); } catch (e) { }
         });
     }
