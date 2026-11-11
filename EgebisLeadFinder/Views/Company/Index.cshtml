@@ -237,7 +237,21 @@
     </form>
 }
 
-<nav class="stage-chips mb-4" aria-label="Satış aşaması filtresi">
+@{
+    var stageActive = (string.IsNullOrEmpty(Model.Stage) ? 0 : 1) + (Model.Icp ? 1 : 0) + (Model.NotEvaluated ? 1 : 0) + (Model.Favorites ? 1 : 0);
+}
+<div class="collapse-box mb-4 @(stageActive > 0 ? "is-open" : "")" data-collapse data-collapse-key="eg-stage-filters" data-collapse-force="@(stageActive > 0 ? "open" : "")">
+    <button type="button" class="collapse-toggle" data-collapse-toggle aria-expanded="@(stageActive > 0 ? "true" : "false")" aria-controls="stageChipsPanel">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4 2v-8z" /></svg>
+        <span>Durum filtreleri</span>
+        @if (stageActive > 0)
+        {
+            <span class="collapse-badge">@stageActive aktif</span>
+        }
+        <svg class="collapse-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+    </button>
+    <div class="collapse-panel" id="stageChipsPanel"><div class="collapse-inner">
+<nav class="stage-chips" aria-label="Satış aşaması filtresi">
     @foreach (var s in stages)
     {
         <a class="stage-chip @s.Css @(Model.Stage == s.Key ? "is-active" : "")" href="@StageUrl(s.Key)">
@@ -268,6 +282,8 @@
         <a class="stage-chip" asp-controller="Icp" asp-action="Index" title="İdeal müşteri profilini düzenle">ICP ayarla</a>
     }
 </nav>
+    </div></div>
+</div>
 
 @* ---------- Detayli filtre cekmecesi ---------- *@
 <div class="offcanvas offcanvas-end filter-drawer" tabindex="-1" id="filterDrawer" aria-labelledby="filterDrawerTitle">

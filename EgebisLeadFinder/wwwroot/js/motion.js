@@ -108,4 +108,20 @@
             if (t < 1) requestAnimationFrame(step);
         })(performance.now());
     });
+
+    // ---- Acilir / kapanir kutular: [data-collapse] > [data-collapse-toggle] ----
+    document.querySelectorAll('[data-collapse]').forEach(function (box) {
+        var btn = box.querySelector('[data-collapse-toggle]');
+        if (!btn) return;
+        var key = box.getAttribute('data-collapse-key');
+        var forced = box.getAttribute('data-collapse-force');
+        var open = forced === 'open' ? true : (key && store('get', key) === 'open');
+        function apply(v) { box.classList.toggle('is-open', v); btn.setAttribute('aria-expanded', v ? 'true' : 'false'); }
+        apply(!!open);
+        btn.addEventListener('click', function () {
+            var v = !box.classList.contains('is-open');
+            apply(v);
+            if (key && forced !== 'open') store('set', key, v ? 'open' : 'closed');
+        });
+    });
 })();

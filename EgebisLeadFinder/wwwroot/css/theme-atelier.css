@@ -331,3 +331,35 @@ a:not(.btn):not(.action-btn):not(.eg-side-link):not(.tb-btn):hover { color: var(
 }
 .eg-brand-mark::after { display: none; }
 .eg-top-brand .eg-brand-mark { width: 34px; height: 34px; }
+
+
+/* Acilir/kapanir kutu (durum filtreleri): kayarak acilir, cipler sirayla gelir */
+.collapse-box { display: block; }
+.collapse-toggle {
+    display: inline-flex; align-items: center; gap: .55rem; min-height: 40px; padding: 0 .95rem;
+    border: 1px solid color-mix(in srgb, var(--blue) 35%, var(--eg-border-strong)); border-radius: 10px; cursor: pointer;
+    background: color-mix(in srgb, var(--blue) 8%, var(--eg-surface)); color: var(--eg-text); font-weight: 600; font-size: .92rem;
+    transition: background var(--m-in) var(--m-ease), border-color var(--m-in) var(--m-ease), transform var(--m-in) var(--m-ease);
+}
+.collapse-toggle:hover { background: color-mix(in srgb, var(--blue) 18%, var(--eg-surface)); border-color: var(--blue); }
+.collapse-toggle:active { transform: scale(.985); transition-duration: var(--m-press); }
+.collapse-chevron { transition: transform 280ms var(--m-ease-enter); }
+.collapse-box.is-open .collapse-chevron { transform: rotate(180deg); }
+.collapse-badge { background: var(--accent); color: var(--accent-ink); border-radius: 999px; font-size: .72rem; font-weight: 700; padding: .12rem .5rem; }
+.collapse-panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 300ms var(--m-ease-enter); }
+.collapse-box.is-open .collapse-panel { grid-template-rows: 1fr; }
+.collapse-inner { overflow: hidden; min-height: 0; }
+.collapse-inner .stage-chips { padding-top: .85rem; margin: 0; }
+.collapse-panel .stage-chip { opacity: 0; transform: translateY(-6px); transition: opacity 220ms ease, transform 280ms var(--m-ease-enter), background var(--m-in), border-color var(--m-in); }
+.collapse-box.is-open .stage-chip { opacity: 1; transform: none; }
+.collapse-box.is-open .stage-chip:nth-child(1) { transition-delay: 40ms; } .collapse-box.is-open .stage-chip:nth-child(2) { transition-delay: 80ms; }
+.collapse-box.is-open .stage-chip:nth-child(3) { transition-delay: 120ms; } .collapse-box.is-open .stage-chip:nth-child(4) { transition-delay: 160ms; }
+.collapse-box.is-open .stage-chip:nth-child(5) { transition-delay: 200ms; } .collapse-box.is-open .stage-chip:nth-child(n+6) { transition-delay: 240ms; }
+.collapse-panel:not(:has(*:focus)) .stage-chip { visibility: visible; }
+.collapse-box:not(.is-open) .collapse-panel { visibility: hidden; transition: grid-template-rows 300ms var(--m-ease-enter), visibility 0s linear 300ms; }
+@media (prefers-reduced-motion: reduce) { .collapse-panel, .collapse-panel .stage-chip { transition: none !important; } }
+
+/* Detayli filtre cekmecesi: agir efektler kapali (bazi ekran kartlarinda siyah ekran yapiyordu) */
+.offcanvas-backdrop, .offcanvas-backdrop.show, .modal-backdrop { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; background-color: #070c18; }
+.offcanvas-backdrop.show { opacity: .55; }
+main.container > .offcanvas, main.container > .modal { animation: none !important; }
