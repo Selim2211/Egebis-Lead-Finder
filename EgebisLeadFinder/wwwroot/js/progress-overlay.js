@@ -86,6 +86,16 @@
         document.body.classList.remove("eg-progress-lock");
     }
 
+    // Sonuc adresi ayni sayfa + #parca ise tarayici yeniden yuklemez; bu durumda sayfa elle yenilenir.
+    function goTo(url) {
+        var target = url || window.location.href;
+        var a = document.createElement("a");
+        a.href = target;
+        var samePage = a.origin === window.location.origin && a.pathname === window.location.pathname && a.search === window.location.search;
+        window.location.href = target;
+        if (samePage) window.location.reload();
+    }
+
     function fail(el, message) {
         el.classList.add("is-error");
         el.querySelector(".eg-progress__stage").textContent = "İşlem başarısız";
@@ -147,7 +157,7 @@
                 if (d.state === "done") {
                     setPercent(el, 100);
                     el.querySelector(".eg-progress__stage").textContent = "Tamamlandı, yönlendiriliyor…";
-                    window.location.href = d.resultUrl || window.location.href;
+                    goTo(d.resultUrl);
                     return;
                 }
                 if (d.state === "failed") {
@@ -158,7 +168,7 @@
                     el.querySelector(".eg-progress__cancel").hidden = true;
                     el.querySelector(".eg-progress__stage").textContent = "İptal edildi";
                     if (d.resultUrl) {
-                        window.location.href = d.resultUrl;
+                        goTo(d.resultUrl);
                     } else {
                         el.querySelector(".eg-progress__close").hidden = false;
                     }
