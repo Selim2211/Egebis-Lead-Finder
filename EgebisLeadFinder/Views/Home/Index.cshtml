@@ -7,6 +7,19 @@
     var tr = new System.Globalization.CultureInfo("tr-TR");
 
     // Grafikler kutuphanesiz; yuzdeler burada hesaplanir.
+    // Kucuk cizgi grafik: 7 gunluk degerlerden SVG noktalari (yeterli veri yoksa bos doner).
+    string Spark(IEnumerable<int> values)
+    {
+        var v = values.ToList();
+        if (v.Count < 2 || v.Max() == 0) return "";
+        var max = v.Max();
+        var pts = v.Select((n, i) => (i * 100.0 / (v.Count - 1)).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "," +
+            (22 - n * 20.0 / max).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture));
+        return string.Join(" ", pts);
+    }
+    var sparkCompanies = Spark(Model.Activity.Select(a => a.Companies));
+    var sparkMails = Spark(Model.Activity.Select(a => a.Mails));
+
     int Pct(int value, int max) => max <= 0 || value <= 0 ? 0 : Math.Max(3, (int)Math.Round(100.0 * value / max));
 
     var leadCount = Model.Funnel.FirstOrDefault(f => f.Label == "Lead açıldı")?.Count ?? 0;
@@ -70,6 +83,10 @@
             <div class="stat-label">Toplam Firma</div>
             <div class="stat-value">@Model.TotalCompanies</div>
             <div class="stat-note">@Model.PotentialLeads puanlı aday</div>
+            @if (sparkCompanies != "")
+            {
+                <svg class="eg-spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline points="@sparkCompanies" /></svg>
+            }
         </a>
     </div>
     <div class="col-6 col-lg-3">
@@ -77,6 +94,10 @@
             <div class="stat-label">Lead açılan firma</div>
             <div class="stat-value">@leadCount</div>
             <div class="stat-note">@Model.Sent lead'e mail atıldı</div>
+            @if (sparkMails != "")
+            {
+                <svg class="eg-spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline points="@sparkMails" /></svg>
+            }
         </a>
     </div>
     <div class="col-6 col-lg-3">

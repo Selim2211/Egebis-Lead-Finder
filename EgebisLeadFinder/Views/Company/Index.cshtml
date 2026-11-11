@@ -469,7 +469,16 @@ else
                             </div>
                         </div>
                         <div class="company-card-score">
-                            <partial name="_CompanyScore" model="company" />
+                            @if (company.EvaluationStatus != EvaluationStatus.NotEvaluated && company.Score > 0)
+                            {
+                                <span class="eg-ring @(company.Score >= 70 ? "ring-hot" : company.Score >= 40 ? "ring-warm" : "ring-cold")" data-p="@Math.Min(100, company.Score)" title="Lead puanı @company.Score" aria-label="Lead puanı @company.Score">
+                                    <span class="eg-ring-n">@company.Score</span>
+                                </span>
+                            }
+                            else
+                            {
+                                <partial name="_CompanyScore" model="company" />
+                            }
                         </div>
                     </div>
 

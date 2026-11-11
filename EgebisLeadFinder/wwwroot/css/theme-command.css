@@ -239,10 +239,38 @@ main.container > *:nth-child(n+6) { animation-delay: 300ms; }
 .row > .col-6:nth-child(3) .stat-card, .row > .col-lg-3:nth-child(3) .stat-card { animation-delay: 200ms; }
 .row > .col-6:nth-child(4) .stat-card, .row > .col-lg-3:nth-child(4) .stat-card { animation-delay: 260ms; }
 
-/* Puan halkasi: yuklemede bir kez dolar */
-.eg-ring { --p: 0; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 auto;
-    background: conic-gradient(var(--ring, var(--accent)) calc(var(--p) * 1%), color-mix(in srgb, var(--eg-text) 9%, transparent) 0);
-    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px)); mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px)); }
+/* Puan halkasi: yuklemede bir kez dolar (sayi halkanin icinde, maske yalniz halkayi keser) */
+.eg-ring { --p: 0; --ring: var(--accent); position: relative; width: 46px; height: 46px; display: grid; place-items: center; flex: 0 0 auto; }
+.eg-ring::before {
+    content: ""; position: absolute; inset: 0; border-radius: 50%;
+    background: conic-gradient(var(--ring) calc(var(--p) * 1%), color-mix(in srgb, var(--eg-text) 10%, transparent) 0);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px)); mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+}
+.eg-ring-n { position: relative; font-family: var(--font-mono); font-weight: 600; font-size: .95rem; font-variant-numeric: tabular-nums; color: var(--eg-text); }
+.eg-ring.ring-hot { --ring: #059669; }
+.eg-ring.ring-warm { --ring: #f59e0b; }
+.eg-ring.ring-cold { --ring: #94a3b8; }
+
+/* Panel: kucuk cizgi grafik */
+.stat-card { position: relative; overflow: hidden; }
+.eg-spark { position: absolute; right: 12px; bottom: 12px; width: 84px; height: 24px; opacity: .85; }
+.eg-spark polyline { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
+    stroke-dasharray: 220; stroke-dashoffset: 220; animation: eg-draw 900ms var(--m-ease-enter) 250ms forwards; }
+@keyframes eg-draw { to { stroke-dashoffset: 0; } }
+
+/* Ilerleme penceresi: radar taramasi (yalniz renk/donus; hareket azaltmada durur) */
+.eg-progress:not(.is-error) .eg-progress__ring::before {
+    content: ""; position: absolute; inset: 4px; border-radius: 50%; z-index: 0;
+    background: conic-gradient(from 0deg, transparent 0deg, rgba(245, 158, 11, .0) 250deg, rgba(245, 158, 11, .28) 360deg);
+    animation: eg-sweep 3.2s linear infinite;
+}
+.eg-progress__ring svg, .eg-progress__pct { position: relative; z-index: 1; }
+.eg-progress__ring svg { position: absolute; inset: 0; }
+@keyframes eg-sweep { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .eg-progress .eg-progress__ring::before { animation: none; } }
+
+/* Firma / lead kartlari: puan halkasi icin yer */
+.company-card-score { display: grid; place-items: center; min-width: 46px; }
 
 /* ---------- Komut paleti ---------- */
 .eg-cmd { position: fixed; inset: 0; z-index: 3000; display: grid; place-items: start center; padding-top: 14vh; }
