@@ -1,0 +1,96 @@
+/* Komuta Merkezi: kenar cubugu davranisi ve sayfa hareketleri.
+   Yalnizca transform / opacity kullanilir; hareket azaltma tercihi saygi gorur. */
+(function () {
+    'use strict';
+
+    var body = document.body;
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function store(op, key, val) {
+        try { return op === 'get' ? localStorage.getItem(key) : localStorage.setItem(key, val); } catch (e) { return null; }
+    }
+    function session(op, key, val) {
+        try { return op === 'get' ? sessionStorage.getItem(key) : sessionStorage.setItem(key, val); } catch (e) { return null; }
+    }
+
+    // ---- Kenar cubugu: daralt / ac ----
+    var collapseBtn = document.getElementById('egSideCollapse');
+    if (store('get', 'eg-side') === 'collapsed' && window.matchMedia('(min-width: 992px)').matches) {
+        body.classList.add('side-collapsed');
+    }
+    if (collapseBtn) {
+        collapseBtn.addEventListener('click', function () {
+            var on = body.classList.toggle('side-collapsed');
+            store('set', 'eg-side', on ? 'collapsed' : 'open');
+            collapseBtn.setAttribute('aria-label', on ? 'Menüyü genişlet' : 'Menüyü daralt');
+        });
+    }
+
+    // ---- Mobil cekmece ----
+    var burger = document.getElementById('egBurger');
+    var backdrop = document.getElementById('egSideBackdrop');
+    function setDrawer(open) {
+        body.classList.toggle('nav-open', open);
+        if (burger) burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (backdrop) backdrop.hidden = !open;
+    }
+    if (burger) burger.addEventListener('click', function () { setDrawer(!body.classList.contains('nav-open')); });
+    if (backdrop) backdrop.addEventListener('click', function () { setDrawer(false); });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && body.classList.contains('nav-open')) setDrawer(false);
+    });
+
+    // ---- Aktif oge gostergesi: bir onceki sayfadaki yerinden yenisine kayar ----
+    var nav = document.getElementById('egSideNav');
+    var ind = nav && nav.querySelector('.eg-side-ind');
+    function placeIndicator() {
+        if (!nav || !ind) return;
+        var active = nav.querySelector('.eg-side-link.is-active');
+        if (!active) { ind.classList.remove('is-on'); return; }
+        var y = active.offsetTop;
+        var prev = parseFloat(session('get', 'eg-ind-y'));
+        if (!reduce && isFinite(prev) && prev !== y) {
+            ind.style.transition = 'none';
+            ind.style.setProperty('--ind-y', prev + 'px');
+            ind.classList.add('is-on');
+            void ind.offsetWidth;   // baslangic konumu uygulansin
+            ind.style.transition = '';
+        }
+        ind.style.setProperty('--ind-y', y + 'px');
+        ind.classList.add('is-on');
+        session('set', 'eg-ind-y', String(y));
+    }
+    placeIndicator();
+    window.addEventListener('resize', function () { if (ind) { ind.style.transition = 'none'; placeIndicator(); } });
+
+    // ---- Sayilar sayarak gelir (bir kez, 900 ms) ----
+    function countUp(el) {
+        var raw = el.textContent.trim();
+        if (!/^\d{1,3}(\.\d{3})*$|^\d+$/.test(raw)) return;       // yalniz tam sayilar ("1.284", "62")
+        var target = parseInt(raw.replace(/\./g, ''), 10);
+        if (!isFinite(target) || target < 2 || target > 1e7) return;
+        var start = performance.now(), dur = 900;
+        function fmt(n) { return n.toLocaleString('tr-TR'); }
+        function frame(now) {
+            var t = Math.min(1, (now - start) / dur);
+            var eased = 1 - Math.pow(1 - t, 3);
+            el.textContent = fmt(Math.round(target * eased));
+            if (t < 1) requestAnimationFrame(frame); else el.textContent = raw;
+        }
+        el.textContent = '0';
+        requestAnimationFrame(frame);
+    }
+    if (!reduce) document.querySelectorAll('.stat-value').forEach(countUp);
+
+    // ---- Puan halkalari: yuklemede bir kez dolar ----
+    document.querySelectorAll('.eg-ring[data-p]').forEach(function (r) {
+        var p = Math.max(0, Math.min(100, parseFloat(r.getAttribute('data-p')) || 0));
+        if (reduce) { r.style.setProperty('--p', p); return; }
+        var start = performance.now(), dur = 700;
+        (function step(now) {
+            var t = Math.min(1, (now - start) / dur);
+            r.style.setProperty('--p', (p * (1 - Math.pow(1 - t, 3))).toFixed(1));
+            if (t < 1) requestAnimationFrame(step);
+        })(performance.now());
+    });
+})();
