@@ -24,9 +24,16 @@ public static class DomainHelper
         return first.Length == 0 ? domain : char.ToUpperInvariant(first[0]) + first[1..];
     }
 
-    /// <summary>Kara listedeki bir domain mi? Alt alan adlarini da kapsar.</summary>
+    /// <summary>
+    /// Kara listedeki bir domain mi? "ornek.com" gibi alan adi kaydi yalnizca o alan adini ve alt alan adlarini kapsar
+    /// ("x.com" polyflex.com.tr'yi engellemez). Uzantisiz kayit ("haber", "ebay.") anahtar kelimedir, parca olarak aranir.
+    /// </summary>
     public static bool IsBlocked(string domain, IEnumerable<string> blockedDomains) =>
-        blockedDomains.Any(b => domain.Equals(b, StringComparison.OrdinalIgnoreCase)
-                             || domain.EndsWith("." + b, StringComparison.OrdinalIgnoreCase)
-                             || domain.Contains(b, StringComparison.OrdinalIgnoreCase));
+        blockedDomains.Any(b => IsDomainEntry(b)
+            ? domain.Equals(b, StringComparison.OrdinalIgnoreCase) || domain.EndsWith("." + b, StringComparison.OrdinalIgnoreCase)
+            : domain.Contains(b, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Ortasinda nokta olan ("ornek.com", "shop.ornek.com.tr") kayit alan adidir; basinda/sonunda nokta ya da noktasiz kayit anahtar kelimedir.</summary>
+    private static bool IsDomainEntry(string entry) =>
+        entry.Length > 2 && entry.IndexOf('.') > 0 && !entry.EndsWith('.');
 }

@@ -54,7 +54,7 @@ public class CompanyAnalysis
     [JsonPropertyName("reason")]
     public string? Reason { get; set; }
 
-    /// <summary>"Biz ne arıyoruz?" profiline uygunluk, 0-100 (profil bossa gelmez).</summary>
+    /// <summary>"Şirketimiz" profiline uygunluk, 0-100 (profil bossa gelmez).</summary>
     [JsonPropertyName("fitScore")]
     public int? FitScore { get; set; }
 

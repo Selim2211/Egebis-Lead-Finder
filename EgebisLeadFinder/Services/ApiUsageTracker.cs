@@ -29,6 +29,9 @@ public interface IApiUsageTracker
 
     /// <summary>Son 'days' gunun gunluk sayilari (bugun dahil, eskiden yeniye).</summary>
     Task<int[]> GetDailySeriesAsync(string provider, int days, CancellationToken ct = default) => Task.FromResult(new int[days]);
+
+    /// <summary>Tarih araligindaki (dahil) tum saglayicilarin gunluk cagri kayitlari.</summary>
+    Task<List<ApiUsageDaily>> GetDailyRowsAsync(DateOnly from, DateOnly to, CancellationToken ct = default) => Task.FromResult(new List<ApiUsageDaily>());
 }
 
 /// <summary>
@@ -52,6 +55,8 @@ public class ApiUsageTracker : IApiUsageTracker
 
     public async Task IncrementAsync(string provider, CancellationToken ct = default)
     {
+        // Aramaya ozel sayac (SearchRun.SerperCredits / AiCalls) veritabani yazimi basarisiz olsa da dogru kalsin.
+        UsageScope.Record(provider);
         try
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
@@ -157,6 +162,13 @@ public class ApiUsageTracker : IApiUsageTracker
         await using var scope = _scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         return await db.GeminiTokenDailies.AsNoTracking().Where(x => x.Date >= from && x.Date <= to).ToListAsync(ct);
+    }
+
+    public async Task<List<ApiUsageDaily>> GetDailyRowsAsync(DateOnly from, DateOnly to, CancellationToken ct = default)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await db.ApiUsageDailies.AsNoTracking().Where(x => x.Date >= from && x.Date <= to).ToListAsync(ct);
     }
 
     public async Task<int> GetRangeCountAsync(string provider, DateOnly from, DateOnly to, CancellationToken ct = default)

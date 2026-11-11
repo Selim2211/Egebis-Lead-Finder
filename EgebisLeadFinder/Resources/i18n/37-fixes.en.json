@@ -1,0 +1,20 @@
+{
+  "Paylaşan:": "Shared by:",
+  "\"{0}\" varsayılan arama profili yapıldı.": "\"{0}\" is now your default search profile.",
+  "Yöneticinizden isteyin": "Ask your administrator",
+  "Bunu yöneticinizden isteyin.": "Ask your administrator for this.",
+  "Ayarlar → E-posta Gönderimi (yönetici)": "Settings → Email sending (administrator)",
+  "Aramalarınızda bulunan bütün firmalar": "All companies found in your searches",
+  "Kendi aramalarınızın sonuçları bir arada": "The results of your own searches together",
+  "Satış aşamasına, ICP uyumuna veya favorilerinize göre tek tıkla süzün.": "Filter with one click by sales stage, ICP fit or your favorites.",
+  "Lead puanı, uygunluk yüzdesi ve yapay zekânın kısa gerekçesi. Karta tıklayınca firma detayı açılır.": "Lead score, fit percentage and the AI's short rationale. Click the card to open the company details.",
+  "Şirket sitenizin adresini yazın; yapay zekâ ne sattığınızı ve ideal müşterinizi taslak olarak çıkarır.": "Enter your company website address; the AI drafts what you sell and your ideal customer.",
+  " firma işlenmedi": " companies were not processed",
+  "O ana kadar işlenen": "Companies processed so far:",
+  "firma kaydedildi": "companies saved",
+  "Siteye girmeden elenen": "Candidates removed without opening their sites:",
+  "aday — neden elendiklerini gör": "— see why they were removed",
+  "firma incelenemedi; kota yenilenince aramayı tekrar çalıştırın.": "companies could not be examined; run the search again when the quota is renewed.",
+  "profiline otomatik eklendi.": "profile automatically.",
+  "Bulunan firmalar": "Companies found were added to the"
+}

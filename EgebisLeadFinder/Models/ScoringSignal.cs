@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace EgebisLeadFinder.Models;
 
 /// <summary>
-/// Puanlama anahtar kelimesi / kriteri: "Biz ne arıyoruz?" tanımından yapay zekânın üretip kullanıcının düzenlediği,
+/// Puanlama anahtar kelimesi / kriteri: "Şirketimiz" tanımından yapay zekânın üretip kullanıcının düzenlediği,
 /// puan veren bir ölçüt (ör. "Üretim yapıyor" +15). Firma bu ölçüte uyuyorsa puan dökümünde görünür.
 /// Eşleşme: yapay zekâ firma analizinde ölçüt adını işaretlediyse veya terimlerden biri firmanın analizinde geçiyorsa.
 /// </summary>

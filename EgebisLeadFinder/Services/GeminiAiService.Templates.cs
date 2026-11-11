@@ -4,7 +4,7 @@ using EgebisLeadFinder.Models;
 
 namespace EgebisLeadFinder.Services;
 
-/// <summary>"Biz ne arıyoruz?" profilinden e-posta taslaklari yazar (genel tanitim, segment basina, takip).</summary>
+/// <summary>"Şirketimiz" profilinden e-posta taslaklari yazar (genel tanitim, segment basina, takip).</summary>
 public interface ITemplateWriterAi
 {
     /// <param name="onlyKeys">Verilirse yalnizca bu anahtarlarin taslaklari yazilir (bos = hepsi).</param>
@@ -33,7 +33,7 @@ public partial class GeminiAiService : ITemplateWriterAi
     public async Task<TemplateDraftResult> DraftTemplatesAsync(BusinessProfile profile, IReadOnlyCollection<string>? onlyKeys = null, CancellationToken ct = default)
     {
         if (!profile.IsConfigured)
-            return new TemplateDraftResult { Error = "Önce “Biz ne arıyoruz?” ekranında şirket profilinizi doldurun." };
+            return new TemplateDraftResult { Error = "Önce “Şirketimiz” ekranında şirket profilinizi doldurun." };
 
         var keys = TemplateKeysFor(profile);
         if (onlyKeys is { Count: > 0 })

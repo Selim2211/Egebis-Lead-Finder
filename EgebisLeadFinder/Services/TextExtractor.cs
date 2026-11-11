@@ -81,6 +81,32 @@ public static partial class TextExtractor
         return sb.ToString().Trim();
     }
 
+    /// <summary>
+    /// Yapay zekaya gidecek metinden tekrarlari atar: ayni satir ikinci kez yazilmaz ve ardisik tekrar eden kayan yazi/menu
+    /// parcalari ("Derin Dondurucular 7 Yil Garantili ✦ ..." x24) tek sefere iner. Boylece sinirli metin payi
+    /// sitenin gercek icerigine kalir.
+    /// </summary>
+    public static string CollapseRepeats(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return string.Empty;
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var sb = new StringBuilder();
+        foreach (var raw in text.Split('\n'))
+        {
+            var line = raw.Trim();
+            if (line.Length == 0) continue;
+            try { line = RepeatedPhraseRegex().Replace(line, "${seg}"); }
+            catch (RegexMatchTimeoutException) { /* olduğu gibi birak */ }
+            if (line.Length > 3 && !seen.Add(line)) continue;
+            sb.AppendLine(line);
+        }
+        return sb.ToString().Trim();
+    }
+
+    [GeneratedRegex(@"(?<seg>[^\n]{12,200}?)(?:[\s✦•|·\-–]+\k<seg>){2,}", RegexOptions.None, matchTimeoutMilliseconds: 1500)]
+    private static partial Regex RepeatedPhraseRegex();
+
     public static IEnumerable<string> FindEmails(string text) =>
         EmailRegex().Matches(text)
             .Select(m => m.Value.ToLowerInvariant())

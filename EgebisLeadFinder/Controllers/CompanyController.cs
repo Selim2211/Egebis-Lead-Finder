@@ -64,6 +64,7 @@ public class CompanyController : Controller
     public async Task<IActionResult> Search(string? industry, CancellationToken ct)
     {
         var model = new CompanySearchViewModel();
+        // Sektor raporundan gelindi: Yeni Arama Profili penceresi bu sektorle acilir.
         if (!string.IsNullOrWhiteSpace(industry)) model.Criteria.Industry = industry.Trim()[..Math.Min(industry.Trim().Length, 150)];
         await FillSearchPageAsync(model, ct);
         return View(model);
@@ -101,6 +102,17 @@ public class CompanyController : Controller
         model.Region = region;
         model.DefaultCountry = region.Name;
         model.Profiles = await VisibleProfilesAsync(ct);
+        model.DefaultProfile = await DefaultProfileAsync(ct);
+        model.Criteria.ProfileId ??= model.DefaultProfile?.Id;
+    }
+
+    /// <summary>Kullanicinin varsayilan arama profili; secilmediyse veya artik gorunmuyorsa null.</summary>
+    private async Task<SearchProfile?> DefaultProfileAsync(CancellationToken ct)
+    {
+        var me = User.UserId();
+        if (me is null) return null;
+        var id = await _db.Users.AsNoTracking().Where(u => u.Id == me).Select(u => u.DefaultSearchProfileId).FirstOrDefaultAsync(ct);
+        return id is null ? null : await _db.SearchProfiles.AsNoTracking().VisibleTo(me).FirstOrDefaultAsync(p => p.Id == id, ct);
     }
 
     /// <summary>Kullanicinin gorebildigi arama sablonlari: kendi sablonlari once, sonra herkese acik olanlar.</summary>
@@ -155,39 +167,74 @@ public class CompanyController : Controller
     }
 
     /// <summary>
-    /// Formdan gelen kriterleri moda gore normalize eder. Azami firma ve ulke her
-    /// zaman Ayarlar'dan gelir (formdan gelen deger yok sayilir). Temel aramada il
-    /// ve profil yoktur: ulke genelinde taranir.
+    /// Aramanin kriterlerini kurar. Sektor, NACE, ulke, il ve firma sayisi yalnizca secilen Arama Profili'nden
+    /// gelir; profil secilmeden arama baslamaz. Firma adiyla arama varsayilan profilin ulkesinde yapilir.
     /// </summary>
     private async Task<string?> PrepareCriteriaAsync(CompanySearchViewModel model, CancellationToken ct)
     {
         var c = model.Criteria;
         var (maxCompanies, defaultRegion) = await GetSearchLimitsAsync(ct);
-
-        // Bolge her aramada formdan secilebilir; secim yoksa Ayarlar'daki bolge kullanilir.
-        var region = SearchRegions.IsKnown(c.RegionKey) ? SearchRegions.Get(c.RegionKey) : defaultRegion;
-        c.Country = region.Country;
-        c.RegionKey = region.Key;
-        model.Region = region;
-        model.DefaultCountry = region.Name;
+        c.SmartSearch = true;
 
         if (model.SubmitMode == CompanySearchViewModel.ModeCompany)
         {
             if (string.IsNullOrWhiteSpace(c.CompanyName))
                 return "Aranacak firma adını yazın.";
 
+            var fallback = await DefaultProfileAsync(ct);
+            if (fallback is null)
+                return "Firma adıyla aramak için önce Arama Profilleri ekranından varsayılan profil seçin.";
+
+            ApplyRegion(model, ProfileRegion(fallback, defaultRegion));
             c.CompanyName = c.CompanyName.Trim();
             c.Industry = string.Empty;
-            c.SegmentId = null;
             c.City = null;
             c.ProfileName = null;
+            c.ProfileId = null;
+            c.NaceCode = null;
+            c.NaceProducts = null;
             c.MaxCompanies = CompanySearchViewModel.NameSearchMaxResults;
             return null;
         }
 
         c.CompanyName = null;
+        if (c.ProfileId is not int profileId)
+            return "Aramayı başlatmak için bir Arama Profili seçin.";
 
-        // NACE kodu: gecerliyse kodun adi/arama terimleri cozulur; sektor bossa kodun adi sektor olur.
+        var profile = await _db.SearchProfiles.AsNoTracking().VisibleTo(User.UserId()).FirstOrDefaultAsync(p => p.Id == profileId, ct);
+        if (profile is null)
+            return "Seçilen arama profili bulunamadı; listeden başka bir profil seçin.";
+
+        ApplyRegion(model, ProfileRegion(profile, defaultRegion));
+        c.Industry = profile.Industry ?? string.Empty;
+        c.NaceCode = profile.NaceCode;
+        c.NaceProducts = profile.NaceProducts;
+        c.City = string.IsNullOrWhiteSpace(profile.City) ? null : profile.City;
+        c.MaxCompanies = profile.MaxCompanies is > 0
+            ? Math.Min(profile.MaxCompanies.Value, SettingKeys.SearchMaxCompaniesUpperLimit)
+            : maxCompanies;
+        model.SelectedProfile = profile;
+
+        return await ResolveNaceAsync(c, ct);
+    }
+
+    private static SearchRegion ProfileRegion(SearchProfile p, SearchRegion fallback)
+    {
+        var key = p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key;
+        return SearchRegions.IsKnown(key) ? SearchRegions.Get(key) : fallback;
+    }
+
+    private static void ApplyRegion(CompanySearchViewModel model, SearchRegion region)
+    {
+        model.Criteria.Country = region.Country;
+        model.Criteria.RegionKey = region.Key;
+        model.Region = region;
+        model.DefaultCountry = region.Name;
+    }
+
+    /// <summary>NACE kodu gecerliyse urunleri ve yapay zeka baglamini cozer; sektor bossa kodun adi sektor olur.</summary>
+    private async Task<string?> ResolveNaceAsync(SearchCriteria c, CancellationToken ct)
+    {
         c.ProductList.Clear();
         c.NaceContext = null;
         if (!string.IsNullOrWhiteSpace(c.NaceCode))
@@ -217,26 +264,6 @@ public class CompanyController : Controller
             return "Sektör alanı ya da NACE kodu zorunludur.";
 
         c.Industry = c.Industry.Trim();
-        // Ekrandaki "firma sayisi" secimi o aramaya ozeldir; Ayarlar'daki deger varsayilandir.
-        c.MaxCompanies = model.MaxCompaniesOverride is > 0
-            ? Math.Min(model.MaxCompaniesOverride.Value, SettingKeys.SearchMaxCompaniesUpperLimit)
-            : maxCompanies;
-
-        switch (model.SubmitMode)
-        {
-            case CompanySearchViewModel.ModeAdvancedSave:
-                if (string.IsNullOrWhiteSpace(c.ProfileName))
-                    return "Profili kaydetmek için bir profil adı girin.";
-                break;
-            case CompanySearchViewModel.ModeAdvanced:
-                c.ProfileName = null;
-                break;
-            default:
-                c.City = null;
-                c.ProfileName = null;
-                break;
-        }
-
         return null;
     }
 
@@ -244,7 +271,10 @@ public class CompanyController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Search(CompanySearchViewModel model, CancellationToken ct)
     {
+        // Sayfa verileri doldurulurken varsayilan profil secili gelir; ama arama icin profil acikca secilmis olmalidir.
+        var postedProfileId = model.Criteria.ProfileId;
         await FillSearchPageAsync(model, ct);
+        model.Criteria.ProfileId = postedProfileId;
 
         var error = await PrepareCriteriaAsync(model, ct);
         if (error is not null)
@@ -255,12 +285,15 @@ public class CompanyController : Controller
 
         var runs = HttpContext.RequestServices.GetRequiredService<SearchRunService>();
         SearchRun? run = null;
+        using var usage = UsageScope.Begin();
         try
         {
-            var profile = await SaveProfileAsync(model.Criteria, ct);
+            var profile = model.SelectedProfile;
             run = await runs.StartAsync(model.Criteria, profile, User.UserId(), ct);
             model.Result = await _discovery.RunAsync(model.Criteria, ct);
             model.Result.RunId = run.Id;
+            model.Result.SerperCredits = usage.SerperCredits;
+            model.Result.AiCalls = usage.AiCalls;
             if (profile is not null)
             {
                 model.Result.ProfileId = profile.Id;
@@ -273,7 +306,7 @@ public class CompanyController : Controller
         catch (Exception ex)
         {
             _logger.LogError(ex, "Firma araması başarısız.");
-            if (run is not null) await runs.FailAsync(run.Id, ex.Message, CancellationToken.None);
+            if (run is not null) await runs.FailAsync(run.Id, ex.Message, CancellationToken.None, usage);
             model.Error = ex.Message;
         }
 
@@ -284,7 +317,7 @@ public class CompanyController : Controller
     /// Criteria.ProfileName doluysa ayni isimli profili kriterlerle gunceller, yoksa
     /// olusturur. Olusturma tarihi (CreatedAt) ilk kayitta sabitlenir. Ad bossa null.
     /// </summary>
-    private async Task<SearchProfile?> SaveProfileAsync(SearchCriteria criteria, CancellationToken ct)
+    private async Task<SearchProfile?> SaveProfileAsync(SearchCriteria criteria, int? maxCompanies, CancellationToken ct)
     {
         var name = criteria.ProfileName?.Trim();
         if (string.IsNullOrWhiteSpace(name)) return null;
@@ -304,7 +337,7 @@ public class CompanyController : Controller
             // sonuclar yine kisiye ozel); kriter veya ad degistiyse kullanicinin kendi kopyasi olusur.
             if (profile is not null && !profile.CanEdit(me, isAdmin))
             {
-                if (profile.IsVisibleTo(me) && profile.Name == name && SameCriteria(profile, criteria))
+                if (profile.IsVisibleTo(me) && profile.Name == name && profile.MaxCompanies == maxCompanies && SameCriteria(profile, criteria))
                     return profile;
                 profile = null;
             }
@@ -328,6 +361,7 @@ public class CompanyController : Controller
         profile.City = criteria.City;
         profile.Country = criteria.Country;
         profile.RegionKey = criteria.RegionKey;
+        profile.MaxCompanies = maxCompanies;
         profile.IsPublic = criteria.ProfilePublic;
 
         await _db.SaveChangesAsync(ct);
@@ -341,31 +375,35 @@ public class CompanyController : Controller
         && string.Equals(p.City ?? "", c.City ?? "", StringComparison.OrdinalIgnoreCase)
         && string.Equals(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key, c.RegionKey, StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>Gelismis arama ekranindaki "Profili Kaydet": arama yapmadan sadece profili kaydeder.</summary>
+    private async Task TryFailRunAsync(SearchRunService runs, int runId, string error, UsageScope usage)
+    {
+        try { await runs.FailAsync(runId, error, CancellationToken.None, usage); }
+        catch (Exception ex) { _logger.LogError(ex, "Arama kaydı hataya çevrilemedi (arama #{Run}).", runId); }
+    }
+
+    /// <summary>Arama Profili penceresindeki "Kaydet": profili olusturur veya gunceller, arama yapmaz.</summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveProfile([FromForm] CompanySearchViewModel model, CancellationToken ct)
     {
-        model.SubmitMode = CompanySearchViewModel.ModeAdvancedSave;
-        var error = await PrepareCriteriaAsync(model, ct);
+        var c = model.Criteria;
+        if (string.IsNullOrWhiteSpace(c.ProfileName))
+            return BadRequest(new { error = "Arama profili için bir ad girin." });
+
+        var (_, defaultRegion) = await GetSearchLimitsAsync(ct);
+        ApplyRegion(model, SearchRegions.IsKnown(c.RegionKey) ? SearchRegions.Get(c.RegionKey) : defaultRegion);
+        c.City = string.IsNullOrWhiteSpace(c.City) ? null : c.City.Trim();
+
+        var error = await ResolveNaceAsync(c, ct);
         if (error is not null)
             return BadRequest(new { error });
 
-        var profile = (await SaveProfileAsync(model.Criteria, ct))!;
-        return Json(new
-        {
-            id = profile.Id,
-            name = profile.Name,
-            industry = profile.Industry,
-            naceCode = profile.NaceCode,
-            naceProducts = profile.NaceProducts,
-            city = profile.City,
-            regionKey = profile.RegionKey,
-            regionName = SearchRegions.Get(profile.RegionKey).Name,
-            createdAt = profile.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm"),
-            isPublic = profile.IsPublic,
-            canEdit = profile.CanEdit(User.UserId(), User.IsAdmin())
-        });
+        var max = model.MaxCompaniesOverride is > 0
+            ? Math.Min(model.MaxCompaniesOverride.Value, SettingKeys.SearchMaxCompaniesUpperLimit)
+            : (int?)null;
+        var profile = (await SaveProfileAsync(c, max, ct))!;
+        AuditActionFilter.SetAuditSummary(HttpContext, $"Arama profili kaydedildi: {profile.Name}");
+        return Json(SearchProfileDto.From(profile, User.UserId(), User.IsAdmin()));
     }
 
     /// <summary>Sablonu herkese acar veya kisiye ozel yapar (yalnizca sahibi). Arama sonuclari hic paylasilmaz.</summary>
@@ -404,7 +442,7 @@ public class CompanyController : Controller
         if (error is not null)
             return BadRequest(new { error });
 
-        var profile = await SaveProfileAsync(model.Criteria, ct);
+        var profile = model.SelectedProfile;
 
         // Profil tanimli ama puanlama anahtar kelimeleri yoksa (eski profil) yapay zeka bir kez uretir; hata aramayi engellemez.
         try { await HttpContext.RequestServices.GetRequiredService<ProfileSignalService>().EnsureAsync(User.Identity?.Name, ct); }
@@ -426,10 +464,13 @@ public class CompanyController : Controller
             var discovery = scope.ServiceProvider.GetRequiredService<LeadDiscoveryService>();
             var runs = scope.ServiceProvider.GetRequiredService<SearchRunService>();
             var reporter = new Progress<JobStep>(s => _progress.Report(job.Id, s.Percent, s.Stage, s.Detail));
+            using var usage = UsageScope.Begin();
 
             try
             {
                 var result = await discovery.RunAsync(criteria, job.Token, reporter);
+                result.SerperCredits = usage.SerperCredits;
+                result.AiCalls = usage.AiCalls;
                 result.RunId = run.Id;
                 result.Criteria = criteria;
                 if (profile is not null)
@@ -455,14 +496,15 @@ public class CompanyController : Controller
             }
             catch (MissingApiKeyException ex)
             {
-                await runs.FailAsync(run.Id, ex.Message);
                 _progress.Fail(job.Id, ex.Message);
+                await TryFailRunAsync(runs, run.Id, ex.Message, usage);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Firma araması başarısız (arka plan).");
-                await runs.FailAsync(run.Id, ex.Message);
+                // Ilerleme once "hata" olur: veritabani kaydi basarisiz olsa bile tarayici sonsuza dek beklemez.
                 _progress.Fail(job.Id, ex.Message);
+                await TryFailRunAsync(runs, run.Id, ex.Message, usage);
             }
         });
 
@@ -597,18 +639,17 @@ public class CompanyController : Controller
         int? profileId = null, string? stage = null, string? signal = null, string? sort = null,
         [FromQuery(Name = "region")] string[]? regions = null, [FromQuery(Name = "city")] string[]? cities = null,
         [FromQuery(Name = "country")] string[]? countries = null, string? nace = null, bool icp = false,
-        int page = 1, string? run = null, bool notEvaluated = false, string? segment = null, bool fav = false,
+        int page = 1, string? run = null, bool notEvaluated = false, bool fav = false,
         CancellationToken ct = default)
     {
         var geo = GeoFilter.From(regions, cities, countries);
         if (signal is not ("guclu" or "incelenmeli" or "riskli" or "none")) signal = null;
         sort = CompanySort.Options.Any(o => o.Key == sort) ? sort! : CompanySort.Default;
         nace = NaceCatalog.DivisionCode(nace);
-        segment = string.IsNullOrWhiteSpace(segment) ? null : segment.Trim();
         // Favoriler suzgeci tum (gorunen) firmalar uzerinde calisir: cipteki sayi = listedeki firma.
         var runId = await ResolveRunAsync(fav ? "all" : run, profileId, ct);
         var query = await FilterCompaniesAsync(search, minScore, onlyWithoutLead, profileId, stage, signal, geo, nace, icp, ct,
-            runId, notEvaluated, segment, fav);
+            runId, notEvaluated, fav);
         var ordered = OrderCompanies(query, sort);
 
         // Asama, ICP ve "incelenemedi" sayilari tek sorguda: secili aramanin icinden (secili degilse gorunen tum firmalar).
@@ -656,12 +697,6 @@ public class CompanyController : Controller
             RunId = runId,
             NotEvaluated = notEvaluated,
             NotEvaluatedCount = counts?.NotEvaluated ?? 0,
-            Segment = segment,
-            SegmentCounts = await ScopeToRun(_db.Companies.AsNoTracking(), runId)
-                .Where(c => c.FitSegment != null)
-                .GroupBy(c => c.FitSegment!)
-                .Select(g => new { g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.Key, x => x.Count, ct),
             // Havuz sayilari yalnizca yoneticinin "Tumunu sil" onayinda kullanilir.
             Pool = isAdmin ? await FacetAsync("pool", () => PoolCountsAsync(ct)) : null,
             Search = search,
@@ -726,16 +761,15 @@ public class CompanyController : Controller
         int? profileId = null, string? stage = null, string? signal = null, string? sort = null,
         [FromQuery(Name = "region")] string[]? regions = null, [FromQuery(Name = "city")] string[]? cities = null,
         [FromQuery(Name = "country")] string[]? countries = null, string? nace = null, bool icp = false,
-        string? run = null, bool notEvaluated = false, string? segment = null, bool fav = false, CancellationToken ct = default)
+        string? run = null, bool notEvaluated = false, bool fav = false, CancellationToken ct = default)
     {
         var geo = GeoFilter.From(regions, cities, countries);
         var runId = await ResolveRunAsync(fav ? "all" : run, profileId, ct);
-        segment = string.IsNullOrWhiteSpace(segment) ? null : segment.Trim();
         if (signal is not ("guclu" or "incelenmeli" or "riskli" or "none")) signal = null;
         sort = CompanySort.Options.Any(o => o.Key == sort) ? sort! : CompanySort.Default;
 
         var query = await FilterCompaniesAsync(search, minScore, onlyWithoutLead, profileId, stage, signal, geo,
-            NaceCatalog.DivisionCode(nace), icp, ct, runId, notEvaluated, segment, fav);
+            NaceCatalog.DivisionCode(nace), icp, ct, runId, notEvaluated, fav);
         var companies = await OrderCompanies(query, sort).ThenBy(c => c.Id)
             .Take(ExportService.MaxRows)
             .Include(c => c.Contacts)
@@ -780,7 +814,7 @@ public class CompanyController : Controller
     /// <summary>Firmalar listesi ve disa aktarim ayni suzgeci kullanir: ekranda ne varsa o iner.</summary>
     private async Task<IQueryable<Company>> FilterCompaniesAsync(string? search, int minScore, bool onlyWithoutLead,
         int? profileId, string? stage, string? signal, GeoFilter geo, string? nace, bool icp, CancellationToken ct,
-        int? runId = null, bool notEvaluated = false, string? segment = null, bool favorites = false)
+        int? runId = null, bool notEvaluated = false, bool favorites = false)
     {
         var query = ScopeToRun(_db.Companies.AsNoTracking(), runId).Where(c => c.Score >= minScore);
 
@@ -790,7 +824,6 @@ public class CompanyController : Controller
             query = query.Where(c => _db.FavoriteCompanies.Any(f => f.UserId == me && f.CompanyId == c.Id));
         }
 
-        if (segment is not null) query = query.Where(c => c.FitSegment == segment);
 
         if (notEvaluated) query = query.Where(c => c.EvaluationStatus == EvaluationStatus.NotEvaluated);
 

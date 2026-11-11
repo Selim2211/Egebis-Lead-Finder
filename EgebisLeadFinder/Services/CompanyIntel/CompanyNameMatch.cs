@@ -15,6 +15,10 @@ public static class CompanyNameMatch
         "holding", "grubu", "grup", " ve "
     };
 
+    private static readonly System.Text.RegularExpressions.Regex NoiseRegex = new(
+        @"(?<![a-z0-9])(?:" + string.Join("|", Noise.Select(n => System.Text.RegularExpressions.Regex.Escape(n.Trim())).OrderByDescending(n => n.Length)) + @")(?![a-z0-9])",
+        System.Text.RegularExpressions.RegexOptions.Compiled);
+
     /// <summary>
     /// Karsilastirma anahtari: kucuk harf + ASCII + gurultu kelimeler cikarilmis.
     /// Ornek: "Trakya Cam Sanayii A.Ş." ve "TRAKYA CAM SANAYİİ A.Ş." -> "trakya cam".
@@ -23,8 +27,8 @@ public static class CompanyNameMatch
     {
         var s = TurkishText.Normalize(name);
 
-        foreach (var noise in Noise)
-            s = s.Replace(noise, " ");
+        // Gurultu kelimeler yalnizca tam kelime olarak silinir: "plastik" icindeki "sti" ya da "arsan" icindeki "san" firma adini bozmasin.
+        s = NoiseRegex.Replace(s, " ");
 
         return string.Join(' ',
             s.Split(new[] { ' ', '.', ',', '-', '/', '&' }, StringSplitOptions.RemoveEmptyEntries));

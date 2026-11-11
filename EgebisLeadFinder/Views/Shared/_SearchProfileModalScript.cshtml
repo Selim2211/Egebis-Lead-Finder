@@ -1,0 +1,376 @@
+@using EgebisLeadFinder.Data
+@{
+    // Turkiye disindaki Avrupa ulkelerinde bolge/eyalet listesi (secime gore panel JS ile kurulur).
+    var subJson = System.Text.Json.JsonSerializer.Serialize(
+        RegionSubdivisions.All.ToDictionary(k => k.Key, k => k.Value.Select(g => new { name = g.Name, items = g.Items }).ToList()));
+}
+<script>
+    // Arama Profili penceresi (olustur/duzenle) ve detay penceresi. Firma Ara ile Arama Profilleri ekranlari ortak kullanir.
+    // Kaydedince document uzerinde 'searchprofile:saved' olayi (detail: profil) yayinlanir.
+    (function () {
+        var modalEl = document.getElementById('searchProfileModal');
+        var form = document.getElementById('searchProfileForm');
+        var title = document.getElementById('searchProfileTitle');
+        var idField = document.getElementById('spId');
+        var nameInput = document.getElementById('spName');
+        var industry = document.getElementById('spIndustry');
+        var region = document.getElementById('spRegion');
+        var maxInput = document.getElementById('spMax');
+        var publicBox = document.getElementById('spPublic');
+        var status = document.getElementById('spStatus');
+        var saveBtn = document.getElementById('spSave');
+        var hiddenCity = document.getElementById('cityHiddenField');
+        var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.city-checkbox'));
+        var countLabel = document.getElementById('citySelectedCount');
+        var provincePanel = document.getElementById('provincePanel');
+        var freePanel = document.getElementById('freePanel');
+        var freeText = document.getElementById('cityFreeText');
+        var subPanel = document.getElementById('subPanel');
+        var subHidden = document.getElementById('subHiddenField');
+        var subGrid = document.getElementById('subGrid');
+        var subChips = document.getElementById('subChips');
+        var subCount = document.getElementById('subSelectedCount');
+        var SUBS = @Html.Raw(subJson);
+        var subKey = null;
+        var regionNames = {};
+        Array.prototype.forEach.call(region.options, function (o) { regionNames[o.value] = o.textContent; });
+
+        function setRegion(key) {
+            if (!regionNames[key]) key = modalEl.getAttribute('data-default-region');
+            region.value = key;
+            document.querySelectorAll('.region-name').forEach(function (s) { s.textContent = regionNames[key]; });
+            var tr = key === 'TR';
+            var sub = !tr && !!SUBS[key];
+            provincePanel.hidden = !tr;
+            subPanel.hidden = !sub;
+            freePanel.hidden = tr || sub;
+            hiddenCity.disabled = !tr;
+            subHidden.disabled = !sub;
+            freeText.disabled = tr || sub;
+            if (sub) buildSub(key);
+        }
+
+        // Avrupa ulkelerinde bolge / eyalet paneli: hizli gruplar + onay kutulari (secim "Criteria.City" olarak gider).
+        function subSelected() {
+            return Array.prototype.slice.call(subGrid.querySelectorAll('input:checked')).map(function (i) { return i.value; });
+        }
+
+        function syncSub() {
+            var selected = subSelected();
+            if (!subHidden.disabled) subHidden.value = selected.join(', ');
+            subCount.textContent = selected.length === 0 ? (regionNames[subKey] || '') + ' geneli' : selected.length + ' seçili';
+            subChips.querySelectorAll('.region-chip').forEach(function (chip) {
+                var items = chip.getAttribute('data-cities').split('|');
+                chip.classList.toggle('is-active', items.every(function (c) { return selected.indexOf(c) !== -1; }));
+            });
+        }
+
+        function buildSub(key, preset) {
+            var keep = preset || (subKey === key ? subSelected() : []);
+            subKey = key;
+            subChips.innerHTML = '';
+            subGrid.innerHTML = '';
+            (SUBS[key] || []).forEach(function (group) {
+                if ((SUBS[key] || []).length > 1) {
+                    var chip = document.createElement('button');
+                    chip.type = 'button';
+                    chip.className = 'region-chip';
+                    chip.setAttribute('data-cities', group.items.join('|'));
+                    chip.appendChild(document.createTextNode(group.name + ' '));
+                    var n = document.createElement('span');
+                    n.className = 'region-chip-count';
+                    n.textContent = group.items.length;
+                    chip.appendChild(n);
+                    chip.addEventListener('click', function () {
+                        var on = !chip.classList.contains('is-active');
+                        subGrid.querySelectorAll('input').forEach(function (i) {
+                            if (group.items.indexOf(i.value) !== -1) i.checked = on;
+                        });
+                        syncSub();
+                    });
+                    subChips.appendChild(chip);
+                }
+                group.items.forEach(function (name) {
+                    var label = document.createElement('label');
+                    label.className = 'city-check';
+                    var input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.value = name;
+                    input.checked = keep.indexOf(name) !== -1;
+                    input.addEventListener('change', syncSub);
+                    var span = document.createElement('span');
+                    span.textContent = name;
+                    label.appendChild(input);
+                    label.appendChild(span);
+                    subGrid.appendChild(label);
+                });
+            });
+            syncSub();
+        }
+
+        document.getElementById('subClear').addEventListener('click', function () { buildSub(subKey, []); });
+        document.getElementById('subSearchBox').addEventListener('input', function () {
+            var term = this.value.trim().toLocaleLowerCase();
+            subGrid.querySelectorAll('.city-check').forEach(function (label) {
+                label.hidden = term !== '' && label.querySelector('span').textContent.toLocaleLowerCase().indexOf(term) === -1;
+            });
+        });
+
+        // NACE kodu: yazilinca kodun anlami yapay zekadan gelir (sunucuda 30 gun onbellek); bilgi baloncugu (ⓘ) uzerine gelince acilir.
+        var naceBox = modalEl.querySelector('.nace-field');
+        var naceInput = naceBox.querySelector('.nace-input');
+        var naceStatus = naceBox.querySelector('[data-nace-status]');
+        var naceBtn = naceBox.querySelector('[data-nace-info]');
+        var naceBoxProducts = naceBox.querySelector('[data-nace-products]');
+        var naceHolder = naceBox.querySelector('[data-nace-chips]');
+        var naceSync = naceBox.querySelector('.nace-products-sync');
+        var naceUrl = '@Url.Action("NaceInfo", "Company")';
+        var NACE_HINT = 'Çok spesifik arama için: kodu yazınca anlamı ve arama terimleri gelir.';
+        var NACE_TIP_EMPTY = 'NACE kodunu yazınca ne anlama geldiği burada görünür.';
+        var naceCache = {}, naceTimer = null, naceSeq = 0, autoIndustry = '';
+        var nacePending = '', naceChipsCode = null, naceAllProducts = [], naceSelected = [];
+
+        function naceDigits(v) { return (v || '').replace(/\D/g, ''); }
+        function naceNorm(v) { return (v || '').toLocaleLowerCase('tr').trim(); }
+
+        function naceTip(text) {
+            if (!window.bootstrap) return;
+            var tip = bootstrap.Tooltip.getInstance(naceBtn);
+            if (!tip) tip = new bootstrap.Tooltip(naceBtn, { title: text, customClass: 'nace-tip', placement: 'top', trigger: 'hover focus' });
+            tip.setContent({ '.tooltip-inner': text });
+        }
+
+        function naceRender(info, message, tone) {
+            var tip = NACE_TIP_EMPTY, line = message || NACE_HINT;
+            if (info && info.ok) {
+                var shown = info.official ? info.name : (info.shortName || info.name);
+                tip = info.code + ' · ' + info.name
+                    + (info.basis ? '\n\nKapsadığı resmî faaliyetlerden: ' + info.basis : '')
+                    + (info.description && info.name.indexOf(info.description.slice(0, 40)) < 0 && info.description.indexOf(info.name.slice(0, 60)) < 0 ? '\n\n' + info.description : '')
+                    + (info.terms && info.terms.length ? '\n\nArama terimleri: ' + info.terms.join(', ') : '')
+                    + (info.official ? '\n\nKod adı resmî TÜİK/GİB listesindendir; açıklama ve arama terimleri yapay zekâdır.'
+                                     : '\n\nAd, resmî alt faaliyetlere dayanan yapay zekâ özetidir.');
+                line = info.code + ' · ' + (shown.length > 90 ? shown.slice(0, 90) + '…' : shown);
+                tone = 'ok';
+            } else if (message) {
+                tip = message;
+            }
+            naceStatus.textContent = line;
+            naceStatus.classList.toggle('is-ok', tone === 'ok');
+            naceStatus.classList.toggle('is-warn', tone === 'warn');
+            naceStatus.classList.toggle('is-error', tone === 'error');
+            naceTip(tip);
+            naceRenderProducts(info && info.ok ? info : (message || tone ? undefined : null));
+        }
+
+        function naceApplyIndustry(info) {
+            // Sektor bossa (ya da bizim doldurdugumuzla ayniysa) kodun adiyla doldurulur; elle yazilana dokunulmaz.
+            var sector = info.shortName || info.name;
+            if (!industry.value.trim() || industry.value === autoIndustry) industry.value = sector;
+            autoIndustry = sector;
+        }
+
+        function naceLookup(raw) {
+            var seq = ++naceSeq;
+            var digits = naceDigits(raw);
+            if (digits.length === 0) {
+                if (autoIndustry && industry.value === autoIndustry) industry.value = '';
+                autoIndustry = '';
+                naceRender(null, '', '');
+                return;
+            }
+            if ([2, 3, 4, 6].indexOf(digits.length) < 0) {
+                naceRender(null, digits.length < 2 ? 'Kod en az 2 haneli olmalı.' : 'Kod 2, 4 veya 6 haneli olmalı (örn. 27.51.08).', 'error');
+                return;
+            }
+            if (naceCache[digits]) { naceRender(naceCache[digits]); if (naceCache[digits].ok) naceApplyIndustry(naceCache[digits]); return; }
+            naceRender(null, 'Yapay zekâ kodu çözüyor…', '');
+            fetch(naceUrl + '?code=' + encodeURIComponent(digits), { credentials: 'same-origin' })
+                .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                .then(function (info) {
+                    if (seq !== naceSeq) return; // daha yeni bir kod yazildi
+                    if (info.ok) { naceCache[digits] = info; naceRender(info); naceApplyIndustry(info); }
+                    else naceRender(null, info.error || 'Kod çözülemedi.', 'error');
+                })
+                .catch(function () { if (seq === naceSeq) naceRender(null, 'Kod şu an çözülemedi; profil yine de kaydedilebilir.', 'error'); });
+        }
+
+        // NACE urunleri: kodun resmi metnindeki urunler etiket olarak gosterilir; secili olanlarla aranir. En az bir urun secili kalmali.
+        function naceWriteSelection() {
+            naceSync.value = naceSelected.join(', ');
+            naceHolder.querySelectorAll('.nace-chip').forEach(function (b) {
+                var on = naceSelected.some(function (x) { return naceNorm(x) === naceNorm(b.dataset.product); });
+                b.classList.toggle('is-on', on);
+                b.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+        }
+
+        function naceRenderProducts(info) {
+            if (!info || !info.ok || !info.products || !info.products.length) {
+                naceBoxProducts.hidden = true;
+                // null: kod silindi (secimi de temizle); undefined: yukleniyor/hata (yalnizca gizle).
+                if (info === null) { naceChipsCode = null; naceSelected = []; naceSync.value = ''; }
+                return;
+            }
+            if (naceChipsCode !== info.code) {
+                naceAllProducts = info.products.slice();
+                var wanted = (nacePending || '').split(',').map(naceNorm).filter(Boolean);
+                naceSelected = wanted.length
+                    ? naceAllProducts.filter(function (pr) { return wanted.indexOf(naceNorm(pr)) >= 0; })
+                    : naceAllProducts.slice();
+                if (!naceSelected.length) naceSelected = naceAllProducts.slice();
+                nacePending = '';
+                naceChipsCode = info.code;
+                naceHolder.textContent = '';
+                naceAllProducts.forEach(function (pr) {
+                    var b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'nace-chip';
+                    b.dataset.product = pr;
+                    b.textContent = pr;
+                    b.addEventListener('click', function () {
+                        var i = naceSelected.findIndex(function (x) { return naceNorm(x) === naceNorm(pr); });
+                        if (i >= 0) { if (naceSelected.length === 1) return; naceSelected.splice(i, 1); }
+                        else naceSelected.push(pr);
+                        naceWriteSelection();
+                    });
+                    naceHolder.appendChild(b);
+                });
+            }
+            naceBoxProducts.hidden = false;
+            naceWriteSelection();
+        }
+
+        naceInput.addEventListener('input', function () {
+            clearTimeout(naceTimer);
+            naceTimer = setTimeout(function () { naceLookup(naceInput.value); }, 600);
+        });
+        naceInput.addEventListener('blur', function () { clearTimeout(naceTimer); naceLookup(naceInput.value); });
+        naceBtn.addEventListener('click', function (e) { e.preventDefault(); naceLookup(naceInput.value); });
+        naceRender(null, '', '');
+
+        // Il secimi (Turkiye).
+        function selectedCities() {
+            return checkboxes.filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
+        }
+        function syncCities() {
+            var selected = selectedCities();
+            if (!hiddenCity.disabled) hiddenCity.value = selected.join(', ');
+            countLabel.textContent = selected.length === 0 ? 'Türkiye geneli' : selected.length + ' il seçili';
+            document.querySelectorAll('.tr-region-chip').forEach(function (chip) {
+                var cities = chip.getAttribute('data-cities').split('|');
+                chip.classList.toggle('is-active', cities.every(function (c) { return selected.indexOf(c) !== -1; }));
+            });
+        }
+        function setCities(list) {
+            checkboxes.forEach(function (c) { c.checked = list.indexOf(c.value) !== -1; });
+            syncCities();
+        }
+        checkboxes.forEach(function (c) { c.addEventListener('change', syncCities); });
+        document.getElementById('cityClear').addEventListener('click', function () { setCities([]); });
+        document.querySelectorAll('.tr-region-chip').forEach(function (chip) {
+            chip.addEventListener('click', function () {
+                var cities = chip.getAttribute('data-cities').split('|');
+                var on = !chip.classList.contains('is-active');
+                checkboxes.forEach(function (c) { if (cities.indexOf(c.value) !== -1) c.checked = on; });
+                syncCities();
+            });
+        });
+        var citySearch = document.getElementById('citySearchBox');
+        citySearch.addEventListener('input', function () {
+            var term = citySearch.value.trim().toLocaleLowerCase('tr');
+            document.querySelectorAll('#cityCheckboxGrid .city-check').forEach(function (label) {
+                var name = label.querySelector('span').textContent.toLocaleLowerCase('tr');
+                label.style.display = name.indexOf(term) === -1 ? 'none' : '';
+            });
+        });
+        region.addEventListener('change', function () { setRegion(region.value); syncCities(); });
+
+        function showStatus(text, isError) {
+            status.textContent = text;
+            status.className = 'small ' + (isError ? 'text-danger' : 'text-success');
+        }
+
+        // Kullanici duzeltmeye baslayinca eski uyari silinir.
+        form.addEventListener('input', function () { if (status.classList.contains('text-danger')) status.textContent = ''; });
+
+        // Formu bir profille (duzenleme) ya da bos/onerilen degerlerle (yeni) doldurur.
+        function load(p) {
+            p = p || {};
+            title.textContent = p.id ? 'Arama Profilini Düzenle' : 'Yeni Arama Profili';
+            idField.value = p.id || '';
+            nameInput.value = p.name || '';
+            industry.value = p.industry || '';
+            maxInput.value = p.maxCompanies || '';
+            publicBox.checked = !!p.isPublic;
+            status.textContent = '';
+            autoIndustry = '';
+            nacePending = p.naceProducts || '';
+            naceChipsCode = null;
+            naceInput.value = p.naceCode || '';
+            naceLookup(naceInput.value);
+            var list = (p.city || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+            subKey = null;
+            setRegion(p.regionKey || modalEl.getAttribute('data-default-region'));
+            if (region.value === 'TR') { setCities(list); freeText.value = ''; }
+            else if (SUBS[region.value]) { setCities([]); buildSub(region.value, list); freeText.value = ''; }
+            else { setCities([]); freeText.value = list.join(', '); }
+        }
+
+        function open(p) {
+            load(p);
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            syncCities();
+            if (!nameInput.value.trim()) { nameInput.focus(); showStatus('Profil adı girin.', true); return; }
+            if (!industry.value.trim() && !naceInput.value.trim()) { industry.focus(); showStatus('Sektör ya da NACE kodu girin.', true); return; }
+
+            saveBtn.disabled = true;
+            fetch(form.getAttribute('data-url'), { method: 'POST', body: new FormData(form), headers: { Accept: 'application/json' } })
+                .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+                .then(function (res) {
+                    if (!res.ok) { showStatus(res.data.error || 'Profil kaydedilemedi.', true); return; }
+                    bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                    document.dispatchEvent(new CustomEvent('searchprofile:saved', { detail: res.data }));
+                })
+                .catch(function () { showStatus('Sunucuya ulaşılamadı.', true); })
+                .finally(function () { saveBtn.disabled = false; });
+        });
+
+        // Detay penceresi.
+        var showModal = document.getElementById('searchProfileShowModal');
+        var detail = showModal.querySelector('.profile-detail');
+        function put(key, value) { detail.querySelector('[data-show="' + key + '"]').textContent = value || '—'; }
+        function show(p) {
+            put('name', p.name);
+            put('industry', p.industry);
+            put('nace', p.naceCode);
+            put('products', p.naceProducts);
+            put('region', p.regionName);
+            put('city', p.city || (p.regionName + ' geneli'));
+            put('max', p.maxCompanies || ('Varsayılan' + ' (' + detail.getAttribute('data-default-max') + ')'));
+            put('share', p.ownerName ? 'Paylaşan: ' + p.ownerName : (p.isPublic ? 'Herkese açık' : 'Size özel'));
+            put('created', p.createdAt);
+            bootstrap.Modal.getOrCreateInstance(showModal).show();
+        }
+
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-profile-new],[data-profile-edit],[data-profile-show]');
+            if (!btn) return;
+            if (btn.hasAttribute('data-profile-new')) { open(null); return; }
+            var raw = btn.getAttribute('data-profile');
+            if (!raw) return;
+            var p = JSON.parse(raw);
+            if (btn.hasAttribute('data-profile-edit')) open(p); else show(p);
+        });
+
+        window.SearchProfileModal = { open: open, show: show };
+
+        // Sektor raporundan gelindi: pencere o sektorle acilir.
+        var prefill = modalEl.getAttribute('data-prefill-industry');
+        if (prefill) open({ industry: prefill });
+    })();
+</script>

@@ -131,7 +131,17 @@ public class ReplyDetectionService
         }
     }
 
+    // Worker, "Mesajlar > Kontrol et" ve "Simdi kontrol et" ayni imleci kullanir; es zamanli iki kontrol ayni cevabi iki kez kaydederdi.
+    private static readonly SemaphoreSlim CheckGate = new(1, 1);
+
     public async Task<int> CheckAsync(CancellationToken ct = default)
+    {
+        if (!await CheckGate.WaitAsync(0, ct)) return 0;
+        try { return await CheckCoreAsync(ct); }
+        finally { CheckGate.Release(); }
+    }
+
+    private async Task<int> CheckCoreAsync(CancellationToken ct)
     {
         var cfg = await ConfigAsync(ct);
         if (!cfg.IsComplete) return 0;

@@ -54,7 +54,7 @@ public class SerperSearchService : ISearchService
         var extra = await _settings.GetAsync(SettingKeys.ExtraBlockedDomains, ct);
 
         _blocked = _options.BlockedDomains
-            .Concat(ParseDomains(extra))
+            .Concat(SearchBlacklist.Parse(extra).Domains)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
@@ -134,12 +134,27 @@ public class SerperSearchService : ISearchService
         var name = criteria.CompanyName!.Trim();
         var country = criteria.Country?.Trim();
         var found = new Dictionary<string, SearchResult>(StringComparer.OrdinalIgnoreCase);
+        // Ayni site birden fazla sorguda/sonucta cikiyorsa buyuk olasilikla resmi sitedir.
+        var hits = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         void Add(string? url, string? title, string? snippet, string? phone = null, string? address = null, string? category = null)
         {
             var domain = DomainHelper.ExtractDomain(url);
-            if (domain is null || found.ContainsKey(domain)) return;
+            if (domain is null) return;
+            if (found.TryGetValue(domain, out var existing))
+            {
+                hits[domain] = hits.GetValueOrDefault(domain) + 1;
+                // Alt sayfa basliklari (urun PDF'i vb.) firma adini tasimaz: adi en iyi tasiyan baslik kalir.
+                if (!string.IsNullOrWhiteSpace(title)
+                    && NameRelevance(new SearchResult { Domain = domain, Title = title }, name) > NameRelevance(new SearchResult { Domain = domain, Title = existing.Title }, name))
+                {
+                    existing.Title = title;
+                    existing.Snippet = snippet ?? existing.Snippet;
+                }
+                return;
+            }
             if (DomainHelper.IsBlocked(domain, _blocked)) return;
+            hits[domain] = 1;
 
             found[domain] = new SearchResult
             {
@@ -180,9 +195,13 @@ public class SerperSearchService : ISearchService
             }
         }
 
+        // Ayni sitenin alt alan adi ("cdn.ugur.com.tr") ana alan adi da bulunduysa ayri firma sayilmaz.
+        foreach (var child in found.Keys.Where(d => found.Keys.Any(p => d.EndsWith("." + p, StringComparison.OrdinalIgnoreCase))).ToList())
+            found.Remove(child);
+
         // Adla hic ilgisi olmayan siteler (haber, rehber) varsa ilgili olanlar varken elenir.
         var scored = found.Values
-            .Select(r => (Result: r, Score: NameRelevance(r, name)))
+            .Select(r => (Result: r, Score: NameRelevance(r, name) + Math.Min(hits.GetValueOrDefault(r.Domain) - 1, 4) * 2))
             .OrderByDescending(x => x.Score)
             .ToList();
         if (scored.Any(x => x.Score > 0))
@@ -193,7 +212,8 @@ public class SerperSearchService : ISearchService
             .Select(x => x.Result)
             .ToList();
 
-        _logger.LogInformation("Firma adı araması: {Name} → {Count} aday.", name, ranked.Count);
+        _logger.LogInformation("Firma adı araması: {Name} → {Count} aday ({Top}).", name, ranked.Count,
+            string.Join(", ", scored.Take(8).Select(x => $"{x.Result.Domain}={x.Score}")));
         return ranked;
     }
 
@@ -216,6 +236,16 @@ public class SerperSearchService : ISearchService
             if (domain.Contains(t)) score += 10;
             if (title.Contains(t)) score += 4;
             if (snippet.Contains(t)) score += 1;
+        }
+
+        // Marka alan adinin kendisi: "ugur.com.tr" ya da "ugursogutma.com.tr" ("ugurkombiklima.com" gibi ek kelimeli
+        // benzerlerinden ayrilir). Resmi site genelde adin ilk kelimesi veya birlesik halidir.
+        if (score > 0)
+        {
+            var label = domain.StartsWith("www.", StringComparison.Ordinal) ? domain[4..] : domain;
+            label = label.Split('.')[0].Replace("-", string.Empty);
+            if (tokens.Contains(label)) score += 8;
+            else if (label == string.Concat(tokens) || (tokens.Count >= 2 && label == string.Concat(tokens.Take(2)))) score += 12;
         }
         return score;
     }
@@ -525,7 +555,7 @@ public class SerperSearchService : ISearchService
     {
         if (_options.MonthlyCreditCap <= 0) return;
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = UsageService.Today; // sayaclar Turkiye gunune gore tutulur (UTC+3)
         var used = await _usage.GetRangeCountAsync(
             UsageProvider, new DateOnly(today.Year, today.Month, 1), today, ct);
 

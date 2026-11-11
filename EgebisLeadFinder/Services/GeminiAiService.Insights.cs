@@ -177,8 +177,7 @@ public partial class GeminiAiService : IInsightAi
                     .SelectMany(x => SplitJoinedTerms(x.GetString()))
                     .Where(x => x.Length is > 2 and <= 60)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .Take(15)
-                    .ToList();
+                                        .ToList();
             if (string.IsNullOrWhiteSpace(result.Name)) result.Error = "Yapay zekâ kodun adını veremedi.";
         }
         catch (JsonException)

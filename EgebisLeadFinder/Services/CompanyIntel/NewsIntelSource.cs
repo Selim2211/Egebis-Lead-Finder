@@ -46,7 +46,7 @@ public class NewsIntelSource : ICompanyIntelSource
     {
         var intel = new SourceIntel { SourceName = Name };
 
-        // Sorgular "Biz ne arıyoruz?" profiline gore: ihtiyac sinyalleri ve sirketin hedef unvanlari.
+        // Sorgular "Şirketimiz" profiline gore: ihtiyac sinyalleri ve sirketin hedef unvanlari.
         BusinessProfile? profile = null;
         IReadOnlyList<string>? titles = null;
         if (_settings is not null)
@@ -75,6 +75,9 @@ public class NewsIntelSource : ICompanyIntelSource
                 {
                     var text = $"{r.Title}. {r.Snippet}".Trim();
                     if (text.Length < 15) continue;
+
+                    // Baska bir firmanin haberi/ilani ("UĞUR GÜRBÜZ CIVATA" konkordatosu) bu firmaya yazilmasin.
+                    if (!SnippetRelevance.IsAbout(company, text, r.Url)) continue;
 
                     // Ayni haber birden fazla sorguda cikabilir.
                     var key = r.Url ?? text;

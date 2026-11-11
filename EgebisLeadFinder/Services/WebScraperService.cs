@@ -22,6 +22,44 @@ public class WebScraperService : IWebScraperService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Yapay zekaya gidecek metni olusturur: her sayfanin tekrarlari atilir, <paramref name="budget"/> sayfalar arasinda
+    /// esit paylasilir (kisa sayfalarin artan payi uzun olanlara gecer). Sira korunur: ana sayfa, hakkimizda, uretim...
+    /// </summary>
+    public static string BuildAiText(IReadOnlyList<(string Url, string Text)> pages, int budget)
+    {
+        if (pages.Count == 0) return string.Empty;
+
+        var cleaned = pages.Select(p => (p.Url, Text: TextExtractor.CollapseRepeats(p.Text))).ToList();
+        var caps = new int[cleaned.Count];
+        var remaining = budget;
+        var open = Enumerable.Range(0, cleaned.Count).ToList();
+        while (open.Count > 0 && remaining > 0)
+        {
+            var share = Math.Max(200, remaining / open.Count);
+            var done = open.Where(i => cleaned[i].Text.Length <= share).ToList();
+            if (done.Count == 0)
+            {
+                foreach (var i in open) caps[i] = share;
+                break;
+            }
+            foreach (var i in done) { caps[i] = cleaned[i].Text.Length; remaining -= caps[i]; }
+            open = open.Except(done).ToList();
+        }
+
+        var sb = new StringBuilder();
+        for (var i = 0; i < cleaned.Count; i++)
+        {
+            if (caps[i] <= 0) continue;
+            var text = cleaned[i].Text;
+            sb.AppendLine($"--- {cleaned[i].Url} ---");
+            sb.AppendLine(text.Length > caps[i] ? text[..caps[i]] : text);
+            sb.AppendLine();
+        }
+        var result = sb.ToString();
+        return result.Length > budget + 100 * cleaned.Count ? result[..(budget + 100 * cleaned.Count)] : result;
+    }
+
     public async Task<ScrapedSite> ScrapeAsync(string siteUrl, CancellationToken ct = default)
     {
         var result = new ScrapedSite { Url = siteUrl };
@@ -44,6 +82,7 @@ public class WebScraperService : IWebScraperService
             : new List<string>();
 
         var textBuilder = new StringBuilder();
+        var pageTexts = new List<(string Url, string Text)>();
         var pagesRead = 0;
 
         // Cogu site olmayan yol icin 404 yerine ana sayfayi 200 ile dondurur.
@@ -101,6 +140,7 @@ public class WebScraperService : IWebScraperService
             }
 
             result.VisitedUrls.Add(pageUrl);
+            pageTexts.Add((pageUrl, text));
             pagesRead++;
 
             textBuilder.AppendLine($"--- {pageUrl} ---");
@@ -146,9 +186,9 @@ public class WebScraperService : IWebScraperService
             .ToList();
 
         // AI'a gonderilecek metin token maliyeti icin kirpilir.
-        result.Text = full.Length > _options.MaxTextChars
-            ? full[.._options.MaxTextChars]
-            : full;
+        // Ana sayfa tek basina butun payi doldurmasin (vitrin/menu metni "Hakkimizda"yi disarida birakir):
+        // tekrarlar atilir, pay sayfalara bolusturulur.
+        result.Text = BuildAiText(pageTexts, _options.MaxTextChars);
         result.FullText = full.Length > _options.MaxEvidenceChars
             ? full[.._options.MaxEvidenceChars]
             : full;

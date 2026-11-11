@@ -127,14 +127,17 @@ public class ProfileDrivenTests
     }
 
     [Fact]
-    public void Profil_modunda_hedef_sektor_puani_segmentten_gelir()
+    public void Profil_modunda_hedef_sektor_puani_uygunluktan_gelir()
     {
-        var analysis = new CompanyAnalysis { Industry = "İnşaat", Potential = true, FitScore = 70, Segment = "Mekanik tesisat" };
-        var breakdown = new LeadScoringService(Options.Create(new ScoringOptions { TargetIndustry = 15, TargetIndustryKeywords = { "inşaat" } }))
-            .ScoreCompany(analysis, null, null, null, new Company(), new FitContext(true, Array.Empty<string>()));
+        var scoring = new LeadScoringService(Options.Create(new ScoringOptions { TargetIndustry = 15, TargetIndustryKeywords = { "inşaat" } }));
+        var fit = new FitContext(true, Array.Empty<string>());
 
-        Assert.Contains(breakdown.Items, i => i.Reason == "Hedef segment: Mekanik tesisat" && i.Points == 15);
-        Assert.DoesNotContain(breakdown.Items, i => i.Reason == "Hedef sektör");
+        var good = scoring.ScoreCompany(new CompanyAnalysis { Industry = "İnşaat", Potential = true, FitScore = 70 }, null, null, null, new Company(), fit);
+        Assert.Contains(good.Items, i => i.Reason == "Hedef müşteri tanımına uyuyor" && i.Points == 15);
+        Assert.DoesNotContain(good.Items, i => i.Reason == "Hedef sektör");
+
+        var weak = scoring.ScoreCompany(new CompanyAnalysis { Industry = "İnşaat", Potential = true, FitScore = 30 }, null, null, null, new Company(), fit);
+        Assert.DoesNotContain(weak.Items, i => i.Reason == "Hedef müşteri tanımına uyuyor");
     }
 
     [Fact]

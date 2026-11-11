@@ -12,7 +12,7 @@ public static class Icons
         $"<svg class=\"eg-icon{(css is null ? "" : " " + css)}\" width=\"{size}\" height=\"{size}\" viewBox=\"0 0 24 24\" fill=\"none\" " +
         $"stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\">{body}</svg>");
 
-    /// <summary>Hedef: "Biz ne arıyoruz?" ve segmentler.</summary>
+    /// <summary>Hedef: "Şirketimiz" ve segmentler.</summary>
     public static HtmlString Target(int size = 14, string? css = null) =>
         Svg("<circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"5\"/><circle cx=\"12\" cy=\"12\" r=\"1\"/>", size, css);
 

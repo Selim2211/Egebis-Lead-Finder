@@ -61,6 +61,27 @@ public class SalesTrackingTests
     }
 
     [Fact]
+    public void Resmi_marka_alan_adi_benzer_ek_kelimeli_alan_adlarindan_ustte_siralanir()
+    {
+        const string name = "Uğur Soğutma Sistemleri";
+        // Resmi site: baslik (urun PDF'i) firma adini tasimiyor; benzerlerinin basligi "Uğur" iceriyor.
+        var official = new SearchResult { Domain = "ugur.com.tr", Title = "Ticari Tip Sıcak Soğuk Su Pınarı Kullanım Kılavuzu" };
+        var lookalikes = new[]
+        {
+            new SearchResult { Domain = "ugurkombiklima.com", Title = "Uğur Kombi Klima" },
+            new SearchResult { Domain = "ugurderindondurucuu.com.tr", Title = "Uğur Derin Dondurucu Ankara" },
+            new SearchResult { Domain = "uguronlinesatis.com", Title = "Uğur online satış" },
+        };
+
+        var officialScore = SerperSearchService.NameRelevance(official, name);
+
+        Assert.All(lookalikes, l => Assert.True(officialScore > SerperSearchService.NameRelevance(l, name), l.Domain));
+        // Birlesik marka alan adi da resmi site sayilir.
+        Assert.True(SerperSearchService.NameRelevance(new SearchResult { Domain = "ugursogutma.com.tr", Title = "Anasayfa" }, name)
+            > SerperSearchService.NameRelevance(lookalikes[0], name));
+    }
+
+    [Fact]
     public void Firma_adindaki_turkce_karakterler_esitlenir()
     {
         var result = new SearchResult { Domain = "arcelik.com.tr", Title = "Arçelik" };

@@ -10,18 +10,17 @@
                 { title: 'Panel', text: 'Satış hunisinin özeti: kaç firma bulundu, kaçıyla iletişime geçildi, kaç proje başladı. Kartlara tıklayınca ilgili listeye gidersiniz.' },
                 { sel: '.stat-card', title: 'Sayı kartları', text: 'Toplam firma, lead, gönderilen mail gibi göstergeler. Kartın üzerine tıklayınca o kayıtların listesi açılır.' },
                 { sel: '.funnel', title: 'Satış hunisi', text: 'Firmaların hangi aşamada olduğunu gösterir: temas yok → iletişim kuruldu → mail atıldı → proje başladı.' },
-                { sel: '.nav-target', title: 'Biz ne arıyoruz?', text: 'Şirketinizin ne sattığını ve hedef segmentlerini buradan tanımlayın. Yapay zekâ bütün değerlendirmeleri bu tanıma göre yapar.' }
+                { sel: 'a.nav-link[href*="BusinessProfile" i]', title: 'Şirketimiz', text: 'Şirketinizin ne sattığını ve ideal müşterinizi buradan tanımlayın. Yapay zekâ bütün değerlendirmeleri bu tanıma göre yapar.' }
             ]
         },
         {
             key: 'search', match: /^\/company\/search/i, title: 'Firma Ara',
             steps: [
-                { sel: '#basicIndustry', title: 'Sektör yazın', text: 'Aradığınız sektörü yazın (ör. "Otomotiv yan sanayi"). Sistem Google ve Google Haritalar\'da üretici firmaları bulur.' },
-                { sel: '.segment-chips', title: 'Hedef segmentler', text: '"Biz ne arıyoruz?" ekranında tanımladığınız segmentler tek tıkla aramayı doldurur.' },
-                { sel: '.smart-toggle', title: 'Akıllı arama', text: 'Açıkken yapay zekâ ek arama terimleri üretir ve bayi, rehber, rakip gibi hedef dışı adayları siteye girmeden eler.' },
-                { sel: '.search-scope', title: 'Kapsam (bölge)', text: 'Aramanın yapılacağı ülke/bölge. Kalem simgesiyle değiştirin; Türkiye dışı bölgelerde sorgular o ülkenin dilinde kurulur.' },
-                { sel: '[data-bs-target="#advancedSearchModal"]', title: 'Gelişmiş arama ve şablonlar', text: 'İl seçimi ve arama şablonu kaydetme burada. Şablonlar size özeldir; isterseniz tüm kullanıcılarla paylaşabilirsiniz (sonuçlarınız yine size özel kalır).' },
-                { sel: '#companyNameInput', title: 'Belirli bir firmayı bul', text: 'Tanıdığınız bir firmayı adıyla bulup sisteme eklemek için.' }
+                { sel: '#profileSelect', title: 'Arama profili seçin', text: 'Sektör, NACE, ülke, il ve firma sayısı seçtiğiniz profilden gelir. Profil seçmeden arama başlatılamaz.' },
+                { sel: '#profileShow', title: 'Göster', text: 'Seçili profilin detaylarını gösterir.' },
+                { sel: '[data-profile-new]', title: 'Yeni Arama Profili', text: 'Kendinize uygun bir profil oluşturun; kaydedince listede seçili gelir. Profilleri üst menüdeki Arama Profilleri ekranından yönetirsiniz.' },
+                { sel: '#searchButton', title: 'Aramayı Başlat', text: 'Yapay zekâ ek arama terimleri üretir, bayi ve rehber gibi hedef dışı adayları eler, kalan firmaların sitelerini okuyup değerlendirir.' },
+                { sel: '#companyNameInput', title: 'Belirli bir firmayı bul', text: 'Tanıdığınız bir firmayı adıyla bulup sisteme eklemek için. Varsayılan arama profilinizin ülkesinde arar.' }
             ]
         },
         {
@@ -30,8 +29,8 @@
                 { sel: '.run-picker', title: 'Hangi arama?', text: 'Varsayılan olarak son aramanızın sonuçları gösterilir. Buradan önceki aramalarınıza veya "Tüm firmalar"a geçebilirsiniz. Arama sonuçları kişiye özeldir.' },
                 { sel: '.list-search', title: 'Liste içinde ara', text: 'Firma adı, sektör veya alan adıyla süzün.' },
                 { sel: '.list-filter-btn', title: 'Detaylı filtre', text: 'Puan, sektör (NACE), il/ülke, arama şablonu, AI sinyali ve sıralama seçenekleri.' },
-                { sel: '.stage-chips', title: 'Aşama ve segment çipleri', text: 'Satış aşamasına, ICP uyumuna, "Biz ne arıyoruz?" segmentine veya favorilerinize göre tek tıkla süzün.' },
-                { sel: '.company-card', title: 'Firma kartı', text: 'Lead puanı, uygunluk yüzdesi, segment ve yapay zekânın kısa gerekçesi. Karta tıklayınca firma detayı açılır.' },
+                { sel: '.stage-chips', title: 'Aşama çipleri', text: 'Satış aşamasına, ICP uyumuna veya favorilerinize göre tek tıkla süzün.' },
+                { sel: '.company-card', title: 'Firma kartı', text: 'Lead puanı, uygunluk yüzdesi ve yapay zekânın kısa gerekçesi. Karta tıklayınca firma detayı açılır.' },
                 { sel: '.company-card-fav', title: 'Favorilere ekle', text: 'Yıldız firmayı favori listenize ekler. Listeniz size özeldir; Favoriler ekranından herkese açabilirsiniz.' },
                 { sel: '.company-card-actions', title: 'Hızlı işlemler', text: 'İletişim kuruldu / mail atıldı / proje başladı işaretleri, Salesforce\'a aktarma, karşılaştırmaya ekleme (Kıyasla) ve silme.' },
                 { sel: '.export-menu, [data-export-menu], .page-head .dropdown', title: 'Dışa aktar', text: 'Ekranda gördüğünüz filtreli listeyi Excel veya CSV olarak indirin.' }
@@ -74,11 +73,10 @@
             ]
         },
         {
-            key: 'profile', match: /^\/businessprofile/i, title: 'Biz ne arıyoruz?',
+            key: 'profile', match: /^\/businessprofile/i, title: 'Şirketimiz',
             steps: [
-                { sel: '.bp-autofill', title: 'Sitemizden otomatik doldur', text: 'Şirket sitenizin adresini yazın; yapay zekâ ne sattığınızı, ideal müşterinizi ve hedef segmentleri taslak olarak çıkarır.' },
-                { sel: '#profileForm', title: 'Şirket profili', text: 'Ne satıyoruz, ideal müşteri, müşterimiz olmayanlar ve rakipler. Arama, puanlama ve mail yazımı bu tanıma göre çalışır.' },
-                { sel: '#segmentList', title: 'Hedef segmentler', text: 'Farklı ürün grupları için birden fazla hedef segment tanımlayın; Firma Ara ekranında tek tıkla aranır.' }
+                { sel: '.bp-autofill', title: 'Sitemizden otomatik doldur', text: 'Şirket sitenizin adresini yazın; yapay zekâ ne sattığınızı ve ideal müşterinizi taslak olarak çıkarır.' },
+                { sel: '#profileForm', title: 'Şirket profili', text: 'Ne satıyoruz, ideal müşteri, müşterimiz olmayanlar ve rakipler. Arama, puanlama ve mail yazımı bu tanıma göre çalışır.' }
             ]
         },
         {

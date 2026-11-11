@@ -80,32 +80,22 @@ public class BusinessProfileTests
 
         var roundTrip = BusinessProfileService.Parse(JsonSerializer.Serialize(Configured()));
         Assert.True(roundTrip.IsConfigured);
-        Assert.Equal("Metal eşya", Assert.Single(roundTrip.Segments).Name);
+        Assert.Empty(roundTrip.Segments); // eski kayitlardaki hedef segmentler yok sayilir
     }
 
     [Fact]
-    public void Normalize_bos_segmentleri_atar_bolge_ve_idleri_duzeltir()
+    public void Normalize_hedef_segmentleri_temizler()
     {
         var profile = new BusinessProfile
         {
             Offering = "  X  ",
-            Segments =
-            {
-                new TargetSegment { Id = "a", Name = "Bir", RegionKey = "DE", NaceCodes = { "29", "29", " " } },
-                new TargetSegment { Id = "a", Name = "İki", RegionKey = "XX" },
-                new TargetSegment { Name = "   " }
-            }
+            Segments = { new TargetSegment { Id = "a", Name = "Bir", RegionKey = "DE" } }
         };
-        for (var i = 0; i < 10; i++) profile.Segments.Add(new TargetSegment { Name = "S" + i });
 
         BusinessProfileService.Normalize(profile);
 
         Assert.Equal("X", profile.Offering);
-        Assert.Equal(BusinessProfile.MaxSegments, profile.Segments.Count);
-        Assert.Equal("DE", profile.Segments[0].RegionKey);
-        Assert.Null(profile.Segments[1].RegionKey);
-        Assert.NotEqual(profile.Segments[0].Id, profile.Segments[1].Id);
-        Assert.Equal(new[] { "29" }, profile.Segments[0].NaceCodes);
+        Assert.Empty(profile.Segments);
     }
 
     [Theory]
@@ -138,7 +128,7 @@ public class BusinessProfileTests
     }
 
     [Fact]
-    public async Task Kaydet_unvanlari_gunceller_ve_segmentler_ICPye_eklenir()
+    public async Task Kaydet_unvanlari_gunceller()
     {
         var settings = new FakeSettingsService();
         await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -148,22 +138,13 @@ public class BusinessProfileTests
         var service = new BusinessProfileService(settings, icp, null!, null!);
 
         var profile = Configured();
-        profile.Segments[0].NaceCodes = new List<string> { "25", "28.41" };
-        profile.Segments[0].Keywords = new List<string> { "kaynak" };
-        profile.Segments[0].ExcludeKeywords = new List<string> { "Bayi", "servis" };
 
         await service.SaveAsync(profile, new[] { "Genel Müdür", " ", "Üretim Müdürü" }, "admin");
-        var added = await service.ApplySegmentsToIcpAsync(profile);
 
         Assert.Equal("Genel Müdür, Üretim Müdürü", await settings.GetAsync(SettingKeys.LeadTitleKeywords));
         var saved = await service.GetAsync();
         Assert.Equal("admin", saved.UpdatedBy);
         Assert.NotNull(saved.UpdatedAt);
-
-        Assert.Equal(3, added); // 28.41, kaynak, servis (25 ve bayi zaten vardi)
-        var merged = await icp.GetAsync();
-        Assert.Equal(new[] { "25", "28.41" }, merged.NaceCodes);
-        Assert.Equal(new[] { "kaynak" }, merged.IndustryKeywords);
-        Assert.Equal(new[] { "bayi", "servis" }, merged.ExcludeKeywords);
+        Assert.Empty(saved.Segments);
     }
 }

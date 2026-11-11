@@ -129,7 +129,7 @@
                             <div class="sender-line">
                                 <span class="dot @(Model.SmtpEnabled ? "dot-ok" : "dot-off")"></span>
                                 <span>@Model.SenderDisplay</span>
-                                <a class="small ms-auto" asp-controller="Settings" asp-action="Index" asp-fragment="email-settings">değiştir</a>
+                                @if (User.IsInRole("Admin")) { <a class="small ms-auto" asp-controller="Settings" asp-action="Index" asp-fragment="email-settings">değiştir</a> }
                             </div>
                         }
                         else
@@ -137,7 +137,7 @@
                             <div class="sender-line sender-line-missing">
                                 <span class="dot dot-off"></span>
                                 <span>Gönderen adres ayarlanmadı.</span>
-                                <a class="small ms-auto fw-semibold" asp-controller="Settings" asp-action="Index" asp-fragment="email-settings">Ayarlardan ekle →</a>
+                                @if (User.IsInRole("Admin")) { <a class="small ms-auto fw-semibold" asp-controller="Settings" asp-action="Index" asp-fragment="email-settings">Ayarlardan ekle →</a> } else { <span class="small ms-auto">Yöneticinizden isteyin</span> }
                             </div>
                         }
                     </div>
@@ -235,7 +235,7 @@
                 {
                     <div class="alert alert-secondary small mt-3 mb-0" data-flash="info" data-flash-title="Gönderen adres ayarlı değil" data-flash-timeout="9000">
                         Uygulamadan göndermek için
-                        <a asp-controller="Settings" asp-action="Index" asp-fragment="email-settings">Ayarlar → E-posta Gönderimi</a>
+                        @if (User.IsInRole("Admin")) { <a asp-controller="Settings" asp-action="Index" asp-fragment="email-settings">Ayarlar → E-posta Gönderimi</a> } else { <span>Ayarlar → E-posta Gönderimi (yönetici)</span> }
                         bölümüne gönderen adresinizi girin. O zamana kadar metni kopyalayıp Outlook'tan gönderebilir,
                         sonra "Dışarıdan gönderdim, kaydet" ile lead geçmişine ekleyebilirsiniz.
                     </div>

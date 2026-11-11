@@ -47,7 +47,7 @@ public class ScreenResult
 }
 
 /// <summary>
-/// Akilli arama: (1) yazilan sektor ve "Biz ne arıyoruz?" segmentinden bolgenin dilinde ek arama
+/// Akilli arama: (1) yazilan sektor ve "Şirketimiz" segmentinden bolgenin dilinde ek arama
 /// terimleri uretir; (2) bulunan adaylari siteleri okunmadan once eler: once kurallarla (ICP ve
 /// segment eleme kelimeleri), sonra tek yapay zeka cagrisiyla toplu olarak. Boylece site okuma ve
 /// firma analizi (Gemini) yalnizca gercek adaylara harcanir. Herhangi bir adim basarisiz olursa
@@ -57,9 +57,6 @@ public class SearchPlanService
 {
     /// <summary>Kullanicinin terimi dahil en fazla terim sayisi (Serper kredisini sinirlar).</summary>
     public const int MaxTerms = 4;
-
-    /// <summary>NACE (urun) aramasinda denenecek en fazla urun sayisi.</summary>
-    public const int MaxProductTerms = 8;
 
     /// <summary>Tek yapay zeka cagrisinda degerlendirilen aday sayisi.</summary>
     public const int ScreenBatchSize = 40;
@@ -107,9 +104,6 @@ public class SearchPlanService
             criteria.ManufacturerQueries = true;
             criteria.SapQueries = false;
         }
-        plan.Segment = string.IsNullOrWhiteSpace(criteria.SegmentId)
-            ? null
-            : plan.Profile.Segments.FirstOrDefault(s => s.Id == criteria.SegmentId);
 
         if (!criteria.SmartSearch) return plan;
 
@@ -178,8 +172,8 @@ public class SearchPlanService
     /// <summary>NACE kodundan gelen terimler (akilli arama kapali ya da AI yoksa bile) arama terimlerine eklenir.</summary>
     private static void AddNaceTerms(List<string> terms, SearchCriteria criteria)
     {
-        // NACE aramasinda terimler kodun urunleridir; urun sayisi kadar (en fazla 8) aranir, MaxTerms siniri uygulanmaz.
-        foreach (var t in criteria.ProductList.Take(MaxProductTerms))
+        // NACE aramasinda terimler kodun urunleridir; urunlerin HEPSI aranir (kullanici etiketlerle kisitlamadiysa), MaxTerms siniri uygulanmaz.
+        foreach (var t in criteria.ProductList)
             if (!terms.Contains(t, StringComparer.OrdinalIgnoreCase)) terms.Add(t);
     }
 

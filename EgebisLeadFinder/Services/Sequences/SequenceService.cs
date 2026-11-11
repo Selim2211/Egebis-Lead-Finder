@@ -201,7 +201,8 @@ public class SequenceService
                 run.NextSendAt = SequenceScheduler.NextSendAt(nowUtc, next.DelayDays);
             }
 
-            await _db.SaveChangesAsync(ct);
+            // Mail zaten gitti: kayit (adim ilerlemesi) kapanista iptal edilirse ayni adim tekrar gonderilirdi.
+            await _db.SaveChangesAsync(CancellationToken.None);
         }
 
         await _db.SaveChangesAsync(ct);

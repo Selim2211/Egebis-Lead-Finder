@@ -52,7 +52,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         return GeminiModelCatalog.IsValidModelId(stored) ? stored! : _options.GeminiModel;
     }
 
-    /// <summary>"Biz ne arıyoruz?" sirket profili; bossa talimatlar eski Egebis tanimini kullanir.</summary>
+    /// <summary>"Şirketimiz" sirket profili; bossa talimatlar eski Egebis tanimini kullanir.</summary>
     private async Task<BusinessProfile> ProfileAsync(CancellationToken ct) =>
         BusinessProfileService.Parse(await _settings.GetAsync(SettingKeys.BusinessProfile, ct));
 
@@ -393,7 +393,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         true. Bizim ürün/hizmetimizi kendi işi için KULLANABİLECEK firma ise false.
 
         potential alanı: firma bizim için gerçek bir satış hedefi mi?
-        Yukarıdaki İDEAL MÜŞTERİMİZ veya HEDEF SEGMENTLER tanımına uyan ve sattığımız
+        Yukarıdaki İDEAL MÜŞTERİMİZ tanımına uyan ve sattığımız
         ürün/hizmete ihtiyaç duyabilecek firmalar için true.
         "Müşterimiz olmayanlar" tanımına uyan firmalar ve rakipler için false.
         Şirket tanımında açıkça hedef olarak yazmıyorsa şunlar için de false ver:
@@ -406,15 +406,14 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         sattığımız hangi ürün/hizmetle ilgili olabileceğini yaz.
 
         fitScore alanı: firmanın bizim için ne kadar iyi bir müşteri adayı olduğu, 0-100.
-        - 80-100: ideal müşteri tanımına ve bir hedef segmente net uyuyor, ürünümüze
+        - 80-100: ideal müşteri tanımına net uyuyor, ürünümüze
           açık ihtiyacı var.
         - 50-79: büyük ölçüde uyuyor ama bir eksik var (büyüklük, sektör kenarı, belirsiz ihtiyaç).
         - 20-49: zayıf uyum; ancak dolaylı bir fırsat olabilir.
         - 0-19: hedef değil (potential=false olan firmalar bu aralıkta olmalı).
         Metinde olmayan bilgiyi varsayma; bilgi azsa puanı düşük tut.
 
-        segment alanı: firma yukarıdaki HEDEF SEGMENTLER'den birine uyuyorsa o segmentin
-        adını aynen yaz; hiçbirine uymuyorsa boş bırak.
+        segment alanını boş bırak.
         """;
 
     private const string AnalysisTail = """
@@ -459,7 +458,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         """;
 
     /// <summary>
-    /// Firma analizi talimati. Sirket profili ("Biz ne arıyoruz?") doluysa hedef ve rakip tanimi
+    /// Firma analizi talimati. Sirket profili ("Şirketimiz") doluysa hedef ve rakip tanimi
     /// profilden gelir; bossa eski Egebis tanimi aynen kullanilir.
     /// </summary>
     public static string AnalysisPrompt(BusinessProfile? profile) =>
@@ -781,7 +780,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
             """;
     }
 
-    // ================= AI #6: "Biz ne arıyoruz?" taslagi =================
+    // ================= AI #6: "Şirketimiz" taslagi =================
 
     /// <summary>
     /// Sirketin kendi sitesinden sirket profili taslagi cikarir: ne satiyor, ideal musteri,

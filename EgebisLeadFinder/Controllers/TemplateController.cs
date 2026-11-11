@@ -94,7 +94,7 @@ public class TemplateController : Controller
     }
 
     /// <summary>
-    /// "Biz ne arıyoruz?" profilinden yapay zeka ile taslak yazar: genel tanitim, her hedef segment ve
+    /// "Şirketimiz" profilinden yapay zeka ile taslak yazar: genel tanitim, her hedef segment ve
     /// takip maili; segment taslaklari o segmentteki firmalara otomatik onerilir. Mevcut taslaklar
     /// istenirse pasife alinir (silinmez).
     /// </summary>

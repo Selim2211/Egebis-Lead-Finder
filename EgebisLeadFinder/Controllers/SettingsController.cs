@@ -83,9 +83,7 @@ public class SettingsController : Controller
             [SettingKeys.FollowUpAfterDays] = form.FollowUpAfterDays is > 0 and < 365
                 ? form.FollowUpAfterDays.ToString()
                 : null,
-            [SettingKeys.ExtraBlockedDomains] = SerperSearchService.ParseDomains(form.ExtraBlockedDomains) is { Count: > 0 } d
-                ? string.Join(", ", d)
-                : null,
+            [SettingKeys.ExtraBlockedDomains] = Clean(form.ExtraBlockedDomains),
 
             [SettingKeys.SmtpFromAddress] = Clean(form.SmtpFromAddress),
             [SettingKeys.SmtpFromName] = Clean(form.SmtpFromName),

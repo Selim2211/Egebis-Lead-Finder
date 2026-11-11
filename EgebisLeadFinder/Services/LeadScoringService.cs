@@ -11,6 +11,9 @@ namespace EgebisLeadFinder.Services;
 /// </summary>
 public class LeadScoringService
 {
+    /// <summary>Uygunluk bu puana ulasirsa firma hedef musteri sayilir ve hedef sektor puanini alir.</summary>
+    private const int HedefMusteriEsigi = 50;
+
     private readonly ScoringOptions _options;
 
     public LeadScoringService(IOptions<ScoringOptions> options) => _options = options.Value;
@@ -26,7 +29,7 @@ public class LeadScoringService
     public ScoreBreakdown ScoreCompany(CompanyAnalysis? analysis, ScrapedSite? site, IEnumerable<Contact>? contacts,
         IcpProfile? icp, Company? company, FitContext? fit = null)
     {
-        // "Biz ne arıyoruz?" profili tanimliysa ve analiz uygunluk puani verdiyse, Egebis'e ozel
+        // "Şirketimiz" profili tanimliysa ve analiz uygunluk puani verdiyse, Egebis'e ozel
         // SAP/uretici puanlari yerine yapay zekanin uygunluk puani kullanilir.
         var useFit = fit is { Active: true } && analysis?.FitScore is not null;
         var breakdown = new ScoreBreakdown();
@@ -107,9 +110,9 @@ public class LeadScoringService
             else if (fit is { Active: true })
             {
                 // Profil modunda "hedef sektor" sabit (uretim) listesinden degil, yapay zekanin
-                // firmayi eslestirdigi "Biz ne arıyoruz?" segmentinden gelir.
-                if (!string.IsNullOrWhiteSpace(analysis.Segment))
-                    breakdown.Add($"Hedef segment: {analysis.Segment.Trim()}", _options.TargetIndustry);
+                // sirket profilimize gore verdigi uygunluk puanindan gelir.
+                if (analysis.FitScore is >= HedefMusteriEsigi)
+                    breakdown.Add("Hedef müşteri tanımına uyuyor", _options.TargetIndustry);
             }
             else if (IsTargetIndustry(analysis.Industry))
                 breakdown.Add("Hedef sektör", _options.TargetIndustry);
@@ -294,7 +297,7 @@ public class ScoreBreakdown
 }
 
 /// <summary>
-/// "Biz ne arıyoruz?" puanlama baglami: profil tanimliysa (Active) uygunluk puani ve hedef unvanlar
+/// "Şirketimiz" puanlama baglami: profil tanimliysa (Active) uygunluk puani ve hedef unvanlar
 /// kullanilir. Bos/pasifse puanlama eski (Egebis) kurallariyla yapilir.
 /// </summary>
 public record FitContext(bool Active, IReadOnlyList<string> TargetTitles, IReadOnlyList<ScoringSignal>? Signals = null)

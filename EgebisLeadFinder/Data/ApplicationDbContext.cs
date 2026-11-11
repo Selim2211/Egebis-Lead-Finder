@@ -220,6 +220,8 @@ public class ApplicationDbContext : DbContext
         });
 
         // Sablon adi kullanici basina tekildir (farkli kullanicilar ayni adi kullanabilir).
+        b.Entity<AppUser>().HasOne<SearchProfile>().WithMany().HasForeignKey(u => u.DefaultSearchProfileId).OnDelete(DeleteBehavior.SetNull);
+
         b.Entity<SearchProfile>(e =>
         {
             e.HasIndex(x => new { x.OwnerUserId, x.Name }).IsUnique().AreNullsDistinct(false);

@@ -85,7 +85,7 @@ public static class SettingKeys
     /// <summary>Ideal musteri profili (IcpProfile) JSON olarak.</summary>
     public const string IcpProfile = "Icp:Profile";
 
-    /// <summary>"Biz ne arıyoruz?" sirket profili (BusinessProfile) JSON olarak.</summary>
+    /// <summary>"Şirketimiz" sirket profili (BusinessProfile) JSON olarak.</summary>
     public const string BusinessProfile = "Business:Profile";
 
     // --- E-posta gonderimi (SMTP). Anahtarlar appsettings "Smtp" bolumuyle ayni:
@@ -156,8 +156,6 @@ public static class SettingKeys
     /// <summary>Profilden otomatik uretilen e-posta taslaklarinin kimlikleri (virgullu).</summary>
     public const string GeneratedTemplateIds = "Templates:GeneratedIds";
 
-    /// <summary>Kalite Olcumu olcu seti (JSON): NACE kodu basina bilinen ureticiler / uretici olmayanlar.</summary>
-    public const string QualityGold = "Quality:Gold";
 
     public const int DefaultSearchMaxCompanies = 100;
     public const int SearchMaxCompaniesUpperLimit = 200;
@@ -173,7 +171,7 @@ public static class SettingKeys
         SalesforceSecurityToken, SalesforceLoginUrl, SalesforceRefreshToken, SalesforceInstanceUrl,
         SalesforcePublicBaseUrl, SequenceDailyCap, ImapHost, ImapPort, ImapUsername, ImapPassword,
         ImapCursor, ImapLastCheck, ImapLastError, ImapInboxBackfill, AuditRetentionDays, GeminiMonthlyLimit, ApolloCreditLimit,
-        GeneratedTemplateIds, QualityGold
+        GeneratedTemplateIds
     };
 
     /// <summary>Deger gizlenmeli mi? API anahtarlari ve e-posta sifresi ekranda maskeli gosterilir.</summary>

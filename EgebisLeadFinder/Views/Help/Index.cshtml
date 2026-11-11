@@ -6,14 +6,15 @@
     {
         ("baslarken", "Başlarken", "Genel"),
         ("panel", "Panel", "Genel"),
-        ("profile", "Biz ne arıyoruz?", "Kurulum"),
+        ("profile", "Şirketimiz", "Kurulum"),
         ("icp", "İdeal müşteri profili (ICP)", "Kurulum"),
+        ("searchprofiles", "Arama profilleri", "Firma bulma"),
         ("search", "Firma arama", "Firma bulma"),
         ("companies", "Firmalar listesi", "Firma bulma"),
         ("details", "Firma detayı", "Firma bulma"),
         ("favorites", "Favoriler", "Firma bulma"),
-        ("compare", "Firma karşılaştırma", "Raporlar"),
-        ("sector", "Sektör analizi (NACE)", "Raporlar"),
+        ("compare", "Firma karşılaştırma", "Araçlar"),
+        ("sector", "Sektör analizi (NACE)", "Araçlar"),
         ("leads", "Lead'ler ve e-posta", "Satış"),
         ("sequences", "Mail dizileri ve taslaklar", "Satış"),
         ("usage", "API kullanımı", "Yönetim"),
@@ -58,7 +59,7 @@
                 karar vericilere ulaşmasını sağlayan bir potansiyel müşteri (lead) bulma uygulamasıdır.
             </p>
             <div class="guide-flow">
-                <span>Biz ne arıyoruz?</span><i>→</i><span>Firma ara</span><i>→</i><span>Değerlendir</span><i>→</i>
+                <span>Şirketimiz</span><i>→</i><span>Arama profili</span><i>→</i><span>Firma ara</span><i>→</i><span>Değerlendir</span><i>→</i>
                 <span>Karar vericiyi bul</span><i>→</i><span>Lead &amp; e-posta</span><i>→</i><span>Takip</span>
             </div>
             <h3 class="h6 mt-3">Giriş</h3>
@@ -79,7 +80,7 @@
                 <em>İleri / Geri</em> düğmeleri veya klavyedeki ok tuşlarıyla ilerler, <em>Esc</em> ile kapanır.</p>
             <figure class="guide-shot"><img src="@Shot("tour")" alt="Sayfa turu" loading="lazy" /><figcaption>Sayfa turu: vurgulanan alan ve açıklaması (Firmalar ekranı, 5. adım).</figcaption></figure>
             <div class="guide-tip mt-3">
-                <div><strong>Gizlilik:</strong> Arama sonuçlarınız ve favori listeniz size özeldir. Arama şablonunuzu veya favori listenizi isterseniz herkese açabilirsiniz; bu durumda bile arama <em>sonuçlarınız</em> paylaşılmaz.</div>
+                <div><strong>Gizlilik:</strong> Arama sonuçlarınız ve favori listeniz size özeldir. Arama profilinizi veya favori listenizi isterseniz herkese açabilirsiniz; bu durumda bile arama <em>sonuçlarınız</em> paylaşılmaz.</div>
             </div>
         </section>
 
@@ -98,22 +99,20 @@
 
         @* ---------------------------------------------------------------- *@
         <section class="guide-section" id="profile">
-            <h2><span class="guide-num">@Num("profile")</span> Biz ne arıyoruz? (şirket profili)</h2>
+            <h2><span class="guide-num">@Num("profile")</span> Şirketimiz (şirket profili)</h2>
             <p class="guide-lead">
-                Uygulamanın “beyni”. Şirketinizin ne sattığını, ideal müşterinizi ve hedef segmentlerinizi burada tanımlarsınız.
+                Uygulamanın “beyni”. Şirketinizin ne sattığını ve ideal müşterinizi burada tanımlarsınız.
                 Yapay zekâ firma analizini, uygunluk puanını, akıllı aramayı ve mail yazımını bu tanıma göre yapar.
             </p>
-            <figure class="guide-shot"><img src="@Shot("profile")" alt="Biz ne arıyoruz ekranı" loading="lazy" /><figcaption>Şirket profili, siteden otomatik doldurma ve hedef segmentler.</figcaption></figure>
             <ol class="guide-steps">
-                <li>Üst menüdeki sarı <strong>Biz ne arıyoruz?</strong> düğmesine tıklayın.</li>
+                <li>Üst menüde <strong>Panel</strong>in yanındaki <strong>Şirketimiz</strong>e tıklayın.</li>
                 <li><strong>Sitemizden otomatik doldur</strong> kutusuna şirket sitenizin adresini yazın; yapay zekâ taslağı birkaç saniyede doldurur.</li>
                 <li>Taslağı kontrol edin: <em>Ne satıyoruz</em>, <em>İdeal müşteri</em>, <em>Müşterimiz olmayanlar</em>, <em>Rakipler</em>.</li>
-                <li><strong>Hedef segmentler</strong>: her ürün grubu veya müşteri sektörü için bir segment ekleyin (arama terimi, bölge, anahtar kelimeler, NACE, ulaşılacak unvanlar).</li>
                 <li><strong>Müşterilerimiz ne tür firmalar?</strong>: üretici mi, her tür şirket mi? Firma araması buna göre “üreticileri / fabrikası” ya da “firmaları / şirketleri” diye yapılır.</li>
                 <li><strong>İhtiyaç sinyalleri</strong>: bir firmanın size ihtiyacı olduğunu gösteren ifadeler (ör. “yeni şantiye”, “ihale”). Firma araştırması haberleri bunlarla tarar, fırsatları bunlara göre önerir.</li>
                 <li><strong>Puanlama anahtar kelimeleri</strong>: puan veren ölçütler; her satır <code>Ad | kelime, kelime | puan</code>. <em>Yapay zekâ ile öner</em> tanımınızdan üretir; boş bırakırsanız kaydederken kendisi üretir.</li>
-                <li><strong>Kaydet</strong>. Segmentler Firma Ara ekranında tek tıkla arama düğmesi olur. Firma analizi, puan, araştırma raporu, kişi seçimi ve mail önerileri artık bu tanıma göre çalışır.</li>
-                <li>Mail taslaklarını kendi işinize göre hazırlamak için <strong>Taslak Düzenleyici → Profilime göre oluştur</strong>; her segment için ayrı taslak yazılır ve o segmentteki firmalara otomatik önerilir.</li>
+                <li><strong>Kaydet</strong>. Firma analizi, puan, araştırma raporu, kişi seçimi ve mail önerileri artık bu tanıma göre çalışır.</li>
+                <li>Mail taslaklarını kendi işinize göre hazırlamak için <strong>Taslak Düzenleyici → Profilime göre oluştur</strong>.</li>
             </ol>
             <figure class="guide-shot"><img src="@Shot("profile-signals")" alt="Puanlama anahtar kelimeleri" loading="lazy" /><figcaption>Müşteri türü, ihtiyaç sinyalleri ve puanlama anahtar kelimeleri. Firma bir ölçüte uyarsa puan alır ve puan dökümünde görünür (en fazla 25 puan).</figcaption></figure>
             <div class="guide-tip"><div>Bu ekranı yalnızca yönetici kaydedebilir; kullanıcılar görüntüler.</div></div>
@@ -133,27 +132,33 @@
         </section>
 
         @* ---------------------------------------------------------------- *@
+        <section class="guide-section" id="searchprofiles">
+            <h2><span class="guide-num">@Num("searchprofiles")</span> Arama profilleri</h2>
+            <p class="guide-lead">Firma aramasıyla ilgili her şey arama profilinde belirlenir: sektör, NACE kodu, ülke, il ve en fazla kaç firma getirileceği. Arama yalnızca bir profil seçilerek başlatılır.</p>
+            <ol class="guide-steps">
+                <li>Üst menüde <strong>Favoriler</strong>in yanındaki <strong>Arama Profilleri</strong>ni açın.</li>
+                <li><strong>Yeni Arama Profili</strong> ile pencereyi açın. Profil adı ve sektörü yazın; çok spesifik arama için <strong>NACE kodu</strong> ekleyin (isteğe bağlı), kodu yazınca ürünler gelir, istemediklerinizi kapatın.</li>
+                <li><strong>Ülke / bölge</strong> seçin. Türkiye'de iller, Avrupa ülkelerinde (Almanya, Avusturya, İsviçre, Hollanda, Belçika, Fransa, İtalya, İspanya, Birleşik Krallık, Polonya, Çekya, Romanya, Bulgaristan, Yunanistan, İsveç) bölge/eyalet listesi açılır. Seçtiğiniz her bölge ayrı aranır; hiç seçmezseniz ülke geneli taranır.</li>
+                <li><strong>En fazla firma</strong>: boş bırakırsanız Ayarlar'daki varsayılan kullanılır.</li>
+                <li>Listede her profil için <strong>Göster</strong>, <strong>Düzenle</strong>, <strong>Sil</strong> ve <strong>Firmalar</strong> düğmeleri vardır. <strong>Dışa aktar</strong> listeyi Excel veya CSV olarak indirir. Profili silmek firmaları silmez.</li>
+                <li><strong>Varsayılan yap</strong> ile kendi varsayılan profilinizi seçin. <em>Belirli bir firmayı bul</em> bu profilin ülkesinde arar; varsayılan seçilmeden adla arama yapılamaz.</li>
+                <li>Profiller <strong>size özeldir</strong>. Listeden <em>Herkese aç</em> derseniz diğer kullanıcılar kriterleri kullanabilir; bulunan firmalar yine kişiye özel kalır.</li>
+            </ol>
+        </section>
+
+        @* ---------------------------------------------------------------- *@
         <section class="guide-section" id="search">
             <h2><span class="guide-num">@Num("search")</span> Firma arama</h2>
-            <p class="guide-lead">Sektör yazarak Google ve Google Haritalar'da üretici firmaları bulur; her firmanın sitesini okuyup yapay zekâ ile değerlendirir.</p>
-            <figure class="guide-shot"><img src="@Shot("search")" alt="Firma Ara ekranı" loading="lazy" /><figcaption>Firma Ara: sektör, segment düğmeleri, akıllı arama ve bölge.</figcaption></figure>
+            <p class="guide-lead">Seçtiğiniz arama profiline göre Google ve Google Haritalar'da firmaları bulur; her firmanın sitesini okuyup yapay zekâ ile değerlendirir.</p>
             <ol class="guide-steps">
-                <li><strong>Sektör</strong> kutusuna aradığınız sektörü yazın (ör. “Otomotiv yan sanayi”) veya bir <strong>segment</strong> düğmesine tıklayın.</li>
-                <li><strong>Akıllı arama</strong> açık kalsın: yapay zekâ ek arama terimleri üretir ve bayi, rehber, haber sitesi, rakip gibi hedef dışı adayları siteye girmeden eler.</li>
-                <li><strong>Kapsam</strong> ve <strong>Sonuç</strong> satırlarındaki kalem simgeleriyle bölgeyi ve <strong>firma sayısını</strong> anında değiştirin; sayıyı elle yazarsınız (1-200) ve yalnızca o aramaya uygulanır.</li>
-                <li>Bölgeyi seçip <strong>Firma Ara</strong>'ya basın. İlerleme çubuğu açılır; gerekirse <strong>İptal et</strong> ile durdurun (o ana kadar bulunanlar kaydedilir).</li>
+                <li><strong>Arama profili</strong> listesinden bir profil seçin. Profil seçmeden arama başlatılamaz.</li>
+                <li>Detayları görmek için <strong>Göster</strong>'e basın. Uygun profil yoksa <strong>Yeni Arama Profili</strong> ile oluşturun; kaydedince listede seçili gelir.</li>
+                <li><strong>Aramayı Başlat</strong>'a basın. İlerleme çubuğu açılır; gerekirse <strong>İptal et</strong> ile durdurun (o ana kadar bulunanlar kaydedilir).</li>
+                <li>Yapay zekâ her aramada ek arama terimleri üretir ve bayi, rehber, haber sitesi, rakip gibi hedef dışı adayları siteye girmeden eler.</li>
                 <li>Arama bitince sonuç özeti gelir: kaç firma bulundu, kaçı yeni, kaçı ön elemede elendi. Her satırdaki yıldızla favoriye ekleyebilirsiniz.</li>
             </ol>
-            <figure class="guide-shot"><img src="@Shot("search-advanced")" alt="Gelişmiş arama" loading="lazy" /><figcaption>Gelişmiş arama: il seçimi ve arama şablonu. “Şablonu tüm kullanıcılarla paylaş” yalnızca kriterleri paylaşır.</figcaption></figure>
-            <h3 class="h6 mt-3">Gelişmiş arama ve arama şablonları</h3>
-            <ol class="guide-steps">
-                <li><strong>Gelişmiş Arama</strong>'yı açın; il/bölge seçin. Türkiye'de iller, Avrupa ülkelerinde (Almanya, Avusturya, İsviçre, Hollanda, Belçika, Fransa, İtalya, İspanya, Birleşik Krallık, Polonya, Çekya, Romanya, Bulgaristan, Yunanistan, İsveç) bölge/eyalet listesi açılır; ör. Almanya'da yalnızca <em>Bayern</em>. Seçtiğiniz her bölge ayrı aranır.</li>
-                <li><strong>Arama profili adı</strong> yazıp <strong>Kaydet ve Ara</strong> derseniz arama şablon olarak saklanır; sonra tek tıkla tekrar çalıştırılır.</li>
-                <li>Şablonlar <strong>size özeldir</strong>. <em>Şablonu tüm kullanıcılarla paylaş</em> işaretlenirse diğer kullanıcılar kriterleri kullanabilir; bulunan firmalar yine kişiye özel kalır.</li>
-                <li>Başkasının paylaştığı şablonu olduğu gibi kullanabilirsiniz; değiştirip kaydederseniz size özel bir kopya oluşur.</li>
-            </ol>
-            <figure class="guide-shot"><img src="@Shot("search-regions")" alt="Avrupa bölge seçimi" loading="lazy" /><figcaption>Gelişmiş arama: Almanya için eyalet seçimi, hızlı gruplar (Güney, Batı, Kuzey, Doğu) ve bölge kutuları.</figcaption></figure>
-            <div class="guide-tip is-info"><div><strong>Belirli bir firmayı bul</strong>: tanıdığınız bir firmayı adıyla aratıp sisteme ekleyebilirsiniz.</div></div>
+            <div class="guide-tip is-info"><div><strong>Belirli bir firmayı bul</strong>: tanıdığınız bir firmayı adıyla aratıp sisteme ekleyebilirsiniz. Arama, varsayılan arama profilinizin ülkesinde yapılır.</div></div>
+            <div class="guide-tip mt-2"><div><strong>Black List</strong>: Ayarlar'daki listeye yazılan firmalar (alan adı veya firma adı) aramada bulunsa dahi gösterilmez.</div></div>
             <div class="guide-actions"><a class="btn btn-sm btn-outline-secondary" href="/Company/Search?tour=1">Firma Ara turunu başlat</a></div>
         </section>
 
@@ -164,9 +169,9 @@
             <figure class="guide-shot"><img src="@Shot("companies")" alt="Firmalar ekranı" loading="lazy" /><figcaption>Firmalar: arama seçici, filtre çipleri, firma kartları ve alttaki karşılaştırma çubuğu.</figcaption></figure>
             <ol class="guide-steps">
                 <li><strong>Gösterilen</strong> seçicisinden önceki aramalarınıza veya <em>Tüm firmalar</em>'a geçin.</li>
-                <li>Arama kutusu ve <strong>Detaylı filtre</strong> ile puan, NACE sektörü, il/ülke, şablon ve AI sinyaline göre süzün; <strong>Dışa aktar</strong> ile ekrandaki listeyi Excel'e indirin.</li>
-                <li>Çipler: satış aşaması, <em>ICP'ye uyanlar</em>, <em>İncelenemedi</em>, segmentler ve <em>Favorilerim</em>.</li>
-                <li>Kartta lead puanı, profilimize <strong>uygunluk yüzdesi</strong>, segment ve yapay zekânın kısa gerekçesi yazar.</li>
+                <li>Arama kutusu ve <strong>Detaylı filtre</strong> ile puan, NACE sektörü, il/ülke, arama profili ve AI sinyaline göre süzün; <strong>Dışa aktar</strong> ile ekrandaki listeyi Excel'e indirin.</li>
+                <li>Çipler: satış aşaması, <em>ICP'ye uyanlar</em>, <em>İncelenemedi</em> ve <em>Favorilerim</em>.</li>
+                <li>Kartta lead puanı, profilimize <strong>uygunluk yüzdesi</strong> ve yapay zekânın kısa gerekçesi yazar.</li>
                 <li>Kart altındaki düğmeler: <em>İletişim / Mail / Proje</em> işaretleri, <em>Salesforce</em>'a aktarma, <em>Kıyasla</em> (karşılaştırmaya ekle) ve silme. Sağ üstteki <strong>yıldız</strong> favoriye ekler.</li>
             </ol>
             <div class="guide-tip"><div><strong>“İncelenemedi”</strong> rozeti, sitesi okunamayan veya servis hatası alan firmalardır; firma detayında <em>Yeniden Analiz Et</em> ile tekrar denenir. <strong>“Elendi”</strong> ise hedef dışı bulunan firmadır.</div></div>
@@ -209,7 +214,7 @@
             <figure class="guide-shot"><img src="@Shot("compare")" alt="Firma karşılaştırma" loading="lazy" /><figcaption>Karşılaştırma: önde olan firma, kriterlerimiz ve yeşil vurgulu kriter tablosu.</figcaption></figure>
             <ol class="guide-steps">
                 <li>Firmalar ekranında iki firmanın kartındaki <strong>Kıyasla</strong> düğmesine basın (veya firma detayında <em>Karşılaştır</em>). Ekranın altında seçim çubuğu çıkar.</li>
-                <li>Çubuktaki <strong>Karşılaştır</strong>'a basın. İsterseniz <em>Raporlar → Firma karşılaştırma</em> ekranında firmaları listeden de seçebilirsiniz.</li>
+                <li>Çubuktaki <strong>Karşılaştır</strong>'a basın. İsterseniz <em>Araçlar → Firma karşılaştırma</em> ekranında firmaları listeden de seçebilirsiniz.</li>
                 <li>Tablo; lead puanı, uygunluk, ICP, puan kalemleri, sektör, ölçek, ERP durumu, ön araştırma ve satış durumunu gösterir. <strong>Yeşil hücre</strong> o kriterde önde olan taraftır.</li>
                 <li><strong>Yapay zekâ yorumu al</strong>: hangisine önce gidilmeli, güçlü yanlar, riskler ve sonraki adımlar.</li>
                 <li><strong>Excel'e aktar</strong> veya <strong>Yazdır / PDF</strong> ile raporu alın (yapay zekâ yorumu da eklenir).</li>
@@ -223,11 +228,11 @@
             <p class="guide-lead">“Bu sektör bize ne kadar uygun?” sorusunun raporlu cevabı. NACE kodunu bilmenize gerek yok.</p>
             <figure class="guide-shot"><img src="@Shot("sector")" alt="Sektör analizi" loading="lazy" /><figcaption>Anahtar kelime yazın; eşleşen NACE kodlarından en fazla 6'sını seçin.</figcaption></figure>
             <ol class="guide-steps">
-                <li>Üst menüden <strong>Raporlar → Sektör analizi</strong>'ni açın.</li>
+                <li>Üst menüden <strong>Araçlar → Sektör analizi</strong>'ni açın.</li>
                 <li>Sektörü günlük dille yazın (ör. “plastik ambalaj”, “süt ürünleri”) ve <strong>NACE kodlarını bul</strong>'a basın. Kodlar resmî listeden ve yapay zekâdan gelir; yanında uygulamada kaç firma olduğu yazar.</li>
                 <li>Analiz edilecek kodları işaretleyip <strong>Seçilenleri analiz et</strong>'e basın.</li>
                 <li>Raporda her sektör için uygunluk puanı, neden uygun olduğu, çözdüğümüz ihtiyaçlar, riskler, hedef firma profili, arama terimleri ve ulaşılacak unvanlar yer alır.</li>
-                <li><strong>Bu sektörde firma ara</strong> düğmesi Firma Ara ekranını doldurulmuş açar. Rapor kaydedilir; Excel ve PDF olarak alınabilir.</li>
+                <li><strong>Bu sektörde firma ara</strong> düğmesi Firma Ara ekranında <em>Yeni Arama Profili</em> penceresini bu sektörle doldurulmuş açar; profili kaydedip arama yaparsınız. Rapor kaydedilir; Excel ve PDF olarak alınabilir.</li>
             </ol>
             <figure class="guide-shot"><img src="@Shot("sector-report")" alt="Sektör analizi raporu" loading="lazy" /><figcaption>Sektör raporu: sıralama, uygunluk halkası, gerekçeler ve uygulamadaki istatistikler.</figcaption></figure>
         </section>
@@ -273,6 +278,7 @@
                 <li>Üst menüdeki kadran simgesinden açın.</li>
                 <li>Her servis için bugün / bu ay kullanım, limit ve kalan yüzdesi görünür; %80'de uyarı, %95'te kritik uyarı verilir.</li>
                 <li><strong>Gemini maliyeti</strong>, Gemini'nin bildirdiği gerçek token sayılarından ve seçili modelin fiyatından hesaplanır; TL karşılığı Ayarlar'daki <em>USD / TL kuru</em> ile bulunur (varsayılan 50).</li>
+                <li><strong>Kullanılan Krediler</strong> <span class="tag tag-muted">Yönetici</span>: Ayarlar'daki <em>Kullanılan Krediler</em> kartından açılır. <em>Gün / Hafta / Ay</em> seçin, ‹ › ile dönemi değiştirin veya <em>Tarih seç</em> ile istediğiniz günü açın. Tabloda gün gün Serper, Apollo (e-posta açma) ve Gemini harcaması, altta seçilen dönemin toplamı görünür. Aşağıda o dönemdeki her aramanın kaç Serper kredisi ve kaç yapay zekâ çağrısı harcadığı yazar.</li>
             </ol>
         </section>
 
@@ -283,7 +289,9 @@
             <figure class="guide-shot"><img src="@Shot("settings")" alt="Ayarlar" loading="lazy" /><figcaption>Ayarlar: API anahtarları ve şifreler veritabanında şifreli saklanır; şifre alanları kaydedildikten sonra tekrar gösterilmez.</figcaption></figure>
             <ol class="guide-steps">
                 <li><strong>API anahtarları</strong>: Serper, Gemini ve Apollo anahtarlarını girin. Anahtarlar yalnızca yöneticiye görünür ve veritabanında şifreli saklanır.</li>
-                <li><strong>Arama</strong>: azami firma sayısı ve varsayılan bölge. Firma sayısını her aramada Firma Ara ekranından da değiştirebilirsiniz.</li>
+                <li><strong>Arama</strong>: azami firma sayısı (arama profilinde boş bırakılırsa bu değer geçerlidir) ve varsayılan bölge. Firma sayısı ve bölgeyi profil bazında Arama Profilleri'nden de belirlersiniz.</li>
+                <li><strong>Black List</strong>: aramada bulunsa dahi gösterilmeyecek firmalar. Her satıra bir alan adı veya firma adı yazın; listeye eklemek havuzdaki firmaları silmez.</li>
+                <li><strong>Kullanılan Krediler</strong>: Serper, Apollo ve Gemini harcamasını gün, hafta veya ay olarak görürsünüz (<em>API kullanımı</em> bölümüne bakın).</li>
                 <li><strong>Limitler</strong>: Gemini aylık çağrı limiti, Apollo kredisi ve Gemini maliyeti için <em>USD / TL kuru</em>.</li>
                 <li><strong>E-posta</strong>: SMTP hesabını girip <em>Test e-postası gönder</em> ile deneyin; cevap takibi için IMAP bilgileri.</li>
                 <li><strong>Salesforce</strong>: bağlantıyı kurun; firmalar ve kişiler tek tıkla Salesforce'a aktarılır, sonraki değişiklikler otomatik senkronlanır.</li>
@@ -321,7 +329,7 @@
             <h2><span class="guide-num">@Num("sss")</span> Sık sorulanlar</h2>
             <dl class="mb-0">
                 <dt>Arama çok az firma getirdi.</dt>
-                <dd>Sektörü daha genel yazın, akıllı aramayı açık tutun veya bölgeyi genişletin. Azami firma sayısı Ayarlar'dadır.</dd>
+                <dd>Arama profilinde sektörü daha genel yazın, firma sayısını artırın veya bölgeyi genişletin.</dd>
                 <dt>Bir firma yanlışlıkla elendi.</dt>
                 <dd>Firma detayında <em>Yeniden Analiz Et</em> deyin; hariç tutulan kelimeler ICP ekranındadır.</dd>
                 <dt>Başka bir kullanıcının bulduğu firmaları neden görmüyorum?</dt>
@@ -329,9 +337,9 @@
                 <dt>“Kota doldu” uyarısı aldım.</dt>
                 <dd>API kullanımı ekranından hangi servisin dolduğunu görün; yönetici limiti veya anahtarı Ayarlar'dan günceller.</dd>
                 <dt>Bir firma neden bu puanı aldı?</dt>
-                <dd>Firma detayında sağdaki <em>Puan Dökümü</em>'ne bakın: uygunluk, anahtar kelimeler, hedef segment ve e-posta gibi her kalem puanıyla yazılıdır.</dd>
+                <dd>Firma detayında sağdaki <em>Puan Dökümü</em>'ne bakın: uygunluk, anahtar kelimeler ve e-posta gibi her kalem puanıyla yazılıdır.</dd>
                 <dt>Almanya'da yalnızca Bayern'de arama yapabilir miyim?</dt>
-                <dd>Evet. <em>Gelişmiş Arama</em>'da ülkeyi Almanya seçin ve eyalet listesinden Bayern'i işaretleyin. Aynı yöntem diğer Avrupa ülkelerinde de çalışır.</dd>
+                <dd>Evet. Arama profilinde ülkeyi Almanya seçin ve eyalet listesinden Bayern'i işaretleyin. Aynı yöntem diğer Avrupa ülkelerinde de çalışır.</dd>
                 <dt>Maili başka dilde nasıl gönderirim?</dt>
                 <dd>E-posta yazma ekranında <em>Çevir</em> menüsünden dili seçin; metin çevrilir, siz kontrol edip gönderirsiniz.</dd>
                 <dt>Uygulamayı İngilizce kullanabilir miyim?</dt>

@@ -4,7 +4,7 @@ namespace EgebisLeadFinder.Services;
 
 /// <summary>
 /// Faz-II rapor yapay zekasi: iki firmayi karsilastirma, NACE sektor analizi ve sirket
-/// sitesinden ICP onerisi. Tumu "Biz ne arıyoruz?" sirket profiline gore degerlendirir.
+/// sitesinden ICP onerisi. Tumu "Şirketimiz" sirket profiline gore degerlendirir.
 /// </summary>
 public interface IInsightAi
 {

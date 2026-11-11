@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 namespace EgebisLeadFinder.Models;
 
 /// <summary>
-/// "Biz ne arıyoruz?" — uygulamayi kullanan sirketin kendi tanimi: ne satiyor, kime satiyor,
+/// "Şirketimiz" — uygulamayi kullanan sirketin kendi tanimi: ne satiyor, kime satiyor,
 /// kimler musterisi degil. Yapay zeka firma analizinde, arastirma raporunda ve e-posta yaziminda
 /// bu tanimi kullanir; bos ise eski (Egebis'e ozel) sabit tanimlar gecerlidir.
 /// Ayarlar tablosunda JSON olarak tutulur (SettingKeys.BusinessProfile).

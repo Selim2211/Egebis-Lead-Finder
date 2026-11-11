@@ -4440,6 +4440,14 @@ a.pager-btn:hover { border-color: var(--eg-mailed-border); background: var(--eg-
 .run-picker-row > .run-picker-item { flex: 1 1 auto; min-width: 0; background: transparent; box-shadow: none; }
 .run-picker-del { flex: 0 0 auto; width: 1.9rem; height: 1.9rem; margin-right: .35rem; border: 0; border-radius: 6px; background: transparent; color: var(--eg-text-muted); font-size: 1.25rem; line-height: 1; cursor: pointer; }
 .run-picker-del:hover, .run-picker-del:focus-visible { background: rgba(220, 38, 38, .12); color: #dc2626; }
+.profile-actions { min-width: 15rem; max-width: 22rem; }
+.profile-actions form { margin: 0; }
+.profile-pick { display: flex; flex-wrap: wrap; gap: .5rem; }
+.profile-pick .form-select { flex: 1 1 100%; min-width: 0; }
+.profile-pick .btn { flex: 1 1 auto; }
+.profile-detail { display: grid; grid-template-columns: minmax(7rem, auto) 1fr; gap: .4rem 1rem; }
+.profile-detail dt { font-weight: 600; font-size: .85rem; color: var(--eg-text-muted); }
+.profile-detail dd { margin: 0; overflow-wrap: anywhere; }
 .run-picker-empty { padding: .6rem; font-size: .85rem; color: var(--eg-text-muted); }
 .run-tag { font-size: .68rem; margin-left: .3rem; vertical-align: middle; }
 .stage-chip.chip-unknown.is-active { background: var(--eg-warning-bg); border-color: #fcd34d; color: #92400e; }

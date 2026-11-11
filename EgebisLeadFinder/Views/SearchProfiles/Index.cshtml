@@ -1,0 +1,169 @@
+@model SearchProfilesViewModel
+@{
+    ViewData["Title"] = "Arama Profilleri";
+    var me = EgebisLeadFinder.Services.Auth.ClaimsPrincipalExtensions.UserId(User);
+    var isAdmin = User.IsInRole(nameof(UserRole.Admin));
+    var returnUrl = Url.Action("Index", "SearchProfiles");
+
+    static string CityLabel(string? city, string regionName)
+    {
+        var cities = (city ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return cities.Length switch
+        {
+            0 => regionName + " geneli",
+            <= 3 => string.Join(", ", cities),
+            _ => $"{string.Join(", ", cities.Take(3))} +{cities.Length - 3}"
+        };
+    }
+}
+
+<div class="page-head">
+    <div>
+        <h1>Arama Profilleri</h1>
+        <div class="page-sub">Firma aramaları bu profillerle yapılır. Varsayılan profil, firma adıyla aramada kullanılır.</div>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        @if (Model.Profiles.Count > 0)
+        {
+            <details class="export-menu">
+                <summary class="btn btn-outline-secondary btn-sm">Dışa aktar ▾</summary>
+                <div class="export-menu-list">
+                    <a asp-action="Export" asp-route-format="xlsx">Excel (.xlsx)</a>
+                    <a asp-action="Export" asp-route-format="csv">CSV (.csv)</a>
+                </div>
+            </details>
+        }
+        <button type="button" class="btn btn-accent" data-profile-new>Yeni Arama Profili</button>
+    </div>
+</div>
+
+@if (TempData["ProfilesOk"] is string ok)
+{
+    <div class="alert alert-success" data-flash="success">@ok</div>
+}
+@if (TempData["ProfilesError"] is string err)
+{
+    <div class="alert alert-danger" data-flash="error">@err</div>
+}
+@if (TempData["SettingsSaved"] is string saved)
+{
+    <div class="alert alert-success" data-flash="success">@saved</div>
+}
+
+@if (Model.DefaultProfileId is null && Model.Profiles.Count > 0)
+{
+    <div class="alert alert-warning">Varsayılan profil seçilmedi. Firma adıyla arama için listeden <strong>Varsayılan yap</strong> ile bir profil seçin.</div>
+}
+
+<div class="card">
+    @if (Model.Profiles.Count == 0)
+    {
+        <div class="empty-state">
+            <div class="empty-title">Henüz arama profili yok</div>
+            <div>Firma aramak için önce bir arama profili oluşturun.</div>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="profilesTable">
+                <thead>
+                    <tr>
+                        <th style="min-width:12rem">Profil</th>
+                        <th style="min-width:9rem">Sektör / NACE</th>
+                        <th>Ülke ve il</th>
+                        <th>En fazla firma</th>
+                        <th>Paylaşım</th>
+                        <th class="text-end">İşlemler</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var p in Model.Profiles)
+                {
+                    var dto = SearchProfileDto.From(p, me, isAdmin);
+                    var isDefault = Model.DefaultProfileId == p.Id;
+                    <tr>
+                        <td>
+                            <div class="cell-title">
+                                @p.Name
+                                @if (isDefault)
+                                {
+                                    <span class="tag tag-success run-tag">Varsayılan</span>
+                                }
+                            </div>
+                            <div class="cell-sub">@dto.CreatedAt</div>
+                        </td>
+                        <td>
+                            <div>@(string.IsNullOrWhiteSpace(p.Industry) ? "—" : p.Industry)</div>
+                            @if (!string.IsNullOrWhiteSpace(p.NaceCode))
+                            {
+                                <div class="cell-sub">NACE @p.NaceCode</div>
+                            }
+                        </td>
+                        <td>
+                            <div>@dto.RegionName</div>
+                            <div class="cell-sub">@CityLabel(p.City, dto.RegionName)</div>
+                        </td>
+                        <td>@if (p.MaxCompanies is int pm) { @pm } else { <span>Varsayılan</span> <span class="text-muted-2">(@Model.DefaultMaxCompanies)</span> }</td>
+                        <td>
+                            @if (dto.OwnerName is not null)
+                            {
+                                <span class="small">Paylaşan: @dto.OwnerName</span>
+                            }
+                            else if (dto.CanEdit)
+                            {
+                                <form method="post" asp-controller="Company" asp-action="SetProfileVisibility" class="m-0">
+                                    <input type="hidden" name="profileId" value="@p.Id" />
+                                    <input type="hidden" name="isPublic" value="@(p.IsPublic ? "false" : "true")" />
+                                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                    <div class="small">@(p.IsPublic ? "Herkese açık" : "Size özel")</div>
+                                    <button type="submit" class="btn btn-link btn-sm p-0" title="Sonuçlar her durumda size özel kalır">
+                                        @(p.IsPublic ? "Özel yap" : "Herkese aç")
+                                    </button>
+                                </form>
+                            }
+                            else
+                            {
+                                <span class="small">@(p.IsPublic ? "Herkese açık" : "Size özel")</span>
+                            }
+                        </td>
+                        <td class="profile-actions"><div class="d-flex flex-wrap justify-content-end gap-1">
+                            <form method="post" asp-action="SetDefault" class="d-inline">
+                                @if (!isDefault)
+                                {
+                                    <input type="hidden" name="id" value="@p.Id" />
+                                }
+                                <button type="submit" class="btn btn-sm @(isDefault ? "btn-outline-secondary" : "btn-outline-primary")">
+                                    @(isDefault ? "Varsayılanı kaldır" : "Varsayılan yap")
+                                </button>
+                            </form>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-profile-show data-profile="@dto.ToJson()">Göster</button>
+                            <a class="btn btn-sm btn-outline-secondary" asp-controller="Company" asp-action="Index" asp-route-profileId="@p.Id">Firmalar</a>
+                            @if (dto.CanEdit)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-profile-edit data-profile="@dto.ToJson()">Düzenle</button>
+                                <form method="post" asp-action="Delete" class="d-inline">
+                                    <input type="hidden" name="id" value="@p.Id" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"
+                                            data-confirm="Firmalar silinmez; yalnızca bu profil ve firmalardaki profil etiketi kaldırılır."
+                                            data-confirm-title="Arama profili silinsin mi?" data-confirm-subject="@p.Name"
+                                            data-confirm-ok="Profili sil" data-confirm-tone="danger">Sil</button>
+                                </form>
+                            }
+                        </div></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<partial name="_SearchProfileModal" model="@(new SearchProfileModalModel(Model.Region, Model.DefaultMaxCompanies, null))" />
+
+@section Scripts {
+    <partial name="_SearchProfileModalScript" />
+    <script>
+        document.addEventListener('searchprofile:saved', function () { location.reload(); });
+    </script>
+}

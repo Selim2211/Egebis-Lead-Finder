@@ -4,14 +4,14 @@ using EgebisLeadFinder.Models;
 
 namespace EgebisLeadFinder.Services;
 
-/// <summary>AI #6: sirketin kendi sitesinden "Biz ne arıyoruz?" taslagi. GeminiAiService uygular.</summary>
+/// <summary>AI #6: sirketin kendi sitesinden "Şirketimiz" taslagi. GeminiAiService uygular.</summary>
 public interface IBusinessProfileAi
 {
     Task<BusinessProfileDraft> DraftBusinessProfileAsync(string siteUrl, string siteText, CancellationToken ct = default);
 }
 
 /// <summary>
-/// "Biz ne arıyoruz?" sirket profilini okur/yazar, sitemizden yapay zeka taslagi cikarir ve
+/// "Şirketimiz" sirket profilini okur/yazar, sitemizden yapay zeka taslagi cikarir ve
 /// segmentleri ICP'ye aktarir.
 /// </summary>
 public class BusinessProfileService
@@ -40,7 +40,10 @@ public class BusinessProfileService
         if (string.IsNullOrWhiteSpace(raw)) return new BusinessProfile();
         try
         {
-            return JsonSerializer.Deserialize<BusinessProfile>(raw, JsonOptions) ?? new BusinessProfile();
+            var profile = JsonSerializer.Deserialize<BusinessProfile>(raw, JsonOptions) ?? new BusinessProfile();
+            // Hedef segmentler kaldirildi: eski kayitlarda kalanlar hicbir yerde kullanilmaz.
+            profile.Segments = new List<TargetSegment>();
+            return profile;
         }
         catch (JsonException)
         {
@@ -68,23 +71,6 @@ public class BusinessProfileService
         }
 
         await _settings.SetManyAsync(values, ct);
-    }
-
-    /// <summary>
-    /// Segmentlerdeki NACE kodlari, sektor kelimeleri ve eleme kelimelerini ICP'ye ekler
-    /// (mevcut ICP degerleri korunur). Eklenen yeni oge sayisini doner.
-    /// </summary>
-    public async Task<int> ApplySegmentsToIcpAsync(BusinessProfile profile, CancellationToken ct = default)
-    {
-        var icp = await _icp.GetAsync(ct);
-        var added = 0;
-
-        added += Merge(icp.NaceCodes, profile.Segments.SelectMany(s => s.NaceCodes).Select(NaceCatalog.Normalize).OfType<string>());
-        added += Merge(icp.IndustryKeywords, profile.Segments.SelectMany(s => s.Keywords));
-        added += Merge(icp.ExcludeKeywords, profile.Segments.SelectMany(s => s.ExcludeKeywords));
-
-        if (added > 0) await _icp.SaveAsync(icp, ct);
-        return added;
     }
 
     /// <summary>Sirket sitesini okuyup yapay zekaya taslak profil cikartir (kaydetmez).</summary>
@@ -133,24 +119,8 @@ public class BusinessProfileService
         p.BuyingSignals = CleanList(p.BuyingSignals).Take(20).ToList();
         p.ScoringSignals = ScoringSignal.Clean(p.ScoringSignals);
 
-        p.Segments = p.Segments
-            .Where(s => !string.IsNullOrWhiteSpace(s.Name))
-            .Take(BusinessProfile.MaxSegments)
-            .ToList();
-
-        var ids = new HashSet<string>();
-        foreach (var s in p.Segments)
-        {
-            if (string.IsNullOrWhiteSpace(s.Id) || !ids.Add(s.Id)) { s.Id = Guid.NewGuid().ToString("N")[..8]; ids.Add(s.Id); }
-            s.Name = Clip(s.Name, 100)!;
-            s.Description = Clip(s.Description, 1000);
-            s.SearchTerm = Clip(s.SearchTerm, 150);
-            s.RegionKey = SearchRegions.IsKnown(s.RegionKey) ? s.RegionKey : null;
-            s.Keywords = CleanList(s.Keywords).Take(30).ToList();
-            s.NaceCodes = CleanList(s.NaceCodes.Select(n => NaceCatalog.Normalize(n) ?? string.Empty)).Take(30).ToList();
-            s.ExcludeKeywords = CleanList(s.ExcludeKeywords).Take(30).ToList();
-            s.TargetTitles = CleanList(s.TargetTitles).Take(30).ToList();
-        }
+        // Hedef segmentler kaldirildi: eski kayitlardan gelenler arama, puan ve maillerde kullanilmaz.
+        p.Segments = new List<TargetSegment>();
     }
 
     public static List<string> CleanList(IEnumerable<string?> items) =>

@@ -127,6 +127,9 @@ namespace EgebisLeadFinder.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("DefaultSearchProfileId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Email")
                         .HasMaxLength(255)
                         .HasColumnType("text");
@@ -172,6 +175,8 @@ namespace EgebisLeadFinder.Migrations
                         .HasColumnType("character varying(64)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DefaultSearchProfileId");
 
                     b.HasIndex("UserName")
                         .IsUnique();
@@ -929,6 +934,9 @@ namespace EgebisLeadFinder.Migrations
                     b.Property<bool>("IsPublic")
                         .HasColumnType("boolean");
 
+                    b.Property<int?>("MaxCompanies")
+                        .HasColumnType("integer");
+
                     b.Property<string>("NaceCode")
                         .HasMaxLength(12)
                         .HasColumnType("character varying(12)");
@@ -971,6 +979,9 @@ namespace EgebisLeadFinder.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<int>("AiCalls")
+                        .HasColumnType("integer");
+
                     b.Property<string>("City")
                         .HasColumnType("text");
 
@@ -1009,6 +1020,9 @@ namespace EgebisLeadFinder.Migrations
                         .HasColumnType("character varying(8)");
 
                     b.Property<int?>("SearchProfileId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SerperCredits")
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("StartedAt")
@@ -1210,6 +1224,14 @@ namespace EgebisLeadFinder.Migrations
                     b.HasIndex("TemplateId");
 
                     b.ToTable("SequenceSteps");
+                });
+
+            modelBuilder.Entity("EgebisLeadFinder.Models.AppUser", b =>
+                {
+                    b.HasOne("EgebisLeadFinder.Models.SearchProfile", null)
+                        .WithMany()
+                        .HasForeignKey("DefaultSearchProfileId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("EgebisLeadFinder.Models.CompanySearchProfile", b =>

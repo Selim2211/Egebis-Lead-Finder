@@ -44,6 +44,7 @@
         $"{r.StartedAt.ToLocalTime():dd.MM.yyyy HH:mm} · {r.Describe()}";
     string RunStats(SearchRun r) =>
         $"{r.Found} bulundu · {r.NewCount} yeni · {r.KnownCount} zaten kayıtlı" + (r.User is null ? "" : $" · {r.User.DisplayName}")
+        + (r.SerperCredits > 0 || r.AiCalls > 0 ? $" · {r.SerperCredits} Serper kredisi, {r.AiCalls} yapay zekâ çağrısı" : "")
         + (r.Status == SearchRunStatus.Done && !r.IsStale(nowUtc) ? "" : $" · {r.StatusLabel(nowUtc)}");
     if (profile is not null) chips.Add(($"Profil: {profile.Name} ({SearchRegions.Get(profile.RegionKey ?? SearchRegions.ByCountry(profile.Country)?.Key).Name})", QueryUrl.Without(req, "profileId")));
     if (Model.MinScore > 0) chips.Add(($"Skor ≥ {Model.MinScore}", QueryUrl.Without(req, "minScore")));
@@ -178,7 +179,7 @@
             </a>
         }
         <a class="filter-chip-clear" href="@Url.Action("Index", new { stage = Model.Stage })">Tümünü temizle</a>
-        @if (profile is not null && !string.IsNullOrWhiteSpace(profile.Industry))
+        @if (profile is not null && (!string.IsNullOrWhiteSpace(profile.Industry) || !string.IsNullOrWhiteSpace(profile.NaceCode)))
         {
             @* Profilin kriterleriyle yeni arama: zaten kayitli firmalar tekrar islenmez. *@
             <form method="post" class="d-inline-flex m-0"
@@ -186,13 +187,8 @@
                   data-progress-title="@profile.Name profili yeniden çalıştırılıyor"
                   data-progress-hint="Yalnızca yeni bulunan firmalar işlenir; kayıtlı firmalar atlanır.">
                 @Html.AntiForgeryToken()
-                <input type="hidden" name="SubmitMode" value="@CompanySearchViewModel.ModeAdvancedSave" />
-                <input type="hidden" name="Criteria.Industry" value="@profile.Industry" />
-                <input type="hidden" name="Criteria.City" value="@profile.City" />
-                <input type="hidden" name="Criteria.RegionKey" value="@profile.RegionKey" />
-                <input type="hidden" name="Criteria.ProfileName" value="@profile.Name" />
+                <input type="hidden" name="SubmitMode" value="@CompanySearchViewModel.ModeProfile" />
                 <input type="hidden" name="Criteria.ProfileId" value="@profile.Id" />
-                <input type="hidden" name="Criteria.ProfilePublic" value="@(profile.IsPublic ? "true" : "false")" />
                 <button type="submit" class="filter-chip-action">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 3v6h-6" />
@@ -261,21 +257,16 @@
             İncelenemedi <span class="stage-chip-count">@Model.NotEvaluatedCount</span>
         </a>
     }
-    @foreach (var seg in Model.SegmentCounts.OrderByDescending(kv => kv.Value))
-    {
-        <a class="stage-chip chip-segment @(Model.Segment == seg.Key ? "is-active" : "")"
-           href="@(Model.Segment == seg.Key ? QueryUrl.Without(req, "segment") : QueryUrl.With(req, "segment", seg.Key))"
-           title="Bu segmente uyan firmalar (Biz ne arıyoruz?)">
-            @Icons.Target(13) @seg.Key <span class="stage-chip-count">@seg.Value</span>
-        </a>
-    }
     <a class="stage-chip chip-fav @(Model.Favorites ? "is-active" : "")"
        href="@(Model.Favorites ? QueryUrl.Without(req, "fav") : QueryUrl.With(req, "fav", "true"))"
        title="Favori listenizdeki firmalar">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" /></svg>
         Favorilerim <span class="stage-chip-count">@Model.FavoriteCount</span>
     </a>
-    <a class="stage-chip" asp-controller="Icp" asp-action="Index" title="İdeal müşteri profilini düzenle">ICP ayarla</a>
+    @if (isAdmin)
+    {
+        <a class="stage-chip" asp-controller="Icp" asp-action="Index" title="İdeal müşteri profilini düzenle">ICP ayarla</a>
+    }
 </nav>
 
 @* ---------- Detayli filtre cekmecesi ---------- *@
@@ -290,6 +281,14 @@
         @if (Model.Favorites)
         {
             <input type="hidden" name="fav" value="true" />
+        }
+        @if (Model.Icp)
+        {
+            <input type="hidden" name="icp" value="true" />
+        }
+        @if (Model.NotEvaluated)
+        {
+            <input type="hidden" name="notEvaluated" value="true" />
         }
 
         <div class="fd-head">
@@ -494,10 +493,6 @@ else
                                 <span class="signal-pip @RatingSignalDisplay.PipCss(company.RatingSignal)"></span>
                                 @RatingSignalDisplay.Label(company.RatingSignal)
                             </span>
-                        }
-                        @if (company.FitSegment is not null)
-                        {
-                            <span class="meta-chip meta-chip-segment" title="Uyduğu hedef segment">@Icons.Target(12) @company.FitSegment</span>
                         }
                         @if (company.FitScore is int fit)
                         {

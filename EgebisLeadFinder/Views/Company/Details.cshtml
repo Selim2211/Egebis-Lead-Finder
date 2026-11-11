@@ -128,10 +128,6 @@
                                 <span class="fit-box-level">@FitDisplay.Label(fitScore)</span>
                             </div>
                             <div class="fit-bar" role="img" aria-label="Uygunluk yüzde @fitScore"><span style="width:@(fitScore)%"></span></div>
-                            @if (Model.Company.FitSegment is not null)
-                            {
-                                <div class="fit-box-segment">@Icons.Target(13) Segment: <strong>@Model.Company.FitSegment</strong></div>
-                            }
                         </div>
                     }
 

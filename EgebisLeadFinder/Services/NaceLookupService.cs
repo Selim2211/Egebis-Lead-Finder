@@ -50,7 +50,7 @@ public static class NaceProducts
             .Select(Clean)
             .Where(p => p.Length is > 2 and <= 60)
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(15)
+
             .ToList();
     }
 
@@ -121,6 +121,7 @@ public class NaceLookupService
         if (_cache.TryGetValue(cacheKey, out NaceInfo? cached) && cached is not null) return cached;
 
         var digits = code.Replace(".", string.Empty);
+        var aiFailed = false;
         NaceInfo info;
         if (digits.Length == 6)
         {
@@ -129,14 +130,16 @@ public class NaceLookupService
                 return Fail(code, $"{code} resmî NACE Rev.2 listesinde yok. Kodu kontrol edin (örn. {SuggestSibling(digits)}).");
 
             var ai = await DescribeAsync(code, $"Resmî faaliyet adı (TÜİK/GİB NACE Rev.2 Altılı): {official}", ct);
+            aiFailed |= ai.Error is not null;
             info = Build(code, division, official, ai, official: true, basis: null) with { Products = ProductsFrom(ai, official, NaceProducts.Split(official)) };
         }
         else if (digits.Length == 2)
         {
             var ai = await DescribeAsync(code, $"Resmî bölüm adı (NACE Rev.2): {division.Name} (kısım {division.SectionCode}: {division.SectionName})", ct);
+            aiFailed |= ai.Error is not null;
             info = Build(code, division, division.Name, ai, official: true, basis: null);
             // Bolumun resmi urun listesi yok: yapay zekanin (bolum adina dayali) urunleri kullanilir.
-            info = info with { Products = ai.Error is null && ai.Products.Count > 0 ? ai.Products.Take(10).ToList() : info.SearchTerms };
+            info = info with { Products = ai.Error is null && ai.Products.Count > 0 ? ai.Products.ToList() : info.SearchTerms };
         }
         else
         {
@@ -147,15 +150,17 @@ public class NaceLookupService
 
             var lines = subs.Take(MaxContextItems).Select(s => $"- {NaceCatalog.FormatSixDigit(s.Key)}: {s.Value}");
             var ai = await DescribeAsync(code, $"Bu kodun kapsadığı resmî alt faaliyetler (TÜİK/GİB NACE Rev.2 Altılı, {subs.Count} adet):\n{string.Join('\n', lines)}", ct);
+            aiFailed |= ai.Error is not null;
             var basis = string.Join("; ", subs.Take(3).Select(s => Short(s.Value, 70)));
             info = Build(code, division, null, ai, official: false, basis: basis + (subs.Count > 3 ? $" … (+{subs.Count - 3})" : string.Empty));
             var subsText = string.Join(" ", subs.Select(s => s.Value));
-            info = info with { Products = ProductsFrom(ai, subsText, subs.SelectMany(s => NaceProducts.Split(s.Value)).Distinct(StringComparer.OrdinalIgnoreCase).Take(15).ToList()) };
+            info = info with { Products = ProductsFrom(ai, subsText, subs.SelectMany(s => NaceProducts.Split(s.Value)).Distinct(StringComparer.OrdinalIgnoreCase).ToList()) };
             if (info.Name is null)
                 info = info with { Name = $"{code} sınıfı ({subs.Count} resmî alt faaliyet)", ShortName = division.Name };
         }
 
-        _cache.Set(cacheKey, info, CacheFor);
+        // Yapay zeka basarisizsa eksik sonuc 30 gun onbellekte kalmasin.
+        if (!aiFailed) _cache.Set(cacheKey, info, CacheFor);
         return info;
     }
 
@@ -163,7 +168,7 @@ public class NaceLookupService
     private static List<string> ProductsFrom(NaceDescribeResult ai, string officialText, List<string> fallback)
     {
         var grounded = ai.Error is null
-            ? ai.Products.Where(p => NaceProducts.IsGrounded(p, officialText)).Take(15).ToList()
+            ? ai.Products.Where(p => NaceProducts.IsGrounded(p, officialText)).ToList()
             : new List<string>();
         return grounded.Count > 0 ? grounded : fallback;
     }

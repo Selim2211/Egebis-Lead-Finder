@@ -200,7 +200,6 @@ builder.Services.AddHttpClient<IWebScraperService, WebScraperService>(c =>
 
 builder.Services.AddScoped<LeadScoringService>();
 builder.Services.AddScoped<LeadDiscoveryService>();
-builder.Services.AddSingleton<EgebisLeadFinder.Services.Quality.QualityRunner>();
 builder.Services.AddScoped<EmailTemplateService>();
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddHttpClient<IGeminiModelCatalog, GeminiModelCatalog>(c => c.Timeout = TimeSpan.FromSeconds(10));
@@ -354,9 +353,7 @@ app.UseAuthentication();
 app.Use(async (context, next) =>
 {
     var path = context.Request.Path;
-    var isAsset = path.StartsWithSegments("/css") || path.StartsWithSegments("/js") || path.StartsWithSegments("/lib")
-        || path.StartsWithSegments("/img") || path.StartsWithSegments("/health") || path.Value?.EndsWith(".ico") == true
-        || path.Value?.EndsWith(".css") == true;
+    var isAsset = StaticPaths.IsStatic(path) || path.StartsWithSegments("/health");
 
     if (!isAsset && !path.StartsWithSegments("/Account/Setup") && !SetupState.HasUsers)
     {

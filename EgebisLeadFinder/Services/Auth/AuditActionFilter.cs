@@ -72,7 +72,7 @@ public class AuditActionFilter : IAsyncActionFilter
             ["Icp.Index"] = ("settings.icp", "ICP profili kaydedildi"),
             ["Company.UpdateAddress"] = ("company.address", "Firma adresi güncellendi"),
             ["Icp.StartFillNace"] = ("icp.fillnace", "NACE kodu doldurma başlatıldı"),
-            ["BusinessProfile.Index"] = ("settings.businessprofile", "Şirket profili (Biz ne arıyoruz?) kaydedildi"),
+            ["BusinessProfile.Index"] = ("settings.businessprofile", "Şirket profili (Şirketimiz) kaydedildi"),
             ["BusinessProfile.Draft"] = ("businessprofile.draft", "Şirket profili taslağı siteden çıkarıldı"),
             ["Template.Save"] = ("template.save", "E-posta taslağı kaydedildi"),
             ["Template.Duplicate"] = ("template.duplicate", "E-posta taslağı kopyalandı"),

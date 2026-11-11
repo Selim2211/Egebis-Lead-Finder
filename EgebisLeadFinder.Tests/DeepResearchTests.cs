@@ -48,16 +48,16 @@ public class DeepResearchTests
     {
         var search = new FixedSearch(new()
         {
-            new() { Title = "Örnek yeni fabrika yatırımı", Url = "https://haber.com/1", Snippet = "kısa", Date = "3 gün önce" },
-            new() { Title = "Örnek duyuru", Url = "https://haber.com/2", Snippet = "kısa" },
-            new() { Title = "Örnek LinkedIn", Url = "https://www.linkedin.com/company/ornek", Snippet = "kısa" }
+            new() { Title = "Örnek Metal yeni fabrika yatırımı", Url = "https://haber.com/1", Snippet = "kısa", Date = "3 gün önce" },
+            new() { Title = "Örnek Metal duyuru", Url = "https://haber.com/2", Snippet = "kısa" },
+            new() { Title = "Örnek Metal LinkedIn", Url = "https://www.linkedin.com/company/ornek", Snippet = "kısa" }
         });
         var scraper = new FakeScraper { Articles = { ["https://haber.com/1"] = "Makale gövdesi: 50 milyon TL yatırım." } };
 
         var source = new NewsIntelSource(search, Options.Create(new ResearchOptions { MaxNewsQueries = 1 }),
             NullLogger<NewsIntelSource>.Instance, scraper);
 
-        var intel = await source.CollectAsync(new Company { Name = "Örnek" });
+        var intel = await source.CollectAsync(new Company { Name = "Örnek Metal" });
 
         var enriched = intel.Snippets.Single(s => s.SourceUrl == "https://haber.com/1");
         Assert.Contains("Makale gövdesi", enriched.Text);
@@ -67,15 +67,15 @@ public class DeepResearchTests
     }
 
     [Theory]
-    [InlineData("Örnek A.Ş. SAP'ye geçti", IntelKind.Teknoloji)]
-    [InlineData("Örnek A.Ş. yönünde sapma yaşandı", IntelKind.Haber)]
+    [InlineData("Örnek Metal A.Ş. SAP'ye geçti", IntelKind.Teknoloji)]
+    [InlineData("Örnek Metal A.Ş. yönünde sapma yaşandı", IntelKind.Haber)]
     public async Task Kisa_teknoloji_kelimeleri_tam_kelime_aranir(string title, IntelKind expected)
     {
         var search = new FixedSearch(new() { new() { Title = title, Url = "https://x.com/1", Snippet = "" } });
         var source = new NewsIntelSource(search, Options.Create(new ResearchOptions { MaxNewsQueries = 1 }),
             NullLogger<NewsIntelSource>.Instance);
 
-        var intel = await source.CollectAsync(new Company { Name = "Örnek" });
+        var intel = await source.CollectAsync(new Company { Name = "Örnek Metal" });
 
         Assert.Equal(expected, Assert.Single(intel.Snippets).Kind);
     }

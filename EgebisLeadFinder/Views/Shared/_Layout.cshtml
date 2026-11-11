@@ -37,7 +37,7 @@
         // Rozet kozmetik; veritabani sorunu sayfayi dusurmemeli.
     }
 
-    // "Biz ne arıyoruz?" tanimlanmadiysa menudeki dugmede uyari noktasi.
+    // "Şirketimiz" tanimlanmadiysa menudeki dugmede uyari noktasi.
     var profileConfigured = true;
     try
     {
@@ -131,20 +131,35 @@
                            asp-controller="Home" asp-action="Index">Panel</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @(controller == "Company" && action == "Search" ? "active" : "")"
+                        <a class="nav-link @(controller == "BusinessProfile" ? "active" : "")"
+                           asp-controller="BusinessProfile" asp-action="Index"
+                           title="@(profileConfigured ? "Şirketimiz — şirket profili" : "Şirket profili tanımlı değil — yapay zekâ varsayılan tanımla çalışıyor")">
+                            Şirketimiz
+                            @if (!profileConfigured)
+                            {
+                                <span class="nav-alert-dot is-warning" aria-label="Tanımlı değil"></span>
+                            }
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link @(controller == "Company" && action is ("Search" or "SearchResult") ? "active" : "")"
                            asp-controller="Company" asp-action="Search">Firma Ara</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @(controller == "Company" && action is not ("Search" or "Compare") ? "active" : "")"
+                        <a class="nav-link @(controller == "Company" && action is not ("Search" or "SearchResult" or "Compare") ? "active" : "")"
                            asp-controller="Company" asp-action="Index">Firmalar</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link @(controller == "Favorites" ? "active" : "")"
                            asp-controller="Favorites" asp-action="Index">Favoriler</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link @(controller == "SearchProfiles" ? "active" : "")"
+                           asp-controller="SearchProfiles" asp-action="Index">Arama Profilleri</a>
+                    </li>
                     <li class="nav-item dropdown">
                         <button type="button" class="nav-link dropdown-toggle btn btn-link @(controller == "Sector" || (controller == "Company" && action == "Compare") ? "active" : "")"
-                                data-bs-toggle="dropdown" aria-expanded="false">Raporlar</button>
+                                data-bs-toggle="dropdown" aria-expanded="false">Araçlar</button>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" asp-controller="Sector" asp-action="Index">Sektör analizi (NACE)</a></li>
                             <li><a class="dropdown-item" asp-controller="Company" asp-action="Compare">Firma karşılaştırma</a></li>
@@ -170,18 +185,6 @@
                     </li>
                 </ul>
                 <ul class="navbar-nav mt-2 mt-lg-0 align-items-lg-center gap-lg-2">
-                    <li class="nav-item">
-                        <a class="nav-target @(controller == "BusinessProfile" ? "active" : "")"
-                           asp-controller="BusinessProfile" asp-action="Index"
-                           title="@(profileConfigured ? "Biz ne arıyoruz? — şirket profili ve hedef segmentler" : "Şirket profili tanımlı değil — yapay zekâ varsayılan tanımla çalışıyor")">
-                            <span class="nav-target-icon">@Icons.Target(15)</span>
-                            <span class="nav-target-label">Biz ne arıyoruz?</span>
-                            @if (!profileConfigured)
-                            {
-                                <span class="nav-alert-dot is-warning" aria-label="Tanımlı değil"></span>
-                            }
-                        </a>
-                    </li>
                     <li class="nav-item">
                         <a class="nav-link nav-link-icon nav-inbox @(controller == "Inbox" ? "active" : "")"
                            asp-controller="Inbox" asp-action="Index" title="Mesajlar" aria-label="Mesajlar">

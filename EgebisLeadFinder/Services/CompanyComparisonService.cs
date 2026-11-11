@@ -99,14 +99,13 @@ public class CompanyComparisonService
         {
             Number("Lead puanı (100 üzerinden)", a.Score, b.Score),
             Number("Şirket profilimize uygunluk (%)", a.FitScore, b.FitScore),
-            new("Uyduğu hedef segment", a.FitSegment ?? "—", b.FitSegment ?? "—"),
             Flag("İdeal müşteri profiline (ICP) uyuyor", a.IcpMatch, b.IcpMatch),
             new("Uygunluk gerekçesi (yapay zekâ)", a.FitReason ?? analysisA?.Reason ?? "—", b.FitReason ?? analysisB?.Reason ?? "—"),
             new("Değerlendirme durumu", Evaluation(a, breakdownA), Evaluation(b, breakdownB),
                 Better(Rank(a, breakdownA), Rank(b, breakdownB)))
         };
         result.Sections.Add(new CompareSection("Kriterlerimize uygunluk",
-            "Ayarlar'daki şirket profili (Biz ne arıyoruz?) ve ideal müşteri profiline göre", fit));
+            "Ayarlar'daki şirket profili (Şirketimiz) ve ideal müşteri profiline göre", fit));
 
         // ---- 2. Puan kalemleri: iki firmanin puanini olusturan kriterler yan yana ----
         var reasons = breakdownA.Items.Select(i => i.Reason)
@@ -136,8 +135,6 @@ public class CompanyComparisonService
         // SAP satiri yalnizca SAP ile ilgili satis yapan sirket (ya da profil yokken) icin anlamli.
         if (!profile.IsConfigured || profile.MentionsSap)
             general.Add(new("ERP / SAP durumu", SapLabel(analysisA), SapLabel(analysisB)));
-        if (!string.IsNullOrWhiteSpace(a.FitSegment) || !string.IsNullOrWhiteSpace(b.FitSegment))
-            general.Insert(0, new("Hedef segmentimiz", a.FitSegment ?? "—", b.FitSegment ?? "—"));
         result.Sections.Add(new CompareSection("Firma profili", "Firma sitesinin yapay zekâ analizinden", general));
 
         // ---- 4. Genel durum (internet on arastirmasi) ----
@@ -231,12 +228,10 @@ public class CompanyComparisonService
         {
             result.Criteria.Add($"Ne satıyoruz: {profile.Offering}");
             result.Criteria.Add($"İdeal müşteri: {profile.IdealCustomer}");
-            if (profile.Segments.Count > 0)
-                result.Criteria.Add($"Hedef segmentler: {string.Join(", ", profile.Segments.Select(s => s.Name))}");
         }
         else
         {
-            result.Criteria.Add("Şirket profili (Biz ne arıyoruz?) tanımlı değil; varsayılan kriterler kullanılıyor.");
+            result.Criteria.Add("Şirket profili (Şirketimiz) tanımlı değil; varsayılan kriterler kullanılıyor.");
         }
 
         if (icp.IsActive)

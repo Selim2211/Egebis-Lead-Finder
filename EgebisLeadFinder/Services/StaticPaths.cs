@@ -12,6 +12,9 @@ public static class StaticPaths
         if (string.IsNullOrEmpty(value)) return false;
         foreach (var p in Prefixes)
             if (path.StartsWithSegments(p)) return true;
+        // Uzanti kurali yalnizca kok dizindeki dosyalar icindedir (/favicon.ico gibi). "/Users/Index/x.js" gibi bir yolun
+        // sonuna uzanti eklemek oturum denetimini atlatamasin.
+        if (value.IndexOf('/', 1) >= 0) return false;
         foreach (var e in Extensions)
             if (value.EndsWith(e, StringComparison.OrdinalIgnoreCase)) return true;
         return false;

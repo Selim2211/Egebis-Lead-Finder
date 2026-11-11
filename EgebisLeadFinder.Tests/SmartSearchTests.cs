@@ -135,26 +135,22 @@ public class SmartSearchTests
     }
 
     [Fact]
-    public async Task Akilli_arama_terimleri_ve_segmenti_hazirlar_onbellege_alir()
+    public async Task Akilli_arama_terimleri_hazirlar_onbellege_alir()
     {
-        var profile = new BusinessProfile
-        {
-            Offering = "Robot", IdealCustomer = "Fabrika",
-            Segments = { new TargetSegment { Id = "s1", Name = "Plastik", SearchTerm = "Plastik enjeksiyon", ExcludeKeywords = { "hurda" } } }
-        };
+        var profile = new BusinessProfile { Offering = "Robot", IdealCustomer = "Fabrika" };
         var ai = new FakePlannerAi();
         var planner = Planner(Settings(profile: profile), ai);
 
-        var criteria = new SearchCriteria { Industry = "Plastik", RegionKey = "DE", SegmentId = "s1", MaxCompanies = 20 };
+        var criteria = new SearchCriteria { Industry = "Plastik", RegionKey = "DE", MaxCompanies = 20 };
         var plan = await planner.PrepareAsync(criteria);
-        await planner.PrepareAsync(new SearchCriteria { Industry = "plastik", RegionKey = "DE", SegmentId = "s1" });
+        await planner.PrepareAsync(new SearchCriteria { Industry = "plastik", RegionKey = "DE" });
 
         Assert.True(plan.Smart);
-        Assert.Equal("Plastik", plan.Segment!.Name);
-        Assert.Equal(new[] { "Plastik", "Plastik enjeksiyon", "Kunststoffspritzguss", "Automobilzulieferer" }, plan.Terms);
+        Assert.Null(plan.Segment);
+        Assert.Equal(new[] { "Plastik", "Kunststoffspritzguss", "Automobilzulieferer" }, plan.Terms);
         Assert.Equal(plan.Terms.Skip(1), criteria.SearchTerms);
         Assert.Equal(30, criteria.EffectiveCollectTarget);
-        Assert.Equal(1, ai.TermCalls); // ayni sektor/bolge/segment onbellekten
+        Assert.Equal(1, ai.TermCalls); // ayni sektor/bolge onbellekten
     }
 
     [Fact]

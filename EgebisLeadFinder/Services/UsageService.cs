@@ -121,6 +121,24 @@ public class UsageService
 
     private static DateOnly TurkeyToday => DateOnly.FromDateTime(DateTime.UtcNow.AddHours(3));
 
+    /// <summary>Turkiye gunune gore bugun (Kullanilan Krediler ekraninin varsayilan gunu).</summary>
+    public static DateOnly Today => TurkeyToday;
+
+    /// <summary>
+    /// Kullanilan Krediler: secilen donemde gun gun Serper, Apollo (e-posta acma) ve Gemini harcamasi. Gemini maliyeti
+    /// o gunun gercek token sayilarindan, kayitsiz eski cagrilar tahminle hesaplanir (API Kullanimi ile ayni yontem).
+    /// </summary>
+    public async Task<CreditsReport> GetCreditsAsync(CreditsPeriod period, CancellationToken ct = default)
+    {
+        var rows = await _usage.GetDailyRowsAsync(period.From, period.To, ct);
+        var tokens = (await _usage.GetGeminiTokensAsync(period.From, period.To, ct)).ToLookup(t => t.Date);
+        var usdTry = GeminiPricing.ParseRate(await _settings.GetAsync(SettingKeys.UsdTryRate, ct));
+        var model = await _settings.GetAsync(SettingKeys.GeminiModel, ct) ?? _aiOptions.GeminiModel;
+
+        return CreditsReport.Build(period, rows, (date, calls) =>
+            GeminiCostCalculator.Compute(tokens[date], calls, usdTry, _aiOptions, model, date).Try);
+    }
+
     public async Task<List<ProviderUsage>> GetAllAsync(CancellationToken ct = default)
     {
         var today = TurkeyToday;

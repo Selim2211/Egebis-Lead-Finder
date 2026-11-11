@@ -57,6 +57,8 @@ public class SearchRunService
         run.Status = result.Cancelled ? SearchRunStatus.Cancelled
             : result.AbortReason is not null ? SearchRunStatus.Aborted
             : SearchRunStatus.Done;
+        run.SerperCredits = result.SerperCredits;
+        run.AiCalls = result.AiCalls;
         run.Found = result.FoundBySearch;
         run.NewCount = result.NewCompanyIds.Count;
         run.KnownCount = result.AlreadyKnown;
@@ -66,10 +68,15 @@ public class SearchRunService
         await _db.SaveChangesAsync(ct);
     }
 
-    public async Task FailAsync(int runId, string error, CancellationToken ct = default)
+    public async Task FailAsync(int runId, string error, CancellationToken ct = default, UsageScope? usage = null)
     {
         var run = await _db.SearchRuns.FirstOrDefaultAsync(r => r.Id == runId, ct);
         if (run is null) return;
+        if (usage is not null)
+        {
+            run.SerperCredits = usage.SerperCredits;
+            run.AiCalls = usage.AiCalls;
+        }
         run.Status = SearchRunStatus.Failed;
         run.FinishedAt = DateTime.UtcNow;
         run.AbortReason = Trim(error, 500);

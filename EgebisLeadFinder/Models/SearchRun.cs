@@ -71,6 +71,12 @@ public class SearchRun
     [MaxLength(500)]
     public string? AbortReason { get; set; }
 
+    /// <summary>Bu aramanin harcadigi Serper kredisi (onbellekten donen sorgular sayilmaz).</summary>
+    public int SerperCredits { get; set; }
+
+    /// <summary>Bu aramanin yaptigi yapay zeka cagrilari (Gemini, Groq, NVIDIA...).</summary>
+    public int AiCalls { get; set; }
+
     public List<SearchRunCompany> Companies { get; set; } = new();
 
     /// <summary>Uygulama yeniden baslayinca \"calisiyor\" kalan arama yarida kalmis sayilir.</summary>

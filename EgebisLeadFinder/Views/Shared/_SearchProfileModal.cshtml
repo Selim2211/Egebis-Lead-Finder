@@ -1,0 +1,190 @@
+@model SearchProfileModalModel
+@using EgebisLeadFinder.Data
+@{
+    var region = Model.Region;
+    var hasSub = RegionSubdivisions.Has(region.Key);
+}
+
+@* Daha once aranan sektorler ve NACE bolum adlari: yazarken oneri olarak cikar. *@
+<datalist id="industryOptions">
+    @foreach (var d in NaceCatalog.Divisions.Where(d => string.CompareOrdinal(d.Code, "10") >= 0 && string.CompareOrdinal(d.Code, "33") <= 0))
+    {
+        <option value="@d.Name.Split('(')[0].Trim()" label="NACE @d.Code"></option>
+    }
+</datalist>
+
+@* ======================= Arama Profili: olustur / duzenle ======================= *@
+<div class="modal fade" id="searchProfileModal" tabindex="-1" aria-labelledby="searchProfileTitle" aria-hidden="true"
+     data-prefill-industry="@Model.PrefillIndustry" data-default-region="@region.Key">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <form class="modal-content" id="searchProfileForm" data-url="@Url.Action("SaveProfile", "Company")" novalidate>
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="Criteria.ProfileId" id="spId" value="" />
+
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="searchProfileTitle">Arama Profili</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="row g-4">
+                    <div class="col-lg-4">
+                        <div class="mb-3">
+                            <label class="form-label" for="spName">Profil adı *</label>
+                            <input class="form-control" id="spName" name="Criteria.ProfileName" placeholder="ör. Ege Otomotiv" autocomplete="off" maxlength="150" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="spIndustry">Sektör *</label>
+                            <input class="form-control" id="spIndustry" name="Criteria.Industry" list="industryOptions" placeholder="Otomotiv" autocomplete="off" maxlength="150" />
+                        </div>
+
+                        <div class="mb-3 nace-field">
+                            <label class="form-label d-flex align-items-center gap-1" for="spNace">
+                                NACE kodu <span class="text-muted-2 fw-normal">(isteğe bağlı)</span>
+                                <button type="button" class="nace-info-btn" data-nace-info aria-label="NACE kodu açıklaması" tabindex="0">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                                </button>
+                            </label>
+                            <input class="form-control nace-input" id="spNace" name="Criteria.NaceCode" placeholder="27.51.08" inputmode="decimal" autocomplete="off" maxlength="12" />
+                            <div class="form-text nace-status" data-nace-status aria-live="polite">Çok spesifik arama için: kodu yazınca anlamı ve arama terimleri gelir.</div>
+                            <div class="nace-products" data-nace-products hidden>
+                                <div class="small text-muted-2 mb-1">Bu ürünlerden en az birini üreten firmalar aranır. Tıklayarak seçimi değiştirebilirsiniz:</div>
+                                <div class="nace-product-chips" data-nace-chips></div>
+                            </div>
+                            <input type="hidden" name="Criteria.NaceProducts" class="nace-products-sync" value="" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="spRegion">Ülke / bölge</label>
+                            <select class="form-select" id="spRegion" name="Criteria.RegionKey">
+                                @foreach (var g in SearchRegions.Grouped())
+                                {
+                                    <optgroup label="@g.Key">
+                                        @foreach (var r in g)
+                                        {
+                                            <option value="@r.Key" selected="@(r.Key == region.Key)">@r.Name</option>
+                                        }
+                                    </optgroup>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="spMax">En fazla firma</label>
+                            <input class="form-control" type="number" id="spMax" name="MaxCompaniesOverride" min="1" max="@SettingKeys.SearchMaxCompaniesUpperLimit"
+                                   step="1" inputmode="numeric" placeholder="@Model.DefaultMax" />
+                            <div class="form-text">Boş bırakırsanız Ayarlar'daki varsayılan değer kullanılır.</div>
+                        </div>
+
+                        <label class="form-check mb-0">
+                            <input class="form-check-input" type="checkbox" id="spPublic" name="Criteria.ProfilePublic" value="true" />
+                            <span class="form-check-label small">
+                                Profili tüm kullanıcılarla paylaş
+                                <span class="text-muted-2">— yalnızca arama kriterleri paylaşılır, bulduğunuz firmalar size özel kalır.</span>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div class="col-lg-8" id="provincePanel" hidden="@(region.HasProvinces ? null : "hidden")">
+                        <div class="d-flex justify-content-between align-items-baseline mb-2">
+                            <span class="form-label mb-0">Bölge / il</span>
+                            <span class="small">
+                                <span class="tag tag-muted" id="citySelectedCount">0 il seçili</span>
+                                <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="cityClear">Temizle</button>
+                            </span>
+                        </div>
+
+                        <div class="region-chips mb-2">
+                            @foreach (var r in TurkishProvinces.Regions)
+                            {
+                                <button type="button" class="region-chip tr-region-chip" data-region="@r.Key" data-cities="@string.Join("|", r.Value)">
+                                    @r.Key <span class="region-chip-count">@r.Value.Length</span>
+                                </button>
+                            }
+                        </div>
+
+                        <input type="text" class="form-control mb-2" id="citySearchBox" placeholder="İl ara (ör. izm)" autocomplete="off" />
+
+                        <div class="city-picker city-picker-lg" id="cityCheckboxGrid">
+                            @foreach (var il in TurkishProvinces.All)
+                            {
+                                <label class="city-check">
+                                    <input type="checkbox" class="city-checkbox" value="@il" />
+                                    <span>@il</span>
+                                </label>
+                            }
+                        </div>
+                        <input type="hidden" name="Criteria.City" id="cityHiddenField" value="" disabled="@(region.HasProvinces ? null : "disabled")" />
+                        <div class="form-text">Hiç il seçmezseniz Türkiye geneli taranır.</div>
+                    </div>
+
+                    @* Avrupa ülkeleri: bölge / eyalet / kanton listesi (ör. Almanya'da Bayern). Panel JS ile kurulur. *@
+                    <div class="col-lg-8" id="subPanel" hidden="@(hasSub ? null : "hidden")">
+                        <div class="d-flex justify-content-between align-items-baseline mb-2">
+                            <span class="form-label mb-0">Bölge / eyalet</span>
+                            <span class="small">
+                                <span class="tag tag-muted" id="subSelectedCount">0 seçili</span>
+                                <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="subClear">Temizle</button>
+                            </span>
+                        </div>
+                        <div class="region-chips mb-2" id="subChips"></div>
+                        <input type="text" class="form-control mb-2" id="subSearchBox" placeholder="Bölge ara" autocomplete="off" />
+                        <div class="city-picker city-picker-lg" id="subGrid"></div>
+                        <input type="hidden" name="Criteria.City" id="subHiddenField" value="" disabled="@(hasSub ? null : "disabled")" />
+                        <div class="form-text">
+                            Hiç bölge seçmezseniz <span class="region-name">@region.Name</span> geneli taranır. Birden fazla bölge seçebilirsiniz; her bölge ayrı aranır.
+                        </div>
+                    </div>
+
+                    @* Bölge listesi olmayan ülkelerde şehir adları elle yazılır. *@
+                    <div class="col-lg-8" id="freePanel" hidden="@(region.HasProvinces || hasSub ? "hidden" : null)">
+                        <label class="form-label" for="cityFreeText">Şehir / bölge</label>
+                        <input type="text" class="form-control" id="cityFreeText" name="Criteria.City" placeholder="Bavyera, Stuttgart, Köln" autocomplete="off"
+                               disabled="@(region.HasProvinces || hasSub ? "disabled" : null)" />
+                        <div class="form-text">
+                            Birden fazla şehri virgülle ayırın. Boş bırakırsanız <span class="region-name">@region.Name</span> geneli taranır.
+                            Sorgular seçilen ülkenin dilinde kurulur.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer justify-content-between">
+                <div class="small" id="spStatus" role="status"></div>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Vazgeç</button>
+                    <button type="submit" class="btn btn-accent" id="spSave">Kaydet</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@* ======================= Arama Profili: detayları göster ======================= *@
+<div class="modal fade" id="searchProfileShowModal" tabindex="-1" aria-labelledby="searchProfileShowTitle" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="searchProfileShowTitle">Arama profili detayları</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+            </div>
+            <div class="modal-body">
+                <dl class="profile-detail mb-0" data-default-max="@Model.DefaultMax">
+                    <dt>Profil adı</dt><dd data-show="name"></dd>
+                    <dt>Sektör</dt><dd data-show="industry"></dd>
+                    <dt>NACE kodu</dt><dd data-show="nace"></dd>
+                    <dt>Ürünler</dt><dd data-show="products"></dd>
+                    <dt>Ülke / bölge</dt><dd data-show="region"></dd>
+                    <dt>İl / bölge</dt><dd data-show="city"></dd>
+                    <dt>En fazla firma</dt><dd data-show="max"></dd>
+                    <dt>Paylaşım</dt><dd data-show="share"></dd>
+                    <dt>Oluşturma</dt><dd data-show="created"></dd>
+                </dl>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Kapat</button>
+            </div>
+        </div>
+    </div>
+</div>

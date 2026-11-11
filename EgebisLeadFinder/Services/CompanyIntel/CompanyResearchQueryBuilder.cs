@@ -11,7 +11,7 @@ namespace EgebisLeadFinder.Services.CompanyIntel;
 public static class CompanyResearchQueryBuilder
 {
     /// <summary>
-    /// Firma icin haber/itibar/risk/buyume sorgularini uretir. "Biz ne arıyoruz?" profili doluysa
+    /// Firma icin haber/itibar/risk/buyume sorgularini uretir. "Şirketimiz" profili doluysa
     /// SAP/ERP ve IT sorgulari yerine sirketin ihtiyac sinyalleri ve hedef unvanlariyla aranir.
     /// </summary>
     public static List<string> Build(Company company, ResearchOptions options,

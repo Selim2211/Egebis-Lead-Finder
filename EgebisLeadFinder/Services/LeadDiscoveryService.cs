@@ -19,6 +19,7 @@ public class LeadDiscoveryService
     private readonly LeadScoringService _scoring;
     private readonly IcpService _icp;
     private readonly SearchPlanService? _plans;
+    private readonly ISettingsService? _settings;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly PipelineOptions _options;
     private readonly ILogger<LeadDiscoveryService> _logger;
@@ -32,8 +33,10 @@ public class LeadDiscoveryService
         IOptions<PipelineOptions> options,
         ILogger<LeadDiscoveryService> logger,
         IcpService icp,
-        SearchPlanService? plans = null)
+        SearchPlanService? plans = null,
+        ISettingsService? settings = null)
     {
+        _settings = settings;
         _icp = icp;
         _plans = plans;
         _search = search;
@@ -69,7 +72,6 @@ public class LeadDiscoveryService
             return result;
         }
         if (plan.Terms.Count > 1) result.SearchTerms = plan.Terms;
-        result.SegmentName = plan.Segment?.Name;
         if (plan.Note is not null) result.Warning = plan.Note;
 
         List<SearchResult> searchResults;
@@ -93,6 +95,10 @@ public class LeadDiscoveryService
             result.Cancelled = true;
             return result;
         }
+
+        // Black List (Ayarlar): aramada bulunsa dahi gosterilmez, islenmez, kredi harcamaz.
+        var blacklist = SearchBlacklist.Parse(_settings is null ? null : await _settings.GetAsync(SettingKeys.ExtraBlockedDomains, CancellationToken.None));
+        if (!blacklist.IsEmpty) searchResults = searchResults.Where(r => !blacklist.Matches(r.Domain, r.Title)).ToList();
 
         result.FoundBySearch = searchResults.Count;
 
@@ -224,6 +230,9 @@ public class LeadDiscoveryService
                 StringLengthGuard.Apply(contact);
         }
 
+        // Yapay zekanin buldugu gercek firma adi Black List'te olabilir: kaydedilmez.
+        toInsert = toInsert.Where(c => !blacklist.Matches(c.Domain, c.Name)).ToList();
+
         db.Companies.AddRange(toInsert);
         await db.SaveChangesAsync(ct);
 
@@ -240,6 +249,8 @@ public class LeadDiscoveryService
                 .Include(c => c.Contacts)
                 .ToListAsync(ct)
             : new List<Company>();
+
+        previouslyKnown = previouslyKnown.Where(c => !blacklist.Matches(c.Domain, c.Name)).ToList();
 
         // Kayitli firmanin adresi yoksa bu aramada Haritalar'dan gelen adresle tamamlanir (firma detayindaki harita icin).
         var addresses = searchResults
@@ -406,6 +417,11 @@ public class LeadDiscoveryService
         {
             throw;
         }
+        catch (QuotaExceededException)
+        {
+            // Kota bitti: firma "hatali" diye kaydedilmez (sonra tekrar denenebilsin); ust katman aramayi durdurur.
+            throw;
+        }
         catch (Exception ex)
         {
             // Tek firmanin hatasi tum aramayi durdurmaz.
@@ -476,6 +492,10 @@ public class LeadDiscoveryService
 public class DiscoveryResult
 {
     public int FoundBySearch { get; set; }
+
+    /// <summary>Bu aramanin harcadigi Serper kredisi ve yapay zeka cagrisi (CompanyController doldurur).</summary>
+    public int SerperCredits { get; set; }
+    public int AiCalls { get; set; }
     public int AlreadyKnown { get; set; }
     public int Processed { get; set; }
     public int Failed { get; set; }
@@ -527,8 +547,6 @@ public class DiscoveryResult
     /// <summary>Akilli aramada kullanilan terimler (ilk: kullanicinin yazdigi).</summary>
     public List<string> SearchTerms { get; set; } = new();
 
-    /// <summary>Firma Ara'da secilen "Biz ne arıyoruz?" segmenti.</summary>
-    public string? SegmentName { get; set; }
 
     /// <summary>Siteleri okunmadan elenen adaylar ve nedenleri.</summary>
     public List<ScreenedOut> PreFiltered { get; set; } = new();

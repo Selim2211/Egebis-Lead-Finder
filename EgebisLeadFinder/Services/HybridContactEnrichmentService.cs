@@ -25,7 +25,7 @@ public class HybridContactEnrichmentService : IContactEnrichmentService
     private readonly EnrichmentOptions _options;
     private readonly ILogger<HybridContactEnrichmentService> _logger;
 
-    /// <summary>"Biz ne arıyoruz?" profili tanimli mi (EnrichAsync basinda okunur; servis istek basina olusur).</summary>
+    /// <summary>"Şirketimiz" profili tanimli mi (EnrichAsync basinda okunur; servis istek basina olusur).</summary>
     private bool _profileMode;
 
     /// <summary>Profil modunda hedef unvan listesinde olmasa da kabul edilen ust yoneticiler.</summary>
@@ -63,7 +63,7 @@ public class HybridContactEnrichmentService : IContactEnrichmentService
             // Ayarlardaki unvanlar hem Apollo sorgusunu hem LinkedIn aday elemesini belirler.
             var keywords = await _settings.GetTitleKeywordsAsync(ct);
 
-            // Firma bir "Biz ne arıyoruz?" segmentine uyuyorsa o segmentin unvanlari one alinir.
+            // Firma bir "Şirketimiz" segmentine uyuyorsa o segmentin unvanlari one alinir.
             var profile = BusinessProfileService.Parse(await _settings.GetAsync(SettingKeys.BusinessProfile, ct));
             keywords = SegmentTitlesFirst(company, profile, keywords);
             _profileMode = profile.IsConfigured;

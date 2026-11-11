@@ -33,6 +33,9 @@ public class AppUser
 
     public bool IsActive { get; set; } = true;
 
+    /// <summary>Firma adiyla aramanin kullandigi varsayilan arama profili (kisiye ozel).</summary>
+    public int? DefaultSearchProfileId { get; set; }
+
     /// <summary>Sifre/rol/aktiflik degisince yenilenir; eski oturum cerezleri gecersiz olur.</summary>
     [MaxLength(64)]
     public string SecurityStamp { get; set; } = Guid.NewGuid().ToString("n");

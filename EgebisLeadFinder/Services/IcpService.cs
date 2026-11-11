@@ -112,7 +112,8 @@ public class IcpService
     {
         var result = new ProductMatchResult();
         if (companies.Count == 0 || products.Count == 0) return result;
-        var allowed = products.ToDictionary(p => TurkishText.Normalize(p), p => p);
+        // Buyuk/kucuk harf ya da aksan farkiyla ayni urun iki kez gelirse tek kayit kalir (ToDictionary cokerdi).
+        var allowed = products.GroupBy(p => TurkishText.Normalize(p)).ToDictionary(g => g.Key, g => g.First());
 
         foreach (var batch in companies.Chunk(NaceBatchSize))
         {
@@ -195,6 +196,8 @@ public class IcpService
     /// Yapay zekanin "alinti" diye dondurdugu metin firma ozetinde AYNEN geciyor mu? Gecmiyorsa uydurmadir: null.
     /// Karsilastirma Turkce harf, bosluk ve tirnak farklarini yok sayar; cok kisa metin kanit sayilmaz.
     /// </summary>
+    private const string NoEvidenceMarker = "Sitede somut üretim kanıtı bulunamadı";
+
     public static string? VerifyQuote(string? evidence, string brief)
     {
         if (string.IsNullOrWhiteSpace(evidence)) return null;
@@ -202,7 +205,8 @@ public class IcpService
         var cleaned = System.Text.RegularExpressions.Regex.Replace(evidence.Trim().Trim('«', '»', '"', '“', '”', '…', ' '), @"\s+", " ");
         if (cleaned.Length < 12) return null;
 
-        var haystack = System.Text.RegularExpressions.Regex.Replace(TurkishText.Normalize(brief), @"\s+", " ");
+        // "Sitede somut uretim kaniti bulunamadi" bizim yazdigimiz bir not; yapay zeka bunu "alinti" diye geri verse de kanit sayilmaz.
+        var haystack = System.Text.RegularExpressions.Regex.Replace(TurkishText.Normalize(brief.Replace(NoEvidenceMarker, " ")), @"\s+", " ");
         return haystack.Contains(TurkishText.Normalize(cleaned), StringComparison.Ordinal) ? cleaned : null;
     }
 
@@ -216,7 +220,7 @@ public class IcpService
         var parts = new List<string>();
         if (e.ProducerQuotes.Count > 0) parts.Add("Sitede üretim kanıtı: " + string.Join(" / ", e.ProducerQuotes.Select(q => "«" + q + "»")));
         if (e.TraderQuotes.Count > 0) parts.Add("Sitede bayi/ticaret işareti: " + string.Join(" / ", e.TraderQuotes.Select(q => "«" + q + "»")));
-        if (parts.Count == 0) parts.Add("Sitede somut üretim kanıtı bulunamadı");
+        if (parts.Count == 0) parts.Add(NoEvidenceMarker);
         return " | " + string.Join(" | ", parts).Replace('\n', ' ');
     }
 
@@ -281,7 +285,7 @@ public class IcpService
         _cached = profile;
     }
 
-    /// <summary>"Biz ne arıyoruz?" profili ve puanlama baglami (profil + hedef unvanlar), ornek basina bir kez okunur.</summary>
+    /// <summary>"Şirketimiz" profili ve puanlama baglami (profil + hedef unvanlar), ornek basina bir kez okunur.</summary>
     public async Task<(BusinessProfile Profile, FitContext Fit)> GetFitAsync(CancellationToken ct = default)
     {
         if (_fitCached is { } cached) return cached;

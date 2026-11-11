@@ -23,9 +23,19 @@
     <a class="btn btn-outline-secondary btn-sm" asp-controller="Users" asp-action="Index">Kullanıcılar</a>
     <a class="btn btn-outline-secondary btn-sm" asp-controller="Audit" asp-action="Index">Audit log</a>
     <a class="btn btn-outline-secondary btn-sm" asp-controller="Usage" asp-action="Index">API Kullanımı</a>
+    <a class="btn btn-outline-secondary btn-sm" asp-controller="Usage" asp-action="Credits">Kullanılan Krediler</a>
     <a class="btn btn-outline-secondary btn-sm" asp-controller="Diagnostics" asp-action="Index">Sistem Teşhisi ve Loglar</a>
-    <a class="btn btn-outline-secondary btn-sm" asp-controller="Quality" asp-action="Index">Kalite Ölçümü</a>
 </div>
+
+<a class="card card-link mb-4 d-block text-decoration-none" asp-controller="Usage" asp-action="Credits">
+    <div class="card-body d-flex align-items-center gap-3">
+        <div class="flex-grow-1">
+            <div class="fw-semibold">Kullanılan Krediler</div>
+            <div class="small text-muted-2">Serper, Apollo ve Gemini'de ne kadar harcandı: gün, hafta veya ay seçin, toplamı ve aramaların tek tek maliyetini görün.</div>
+        </div>
+        <span aria-hidden="true">→</span>
+    </div>
+</a>
 
 <a class="card card-link mb-4 d-block text-decoration-none" asp-controller="Icp" asp-action="Index">
     <div class="card-body d-flex align-items-center gap-3">
@@ -108,12 +118,13 @@
                     </div>
                 </div>
                 <div class="col-12">
-                    <label class="form-label" asp-for="ExtraBlockedDomains">Elenecek ek siteler</label>
-                    <input class="form-control" asp-for="ExtraBlockedDomains"
-                           placeholder="ornek-rehber.com, ilan-sitesi.com" />
+                    <label class="form-label" asp-for="ExtraBlockedDomains">Black List</label>
+                    <textarea class="form-control" asp-for="ExtraBlockedDomains" rows="4" spellcheck="false"
+                              placeholder="ornek-firma.com&#10;Örnek Makina"></textarea>
                     <div class="form-text">
-                        Arama sonuçlarında görmek istemediğiniz siteler (virgülle ayırın). Haber siteleri,
-                        rehberler, pazaryerleri ve sosyal medya zaten eleniyor; burası ek liste.
+                        Aramada bulunsa dahi gösterilmeyecek firmalar. Her satıra bir alan adı veya firma adı yazın.
+                        Haber siteleri, rehberler, pazaryerleri ve sosyal medya zaten eleniyor; burası ek liste.
+                        Listeye eklemek daha önce havuza girmiş firmaları silmez.
                     </div>
                 </div>
             </div>

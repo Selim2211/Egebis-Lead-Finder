@@ -41,7 +41,7 @@
     <div class="alert alert-warning">
         <strong>Cevapları görebilmek için gelen kutusu bağlantısı gerekli.</strong>
         Ayarlar'daki e-posta bölümüne SMTP bilgilerini girin; IMAP sunucusu boşsa aynı sunucu kullanılır.
-        <a asp-controller="Settings" asp-action="Index">Ayarlar'a git</a>
+        @if (User.IsInRole("Admin")) { <a asp-controller="Settings" asp-action="Index">Ayarlar'a git</a> } else { <span>Bunu yöneticinizden isteyin.</span> }
     </div>
 }
 else

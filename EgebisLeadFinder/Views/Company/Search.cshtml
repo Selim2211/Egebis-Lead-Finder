@@ -4,33 +4,13 @@
 @{
     ViewData["Title"] = "Firma Ara";
 
-    var selectedCities = (Model.Criteria.City ?? string.Empty)
-        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-        .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-    // Gelismis ekranda hata olduysa (ör. profil adi bos) modal tekrar acik gelsin.
-    var reopenAdvanced = Model.Error is not null
-        && Model.SubmitMode is CompanySearchViewModel.ModeAdvanced or CompanySearchViewModel.ModeAdvancedSave;
-
-    // Bu aramanin bolgesi: formdan secilen, yoksa Ayarlar'daki.
-    var selRegion = SearchRegions.IsKnown(Model.Criteria.RegionKey)
-        ? SearchRegions.Get(Model.Criteria.RegionKey)
-        : Model.Region;
-
-    // Bu aramanin firma sayisi: ekrandan secilen, yoksa Ayarlar'daki. Secenekler sabit liste + mevcut deger.
-    var maxShown = Model.MaxCompaniesOverride is > 0 ? Model.MaxCompaniesOverride.Value : Model.MaxCompanies;
-    // Turkiye disindaki Avrupa ulkelerinde bolge/eyalet listesi (secime gore panel JS ile kurulur).
-    var hasSub = RegionSubdivisions.Has(selRegion.Key);
-    var subJson = System.Text.Json.JsonSerializer.Serialize(
-        RegionSubdivisions.All.ToDictionary(k => k.Key, k => k.Value.Select(g => new { name = g.Name, items = g.Items }).ToList()));
-
-    // "Biz ne arıyoruz?" segmentleri: tek tikla sektor + bolge doldurur.
     var sellerProfile = EgebisLeadFinder.Services.BusinessProfileService
         .Parse(await SearchSettings.GetAsync(SettingKeys.BusinessProfile));
-    var segments = sellerProfile.Segments;
     var profileReady = sellerProfile.IsConfigured;
     var me = EgebisLeadFinder.Services.Auth.ClaimsPrincipalExtensions.UserId(User);
     var isAdmin = User.IsInRole(nameof(UserRole.Admin));
+    var selectedId = Model.Criteria.ProfileId;
+    var defaultProfile = Model.DefaultProfile;
 }
 
 @if (!profileReady)
@@ -38,11 +18,11 @@
     <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2">
         <div class="flex-grow-1">
             <strong>Şirket profiliniz tanımlı değil.</strong> Firma araması, yapay zekâ analizi ve mail önerileri şu an
-            varsayılan tanımla (SAP/üretim yazılımı) çalışıyor. Kendi işinize göre çalışması için “Biz ne arıyoruz?” ekranını doldurun.
+            varsayılan tanımla (SAP/üretim yazılımı) çalışıyor. Kendi işinize göre çalışması için “Şirketimiz” ekranını doldurun.
         </div>
-        @if (User.IsInRole(nameof(UserRole.Admin)))
+        @if (isAdmin)
         {
-            <a class="btn btn-sm btn-accent" asp-controller="BusinessProfile" asp-action="Index">Biz ne arıyoruz?</a>
+            <a class="btn btn-sm btn-accent" asp-controller="BusinessProfile" asp-action="Index">Şirketimiz</a>
         }
         else
         {
@@ -54,26 +34,9 @@
 <div class="page-head">
     <div>
         <h1>Firma Ara</h1>
-        <div class="page-sub">Sektöre göre üretici firma keşfet, yapay zeka ile değerlendir</div>
+        <div class="page-sub">Arama profili seçin, firmaları keşfedin ve yapay zeka ile değerlendirin</div>
     </div>
 </div>
-
-@* Daha once aranan sektorler: yazarken oneri olarak cikar. *@
-<datalist id="industryOptions">
-    @foreach (var industry in Model.Profiles
-        .Select(p => p.Industry)
-        .Where(i => !string.IsNullOrWhiteSpace(i))
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .Take(25))
-    {
-        <option value="@industry"></option>
-    }
-    @* NACE bolum adlari: secilen ad aramaya sektor olarak girer. *@
-    @foreach (var d in NaceCatalog.Divisions.Where(d => string.CompareOrdinal(d.Code, "10") >= 0 && string.CompareOrdinal(d.Code, "33") <= 0))
-    {
-        <option value="@d.Name.Split('(')[0].Trim()" label="NACE @d.Code"></option>
-    }
-</datalist>
 
 <form method="post" asp-action="Search" class="name-search mb-4" id="nameSearchForm"
       data-progress-start="@Url.Action("StartSearch")"
@@ -81,7 +44,6 @@
       data-progress-hint="Firmanın resmi sitesi bulunup yapay zeka ile değerlendiriliyor.">
     @Html.AntiForgeryToken()
     <input type="hidden" name="SubmitMode" value="@CompanySearchViewModel.ModeCompany" />
-    <input type="hidden" name="Criteria.RegionKey" class="region-sync" value="@selRegion.Key" />
 
     <div class="name-search-frame">
         <div class="name-search-inner">
@@ -95,9 +57,9 @@
                 <label class="name-search-label" for="companyNameInput">Belirli bir firmayı bul</label>
                 <input class="name-search-input" id="companyNameInput" name="Criteria.CompanyName"
                        value="@Model.Criteria.CompanyName" placeholder="Firma adı yazın — ör. Toyota, Egebis, Arçelik"
-                       autocomplete="off" maxlength="150" required />
+                       autocomplete="off" maxlength="150" required disabled="@(defaultProfile is null ? "disabled" : null)" />
             </div>
-            <button type="submit" class="name-search-button">
+            <button type="submit" class="name-search-button" disabled="@(defaultProfile is null ? "disabled" : null)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
                     <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
@@ -107,124 +69,46 @@
         </div>
     </div>
     <div class="name-search-hint">
-        Sektör taraması yerine tek bir firmayı adıyla bulur · en fazla @CompanySearchViewModel.NameSearchMaxResults aday site · ~4 Serper kredisi
+        @if (defaultProfile is null)
+        {
+            <span>Firma adıyla aramak için <a asp-controller="SearchProfiles" asp-action="Index">Arama Profilleri</a> ekranından varsayılan profil seçin.</span>
+        }
+        else
+        {
+            <span>Varsayılan profil: <strong>@defaultProfile.Name</strong> (<a asp-controller="SearchProfiles" asp-action="Index">değiştir</a>)</span>
+        }
     </div>
 </form>
 
 <div class="row g-4">
     <div class="col-lg-5">
         <div class="card">
-            <div class="card-header">Sektöre göre arama</div>
+            <div class="card-header">Arama</div>
             <div class="card-body">
                 <form method="post" id="searchForm" asp-action="Search"
                       data-progress-start="@Url.Action("StartSearch")"
                       data-progress-title="Firma araştırması yapılıyor"
                       data-progress-hint="Her firmanın sitesi okunup yapay zeka ile değerlendiriliyor. Bu birkaç dakika sürebilir; sayfayı kapatmayın.">
                     @Html.AntiForgeryToken()
-                    <input type="hidden" name="SubmitMode" value="@CompanySearchViewModel.ModeBasic" />
-                    <input type="hidden" name="Criteria.RegionKey" class="region-sync" value="@selRegion.Key" />
-                    <input type="hidden" name="MaxCompaniesOverride" class="max-sync" value="@maxShown" />
+                    <input type="hidden" name="SubmitMode" value="@CompanySearchViewModel.ModeProfile" />
 
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-baseline gap-2 mb-1">
-                            <span class="form-label mb-0">Hedef segmentlerimiz</span>
-                            <a class="small" asp-controller="BusinessProfile" asp-action="Index">@if (segments.Count == 0) { <span class="d-inline-flex align-items-center gap-1">@Icons.Target(13) Segment tanımla</span> } else { <span>Düzenle</span> }</a>
-                        </div>
-                        @if (segments.Count > 0)
-                        {
-                            <div class="segment-chips" id="segmentChips">
-                                @foreach (var seg in segments)
-                                {
-                                    <button type="button" class="segment-chip @(seg.Id == Model.Criteria.SegmentId ? "is-active" : "")" data-id="@seg.Id" data-term="@seg.EffectiveSearchTerm" data-region="@seg.RegionKey"
-                                            title="@(seg.Description ?? seg.Name)">@seg.Name</button>
-                                }
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="small text-muted-2">Şirket profilinde segment tanımlarsanız burada tek tıkla arama düğmeleri çıkar.</div>
-                        }
-                    </div>
-
-                    <div class="mb-3 nace-field">
-                        <label class="form-label d-flex align-items-center gap-1" for="basicNace">
-                            NACE kodu <span class="text-muted-2 fw-normal">(isteğe bağlı)</span>
-                            <button type="button" class="nace-info-btn" data-nace-info aria-label="NACE kodu açıklaması" tabindex="0">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
-                            </button>
-                        </label>
-                        <input class="form-control nace-input" id="basicNace" name="Criteria.NaceCode" value="@Model.Criteria.NaceCode"
-                               placeholder="27.51.08" inputmode="decimal" autocomplete="off" maxlength="12" />
-                        <div class="form-text nace-status" data-nace-status aria-live="polite">Çok spesifik arama için: kodu yazınca anlamı ve arama terimleri gelir.</div>
-                        <div class="nace-products" data-nace-products hidden>
-                            <div class="small text-muted-2 mb-1">Bu ürünlerden en az birini üreten firmalar aranır. Tıklayarak seçimi değiştirebilirsiniz:</div>
-                            <div class="nace-product-chips" data-nace-chips></div>
-                        </div>
-                        <input type="hidden" name="Criteria.NaceProducts" class="nace-products-sync" value="@Model.Criteria.NaceProducts" />
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label" for="basicIndustry">Sektör *</label>
-                        <input class="form-control" id="basicIndustry" name="Criteria.Industry" list="industryOptions"
-                               value="@Model.Criteria.Industry" placeholder="Otomotiv" required />
-                        <div class="form-text">Örnek: Otomotiv, Makina, Metal, Plastik</div>
-                    </div>
-
-                    <div class="search-scope mb-4">
-                        <div class="search-scope-row">
-                            <span class="search-scope-label">Kapsam</span>
-                            <span><span class="region-name">@selRegion.Name</span> geneli</span>
-                            <button type="button" class="scope-edit" id="scopeEdit" title="Bölgeyi değiştir"
-                                    aria-label="Bölgeyi değiştir" aria-expanded="false" aria-controls="basicRegionSelect">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
-                            </button>
-                        </div>
-                        <select class="form-select form-select-sm mt-1" id="basicRegionSelect" aria-label="Arama bölgesi" hidden>
-                            @foreach (var g in SearchRegions.Grouped())
+                    <label class="form-label" for="profileSelect">Arama profili *</label>
+                    <div class="profile-pick mb-3">
+                        <select class="form-select" id="profileSelect" name="Criteria.ProfileId" required>
+                            <option value="" selected="@(selectedId is null)">Profil seçin</option>
+                            @foreach (var p in Model.Profiles)
                             {
-                                <optgroup label="@g.Key">
-                                    @foreach (var r in g)
-                                    {
-                                        <option value="@r.Key" selected="@(r.Key == selRegion.Key)">@r.Name</option>
-                                    }
-                                </optgroup>
+                                var dto = SearchProfileDto.From(p, me, isAdmin);
+                                <option value="@p.Id" selected="@(selectedId == p.Id)" data-profile="@dto.ToJson()">
+                                    @p.Name — @dto.RegionName
+                                </option>
                             }
                         </select>
-                        <div class="search-scope-row">
-                            <span class="search-scope-label">Sonuç</span>
-                            <span>en fazla <span class="max-name">@maxShown</span> firma, skoru en yüksekten sıralı</span>
-                            <button type="button" class="scope-edit" id="maxEdit" title="Firma sayısını değiştir"
-                                    aria-label="Firma sayısını değiştir" aria-expanded="false" aria-controls="maxInput">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
-                            </button>
-                        </div>
-                        <input type="number" class="form-control form-control-sm mt-1" id="maxInput" aria-label="Firma sayısı"
-                               min="1" max="@SettingKeys.SearchMaxCompaniesUpperLimit" step="1" inputmode="numeric"
-                               value="@maxShown" hidden />
-                        <div title="“Biz ne arıyoruz?” ekranındaki müşteri türüne göre">
-                            <span class="search-scope-label">Arama</span>
-                            @(!sellerProfile.IsConfigured || sellerProfile.TargetsManufacturers ? "üretici firmalar (“üreticileri”, “fabrikası”)" : "her tür şirket (“firmaları”, “şirketleri”)")
-                        </div>
-                        <a class="small" asp-controller="Settings" asp-action="Index">Varsayılanı Ayarlar'dan değiştir</a>
+                        <button type="button" class="btn btn-outline-secondary text-nowrap" id="profileShow" data-profile-show>Göster</button>
+                        <button type="button" class="btn btn-outline-primary text-nowrap" data-profile-new>Yeni Arama Profili</button>
                     </div>
 
-                    <input type="hidden" name="Criteria.SegmentId" class="segment-sync" value="@Model.Criteria.SegmentId" />
-                    <input type="hidden" name="Criteria.SmartSearch" class="smart-sync" value="@(Model.Criteria.SmartSearch ? "true" : "false")" />
-                    <label class="smart-toggle mb-3" title="Yapay zekâ, sektöre ve şirket profilinize göre ek arama terimleri üretir; siteleri okumadan önce bayi, rehber, haber sitesi, rakip gibi hedef dışı adayları eler.">
-                        <input class="form-check-input" type="checkbox" id="smartSearchToggle" checked="@Model.Criteria.SmartSearch" />
-                        <span>
-                            <strong>Akıllı arama</strong>
-                            <span class="d-block small text-muted-2">Ek arama terimleri + siteye girmeden ön eleme (1-2 Gemini çağrısı)</span>
-                        </span>
-                    </label>
-
-                    <button type="submit" class="btn btn-accent w-100 mb-2" id="searchButton">
-                        FİRMA ARA
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary w-100"
-                            data-bs-toggle="modal" data-bs-target="#advancedSearchModal">
-                        Gelişmiş Arama — il / bölge seç, profil kaydet
-                    </button>
+                    <button type="submit" class="btn btn-accent w-100" id="searchButton">Aramayı Başlat</button>
                 </form>
             </div>
         </div>
@@ -304,21 +188,19 @@
                         }
                     </div>
 
-                    @if (result.SearchTerms.Count > 1 || result.SegmentName is not null)
+                    @if (result.SerperCredits > 0 || result.AiCalls > 0)
+                    {
+                        <div class="small text-muted-2 mb-3" title="Önbellekten dönen sorgular kredi harcamaz">
+                            Bu aramanın harcadığı: <strong>@result.SerperCredits</strong> Serper kredisi · <strong>@result.AiCalls</strong> yapay zekâ çağrısı
+                        </div>
+                    }
+                    @if (result.SearchTerms.Count > 1)
                     {
                         <div class="search-terms mb-3">
-                            @if (result.SegmentName is not null)
+                            <span class="search-terms-label">Arama terimleri</span>
+                            @foreach (var term in result.SearchTerms)
                             {
-                                <span class="search-terms-label">Segment</span>
-                                <span class="segment-chip is-active">@result.SegmentName</span>
-                            }
-                            @if (result.SearchTerms.Count > 1)
-                            {
-                                <span class="search-terms-label">Arama terimleri</span>
-                                @foreach (var term in result.SearchTerms)
-                                {
-                                    <span class="tag tag-muted">@term</span>
-                                }
+                                <span class="tag tag-muted">@term</span>
                             }
                         </div>
                     }
@@ -328,13 +210,13 @@
                         @if (result.NaceFiltered > 0)
                         {
                             <p class="text-muted-2 mb-0">
-                                Bulunan firmaların hiçbiri seçilen ürünleri üretmiyor. Firma sayısını artırın ya da ürün seçimini değiştirip tekrar deneyin.
+                                Bulunan firmaların hiçbiri seçilen ürünleri üretmiyor. Arama profilinde firma sayısını artırın ya da ürün seçimini değiştirip tekrar deneyin.
                             </p>
                         }
                         else
                         {
                             <p class="text-muted-2 mb-0">
-                                Sonuç bulunamadı. Sektör veya şehri değiştirip tekrar deneyin.
+                                Sonuç bulunamadı. Arama profilinde sektör veya ili değiştirip tekrar deneyin.
                             </p>
                         }
                     }
@@ -451,762 +333,56 @@
                         </svg>
                     </div>
                     <div class="empty-title">Sonuçlar burada görünecek</div>
-                    <div>Soldaki formu doldurup aramayı başlat.</div>
+                    <div>Soldan bir arama profili seçip aramayı başlatın.</div>
                 </div>
             </div>
         }
     </div>
 </div>
 
-@* ======================= Gelişmiş arama ekranı ======================= *@
-<div class="modal fade" id="advancedSearchModal" tabindex="-1" aria-labelledby="advancedSearchTitle"
-     aria-hidden="true" data-reopen="@(reopenAdvanced ? "true" : "false")">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <form class="modal-content" method="post" id="advancedForm" asp-action="Search"
-              data-progress-start="@Url.Action("StartSearch")"
-              data-progress-title="Firma araştırması yapılıyor"
-              data-progress-hint="Seçilen illerde firmalar aranıyor, her firmanın sitesi okunup yapay zeka ile değerlendiriliyor.">
-            @Html.AntiForgeryToken()
-
-            <div class="modal-header">
-                <h2 class="modal-title h5" id="advancedSearchTitle">Gelişmiş Arama</h2>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
-            </div>
-
-            <div class="modal-body">
-                <div class="row g-4">
-                    <div class="col-lg-4">
-                        <div class="mb-3 nace-field">
-                            <label class="form-label d-flex align-items-center gap-1" for="advNace">
-                                NACE kodu <span class="text-muted-2 fw-normal">(isteğe bağlı)</span>
-                                <button type="button" class="nace-info-btn" data-nace-info aria-label="NACE kodu açıklaması" tabindex="0">
-                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
-                                </button>
-                            </label>
-                            <input class="form-control nace-input" id="advNace" name="Criteria.NaceCode" value="@Model.Criteria.NaceCode"
-                                   placeholder="27.51.08" inputmode="decimal" autocomplete="off" maxlength="12" />
-                            <div class="form-text nace-status" data-nace-status aria-live="polite">Çok spesifik arama için: kodu yazınca anlamı ve arama terimleri gelir.</div>
-                            <div class="nace-products" data-nace-products hidden>
-                                <div class="small text-muted-2 mb-1">Bu ürünlerden en az birini üreten firmalar aranır. Tıklayarak seçimi değiştirebilirsiniz:</div>
-                                <div class="nace-product-chips" data-nace-chips></div>
-                            </div>
-                            <input type="hidden" name="Criteria.NaceProducts" class="nace-products-sync" value="@Model.Criteria.NaceProducts" />
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label" for="advIndustry">Sektör *</label>
-                            <input class="form-control" id="advIndustry" name="Criteria.Industry" list="industryOptions"
-                                   value="@Model.Criteria.Industry" placeholder="Otomotiv" required />
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label" for="advRegion">Ülke / bölge</label>
-                            <select class="form-select" id="advRegion" name="Criteria.RegionKey">
-                                @foreach (var g in SearchRegions.Grouped())
-                                {
-                                    <optgroup label="@g.Key">
-                                        @foreach (var r in g)
-                                        {
-                                            <option value="@r.Key" selected="@(r.Key == selRegion.Key)">@r.Name</option>
-                                        }
-                                    </optgroup>
-                                }
-                            </select>
-                        </div>
-
-                        <input type="hidden" name="Criteria.ProfileId" id="advProfileId" value="" />
-                        <input type="hidden" name="MaxCompaniesOverride" class="max-sync" value="@maxShown" />
-                        <input type="hidden" name="Criteria.SegmentId" class="segment-sync" value="@Model.Criteria.SegmentId" />
-                        <input type="hidden" name="Criteria.SmartSearch" class="smart-sync" value="@(Model.Criteria.SmartSearch ? "true" : "false")" />
-
-                        <div class="mb-4">
-                            <label class="form-label" for="advProfileName">Arama profili adı</label>
-                            <input class="form-control" id="advProfileName" name="Criteria.ProfileName"
-                                   value="@Model.Criteria.ProfileName" placeholder="ör. Ege Otomotiv" autocomplete="off"
-                                   maxlength="150" />
-                            <div class="form-text" id="profileEditHint">
-                                Aynı adla kaydederseniz mevcut profil güncellenir. Aşağıdan bir profile tıklayıp düzenleyebilirsiniz.
-                            </div>
-                            <label class="form-check mt-2 mb-0">
-                                <input class="form-check-input" type="checkbox" id="advProfilePublic" name="Criteria.ProfilePublic" value="true"
-                                       checked="@(Model.Criteria.ProfilePublic ? "checked" : null)" />
-                                <span class="form-check-label small">
-                                    Şablonu tüm kullanıcılarla paylaş
-                                    <span class="text-muted-2">— yalnızca arama kriterleri paylaşılır, bulduğunuz firmalar size özel kalır.</span>
-                                </span>
-                            </label>
-                        </div>
-
-                        <div class="form-label d-flex justify-content-between align-items-baseline">
-                            <span>Kayıtlı profiller</span>
-                            <span class="text-muted-2 small fw-normal" id="profileCount">@Model.Profiles.Count</span>
-                        </div>
-                        <div class="profile-list" id="profileList">
-                            @if (Model.Profiles.Count == 0)
-                            {
-                                <div class="profile-empty text-muted-2 small" id="profileEmpty">
-                                    Henüz kayıtlı profil yok.
-                                </div>
-                            }
-                            @foreach (var p in Model.Profiles)
-                            {
-                                var mine = p.CanEdit(me, isAdmin);
-                                <button type="button" class="profile-item" data-id="@p.Id" data-name="@p.Name"
-                                        data-industry="@p.Industry" data-nace="@p.NaceCode" data-nace-products="@p.NaceProducts" data-city="@p.City"
-                                        data-public="@(p.IsPublic ? "true" : "false")" data-mine="@(mine ? "true" : "false")"
-                                        data-region="@SearchRegions.Get(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key).Key">
-                                    <span class="profile-item-name">
-                                        @p.Name
-                                        <span class="profile-region">@SearchRegions.Get(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key).Name</span>
-                                    </span>
-                                    <span class="profile-item-meta">@p.Industry@(string.IsNullOrWhiteSpace(p.NaceCode) ? "" : " · NACE " + p.NaceCode) · @ProfileCityLabel(p.City)</span>
-                                    <span class="profile-item-date">
-                                        Kaydedildi: @p.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
-                                        <span class="profile-share @(p.IsPublic ? "is-public" : "")">@ShareLabel(p, me)</span>
-                                    </span>
-                                </button>
-                            }
-                        </div>
-                    </div>
-
-                    <div class="col-lg-8" id="provincePanel" hidden="@(selRegion.HasProvinces ? null : "hidden")">
-                        <div class="d-flex justify-content-between align-items-baseline mb-2">
-                            <span class="form-label mb-0">Bölge / il</span>
-                            <span class="small">
-                                <span class="tag tag-muted" id="citySelectedCount">0 il seçili</span>
-                                <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="cityClear">Temizle</button>
-                            </span>
-                        </div>
-
-                        <div class="region-chips mb-2">
-                            @foreach (var region in TurkishProvinces.Regions)
-                            {
-                                <button type="button" class="region-chip" data-region="@region.Key"
-                                        data-cities="@string.Join("|", region.Value)">
-                                    @region.Key <span class="region-chip-count">@region.Value.Length</span>
-                                </button>
-                            }
-                        </div>
-
-                        <input type="text" class="form-control mb-2" id="citySearchBox"
-                               placeholder="İl ara (ör. izm)" autocomplete="off" />
-
-                        <div class="city-picker city-picker-lg" id="cityCheckboxGrid">
-                            @foreach (var il in TurkishProvinces.All)
-                            {
-                                <label class="city-check">
-                                    <input type="checkbox" class="city-checkbox" value="@il"
-                                           checked="@(selectedCities.Contains(il) ? "checked" : null)" />
-                                    <span>@il</span>
-                                </label>
-                            }
-                        </div>
-                        <input type="hidden" name="Criteria.City" id="cityHiddenField" value="@Model.Criteria.City"
-                               disabled="@(selRegion.HasProvinces ? null : "disabled")" />
-                        <div class="form-text">
-                            Hiç il seçmezseniz Türkiye geneli taranır. En fazla <span class="max-name">@maxShown</span> firma
-                            getirilir.
-                        </div>
-                    </div>
-
-                    @* Avrupa ülkeleri: bölge / eyalet / kanton listesi (ör. Almanya'da Bayern). Panel JS ile kurulur. *@
-                    <div class="col-lg-8" id="subPanel" hidden="@(hasSub ? null : "hidden")">
-                        <div class="d-flex justify-content-between align-items-baseline mb-2">
-                            <span class="form-label mb-0">Bölge / eyalet</span>
-                            <span class="small">
-                                <span class="tag tag-muted" id="subSelectedCount">0 seçili</span>
-                                <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="subClear">Temizle</button>
-                            </span>
-                        </div>
-                        <div class="region-chips mb-2" id="subChips"></div>
-                        <input type="text" class="form-control mb-2" id="subSearchBox" placeholder="Bölge ara" autocomplete="off" />
-                        <div class="city-picker city-picker-lg" id="subGrid"></div>
-                        <input type="hidden" name="Criteria.City" id="subHiddenField" value="@Model.Criteria.City"
-                               disabled="@(hasSub ? null : "disabled")" />
-                        <div class="form-text">
-                            Hiç bölge seçmezseniz <span class="region-name">@selRegion.Name</span> geneli taranır. Birden fazla bölge seçebilirsiniz;
-                            her bölge ayrı aranır. En fazla <span class="max-name">@maxShown</span> firma getirilir.
-                        </div>
-                    </div>
-
-                    @* Bölge listesi olmayan ülkelerde şehir adları elle yazılır. *@
-                    <div class="col-lg-8" id="freePanel" hidden="@(selRegion.HasProvinces || hasSub ? "hidden" : null)">
-                        <label class="form-label" for="cityFreeText">Şehir / bölge</label>
-                        <input type="text" class="form-control" id="cityFreeText" name="Criteria.City"
-                               value="@Model.Criteria.City" placeholder="Bavyera, Stuttgart, Köln" autocomplete="off"
-                               disabled="@(selRegion.HasProvinces || hasSub ? "disabled" : null)" />
-                        <div class="form-text">
-                            Birden fazla şehri virgülle ayırın. Boş bırakırsanız <span class="region-name">@selRegion.Name</span> geneli taranır.
-                            Sorgular seçilen ülkenin dilinde kurulur.
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="modal-footer justify-content-between">
-                <div class="small" id="profileSaveStatus" role="status"></div>
-                <div class="d-flex flex-wrap gap-2">
-                    <button type="submit" name="SubmitMode" value="@CompanySearchViewModel.ModeAdvanced"
-                            class="btn btn-outline-primary">
-                        Kaydetmeden Ara
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary" id="saveProfileOnly"
-                            data-url="@Url.Action("SaveProfile")">
-                        Arama Profilini Kaydet
-                    </button>
-                    <button type="submit" name="SubmitMode" value="@CompanySearchViewModel.ModeAdvancedSave"
-                            class="btn btn-accent">
-                        Kaydet ve Ara
-                    </button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-
-@functions {
-    /// <summary>Sablon rozeti: "Size özel", "Herkese açık" veya paylasan kisinin adi.</summary>
-    private static string ShareLabel(SearchProfile p, int? me) =>
-        p.OwnerUserId is not null && p.OwnerUserId != me
-            ? $"Paylaşan: {p.Owner?.DisplayName ?? "başka kullanıcı"}"
-            : p.IsPublic ? "Herkese açık" : "Size özel";
-
-    private static string ProfileCityLabel(string? city)
-    {
-        var cities = (city ?? string.Empty)
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return cities.Length switch
-        {
-            0 => "tüm bölge",
-            <= 3 => string.Join(", ", cities),
-            _ => $"{string.Join(", ", cities.Take(3))} +{cities.Length - 3}"
-        };
-    }
-}
+<partial name="_SearchProfileModal" model="@(new SearchProfileModalModel(Model.Region, Model.MaxCompanies, Model.Result is null ? Model.Criteria.Industry : null))" />
 
 @section Scripts {
+<partial name="_SearchProfileModalScript" />
 <script>
     (function () {
-        var basicForm = document.getElementById('searchForm');
-        var basicButton = document.getElementById('searchButton');
-        var modalEl = document.getElementById('advancedSearchModal');
-        var advForm = document.getElementById('advancedForm');
-        var advIndustry = document.getElementById('advIndustry');
-        var advName = document.getElementById('advProfileName');
-        var hiddenCity = document.getElementById('cityHiddenField');
-        var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.city-checkbox'));
-        var countLabel = document.getElementById('citySelectedCount');
-        var status = document.getElementById('profileSaveStatus');
-        var advRegion = document.getElementById('advRegion');
-        var advProfileId = document.getElementById('advProfileId');
-        var advPublic = document.getElementById('advProfilePublic');
-        var basicRegion = document.getElementById('basicRegionSelect');
-        var provincePanel = document.getElementById('provincePanel');
-        var freePanel = document.getElementById('freePanel');
-        var freeText = document.getElementById('cityFreeText');
-        var subPanel = document.getElementById('subPanel');
-        var subHidden = document.getElementById('subHiddenField');
-        var subGrid = document.getElementById('subGrid');
-        var subChips = document.getElementById('subChips');
-        var subCount = document.getElementById('subSelectedCount');
-        var SUBS = @Html.Raw(subJson);
-        var subKey = null;
-        var regionNames = {};
-        Array.prototype.forEach.call(advRegion.options, function (o) { regionNames[o.value] = o.textContent; });
+        var form = document.getElementById('searchForm');
+        var button = document.getElementById('searchButton');
+        var select = document.getElementById('profileSelect');
+        var show = document.getElementById('profileShow');
 
-        // Secilen bolge tek yerden yonetilir: tum formlar, kapsam yazisi ve il/sehir paneli birlikte guncellenir.
-        function setRegion(key) {
-            if (!regionNames[key]) return;
-            document.querySelectorAll('.region-sync').forEach(function (i) { i.value = key; });
-            basicRegion.value = key;
-            advRegion.value = key;
-            document.querySelectorAll('.region-name').forEach(function (s) { s.textContent = regionNames[key]; });
-            var tr = key === 'TR';
-            var sub = !tr && !!SUBS[key];
-            provincePanel.hidden = !tr;
-            subPanel.hidden = !sub;
-            freePanel.hidden = tr || sub;
-            hiddenCity.disabled = !tr;
-            subHidden.disabled = !sub;
-            freeText.disabled = tr || sub;
-            if (sub) buildSub(key);
+        // Goster dugmesi secili profilin detayini acar; profil secilmeden arama baslatilamaz.
+        function refresh() {
+            var option = select.options[select.selectedIndex];
+            var raw = option ? option.getAttribute('data-profile') : null;
+            if (raw) show.setAttribute('data-profile', raw); else show.removeAttribute('data-profile');
+            show.disabled = !raw;
+            button.disabled = !select.value;
         }
+        select.addEventListener('change', refresh);
+        refresh();
 
-        // Avrupa ulkelerinde bolge / eyalet paneli: hizli gruplar + onay kutulari (secim "Criteria.City" olarak gider).
-        function subSelected() {
-            return Array.prototype.slice.call(subGrid.querySelectorAll('input:checked')).map(function (i) { return i.value; });
-        }
-
-        function syncSub() {
-            var selected = subSelected();
-            if (!subHidden.disabled) subHidden.value = selected.join(', ');
-            subCount.textContent = selected.length === 0 ? (regionNames[subKey] || '') + ' geneli' : selected.length + ' seçili';
-            subChips.querySelectorAll('.region-chip').forEach(function (chip) {
-                var items = chip.getAttribute('data-cities').split('|');
-                chip.classList.toggle('is-active', items.every(function (c) { return selected.indexOf(c) !== -1; }));
-            });
-        }
-
-        function buildSub(key, preset) {
-            var keep = preset || (subKey === key ? subSelected() : []);
-            subKey = key;
-            subChips.innerHTML = '';
-            subGrid.innerHTML = '';
-            (SUBS[key] || []).forEach(function (group) {
-                if ((SUBS[key] || []).length > 1) {
-                    var chip = document.createElement('button');
-                    chip.type = 'button';
-                    chip.className = 'region-chip';
-                    chip.setAttribute('data-cities', group.items.join('|'));
-                    chip.appendChild(document.createTextNode(group.name + ' '));
-                    var n = document.createElement('span');
-                    n.className = 'region-chip-count';
-                    n.textContent = group.items.length;
-                    chip.appendChild(n);
-                    chip.addEventListener('click', function () {
-                        var on = !chip.classList.contains('is-active');
-                        subGrid.querySelectorAll('input').forEach(function (i) {
-                            if (group.items.indexOf(i.value) !== -1) i.checked = on;
-                        });
-                        syncSub();
-                    });
-                    subChips.appendChild(chip);
-                }
-                group.items.forEach(function (name) {
-                    var label = document.createElement('label');
-                    label.className = 'city-check';
-                    var input = document.createElement('input');
-                    input.type = 'checkbox';
-                    input.value = name;
-                    input.checked = keep.indexOf(name) !== -1;
-                    input.addEventListener('change', syncSub);
-                    var span = document.createElement('span');
-                    span.textContent = name;
-                    label.appendChild(input);
-                    label.appendChild(span);
-                    subGrid.appendChild(label);
-                });
-            });
-            syncSub();
-        }
-
-        document.getElementById('subClear').addEventListener('click', function () { buildSub(subKey, []); });
-        document.getElementById('subSearchBox').addEventListener('input', function () {
-            var term = this.value.trim().toLocaleLowerCase();
-            subGrid.querySelectorAll('.city-check').forEach(function (label) {
-                label.hidden = term !== '' && label.querySelector('span').textContent.toLocaleLowerCase().indexOf(term) === -1;
-            });
-        });
-
-        // Firma sayisi: ekrandan anlik secilir; her iki formdaki gizli alan ve yazilar birlikte guncellenir.
-        var maxInput = document.getElementById('maxInput');
-        var maxLimit = parseInt(maxInput.max, 10) || 200;
-        var maxLast = parseInt(maxInput.value, 10) || 1;
-        document.getElementById('maxEdit').addEventListener('click', function () {
-            maxInput.hidden = !maxInput.hidden;
-            this.setAttribute('aria-expanded', maxInput.hidden ? 'false' : 'true');
-            if (!maxInput.hidden) { maxInput.focus(); maxInput.select(); }
-        });
-        function applyMax(value) {
-            document.querySelectorAll('.max-sync').forEach(function (i) { i.value = value; });
-            document.querySelectorAll('.max-name').forEach(function (s) { s.textContent = value; });
-        }
-        // Yazarken gecerli sayi (1-limit) aninda uygulanir; bos birakilirsa son gecerli deger korunur.
-        maxInput.addEventListener('input', function () {
-            var n = parseInt(maxInput.value, 10);
-            if (isNaN(n) || n < 1) return;
-            maxLast = Math.min(n, maxLimit);
-            applyMax(maxLast);
-        });
-        maxInput.addEventListener('blur', function () { maxInput.value = maxLast; applyMax(maxLast); });
-        // Enter formu gondermesin; yalnizca degeri onaylar.
-        maxInput.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') { e.preventDefault(); maxInput.blur(); }
-        });
-
-        document.getElementById('scopeEdit').addEventListener('click', function () {
-            basicRegion.hidden = !basicRegion.hidden;
-            this.setAttribute('aria-expanded', basicRegion.hidden ? 'false' : 'true');
-            if (!basicRegion.hidden) basicRegion.focus();
-        });
-        basicRegion.addEventListener('change', function () { setRegion(basicRegion.value); });
-
-        // Segment dugmesi: sektoru ve (tanimliysa) bolgeyi doldurur.
-        // Sektor elle degistirilirse segment secimi kalkar (segment tanimi baska terimle aranmasin).
-        [document.getElementById('basicIndustry'), advIndustry].forEach(function (input) {
-            input.addEventListener('input', function () {
-                document.querySelectorAll('.segment-sync').forEach(function (i) { i.value = ''; });
-                document.querySelectorAll('#segmentChips .segment-chip').forEach(function (c) { c.classList.remove('is-active'); });
-            });
-        });
-
-        // NACE kodu: yazilinca kodun anlami yapay zekadan gelir (sunucuda 30 gun onbellek). Hem temel formdaki hem
-        // gelismis aramadaki alan ayni degeri tasir; bilgi baloncugu (ⓘ) uzerine gelince acilir.
-        var naceFields = Array.prototype.slice.call(document.querySelectorAll('.nace-field')).map(function (box) {
-            return { input: box.querySelector('.nace-input'), status: box.querySelector('[data-nace-status]'), btn: box.querySelector('[data-nace-info]') };
-        });
-        var industryInputs = [document.getElementById('basicIndustry'), advIndustry];
-        var naceUrl = '@Url.Action("NaceInfo", "Company")';
-        var NACE_HINT = 'Çok spesifik arama için: kodu yazınca anlamı ve arama terimleri gelir.';
-        var NACE_TIP_EMPTY = 'NACE kodunu yazınca ne anlama geldiği burada görünür.';
-        var naceCache = {}, naceTimer = null, naceSeq = 0, autoIndustry = '';
-
-        function naceDigits(v) { return (v || '').replace(/\D/g, ''); }
-
-        function naceTip(f, text) {
-            if (!window.bootstrap) return;
-            var tip = bootstrap.Tooltip.getInstance(f.btn);
-            if (!tip) tip = new bootstrap.Tooltip(f.btn, { title: text, customClass: 'nace-tip', placement: 'top', trigger: 'hover focus' });
-            tip.setContent({ '.tooltip-inner': text });
-        }
-
-        function naceRender(info, message, tone) {
-            var tip = NACE_TIP_EMPTY, line = message || NACE_HINT;
-            if (info && info.ok) {
-                var shown = info.official ? info.name : (info.shortName || info.name);
-                tip = info.code + ' · ' + info.name
-                    + (info.basis ? '\n\nKapsadığı resmî faaliyetlerden: ' + info.basis : '')
-                    + (info.description && info.name.indexOf(info.description.slice(0, 40)) < 0 && info.description.indexOf(info.name.slice(0, 60)) < 0 ? '\n\n' + info.description : '')
-                    + (info.terms && info.terms.length ? '\n\nArama terimleri: ' + info.terms.join(', ') : '')
-                    + (info.official ? '\n\nKod adı resmî TÜİK/GİB listesindendir; açıklama ve arama terimleri yapay zekâdır.'
-                                     : '\n\nAd, resmî alt faaliyetlere dayanan yapay zekâ özetidir.');
-                line = info.code + ' · ' + (shown.length > 90 ? shown.slice(0, 90) + '…' : shown);
-                tone = 'ok';
-            } else if (message) {
-                tip = message;
+        // Yeni kaydedilen profil listeye eklenir ve secili olur.
+        document.addEventListener('searchprofile:saved', function (e) {
+            var p = e.detail;
+            var option = select.querySelector('option[value="' + p.id + '"]');
+            if (!option) {
+                option = document.createElement('option');
+                option.value = p.id;
+                select.insertBefore(option, select.options[1] || null);
             }
-            naceFields.forEach(function (f) {
-                f.status.textContent = line;
-                f.status.classList.toggle('is-ok', tone === 'ok');
-                f.status.classList.toggle('is-warn', tone === 'warn');
-                f.status.classList.toggle('is-error', tone === 'error');
-                naceTip(f, tip);
-            });
-            naceRenderProducts(info && info.ok ? info : (message || tone ? undefined : null));
-        }
-
-        function naceApplyIndustry(info) {
-            // Sektor bossa (ya da bizim doldurdugumuzla ayniysa) kodun adiyla doldurulur; elle yazilana dokunulmaz.
-            var sector = info.shortName || info.name;
-            industryInputs.forEach(function (i) { if (!i.value.trim() || i.value === autoIndustry) i.value = sector; });
-            autoIndustry = sector;
-        }
-
-        function naceLookup(raw) {
-            var seq = ++naceSeq;
-            var digits = naceDigits(raw);
-            if (digits.length === 0) {
-                industryInputs.forEach(function (i) { if (autoIndustry && i.value === autoIndustry) i.value = ''; });
-                autoIndustry = '';
-                naceRender(null, '', '');
-                return;
-            }
-            if ([2, 3, 4, 6].indexOf(digits.length) < 0) {
-                naceRender(null, digits.length < 2 ? 'Kod en az 2 haneli olmalı.' : 'Kod 2, 4 veya 6 haneli olmalı (örn. 27.51.08).', 'error');
-                return;
-            }
-            if (naceCache[digits]) { naceRender(naceCache[digits]); if (naceCache[digits].ok) naceApplyIndustry(naceCache[digits]); return; }
-            naceRender(null, 'Yapay zekâ kodu çözüyor…', '');
-            fetch(naceUrl + '?code=' + encodeURIComponent(digits), { credentials: 'same-origin' })
-                .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-                .then(function (info) {
-                    if (seq !== naceSeq) return; // daha yeni bir kod yazildi
-                    if (info.ok) { naceCache[digits] = info; naceRender(info); naceApplyIndustry(info); }
-                    else naceRender(null, info.error || 'Kod çözülemedi.', 'error');
-                })
-                .catch(function () { if (seq === naceSeq) naceRender(null, 'Kod şu an çözülemedi; arama yine de yapılabilir.', 'error'); });
-        }
-
-        // NACE urunleri: kodun resmi metnindeki urunler etiket olarak gosterilir; secili olanlarla aranir ve sonucta bu
-        // urunlerden en az birini URETEN firmalar kalir. En az bir urun secili kalmali.
-        var naceProductSync = Array.prototype.slice.call(document.querySelectorAll('.nace-products-sync'));
-        var nacePending = naceProductSync.length ? naceProductSync[0].value : '';
-        var naceChipsCode = null, naceAllProducts = [], naceSelected = [];
-
-        function naceNorm(v) { return (v || '').toLocaleLowerCase('tr').trim(); }
-
-        function naceWriteSelection() {
-            var csv = naceSelected.join(', ');
-            naceProductSync.forEach(function (i) { i.value = csv; });
-            document.querySelectorAll('[data-nace-chips] .nace-chip').forEach(function (b) {
-                var on = naceSelected.some(function (x) { return naceNorm(x) === naceNorm(b.dataset.product); });
-                b.classList.toggle('is-on', on);
-                b.setAttribute('aria-pressed', on ? 'true' : 'false');
-            });
-        }
-
-        function naceRenderProducts(info) {
-            var boxes = document.querySelectorAll('[data-nace-products]');
-            if (!info || !info.ok || !info.products || !info.products.length) {
-                boxes.forEach(function (b) { b.hidden = true; });
-                // null: kod silindi (secimi de temizle); undefined: yukleniyor/hata (yalnizca gizle).
-                if (info === null) { naceChipsCode = null; naceSelected = []; naceProductSync.forEach(function (i) { i.value = ''; }); }
-                return;
-            }
-            if (naceChipsCode !== info.code) {
-                naceAllProducts = info.products.slice();
-                var wanted = (nacePending || '').split(',').map(naceNorm).filter(Boolean);
-                naceSelected = wanted.length
-                    ? naceAllProducts.filter(function (pr) { return wanted.indexOf(naceNorm(pr)) >= 0; })
-                    : naceAllProducts.slice();
-                if (!naceSelected.length) naceSelected = naceAllProducts.slice();
-                nacePending = '';
-                naceChipsCode = info.code;
-                document.querySelectorAll('[data-nace-chips]').forEach(function (holder) {
-                    holder.textContent = '';
-                    naceAllProducts.forEach(function (pr) {
-                        var b = document.createElement('button');
-                        b.type = 'button';
-                        b.className = 'nace-chip';
-                        b.dataset.product = pr;
-                        b.textContent = pr;
-                        b.addEventListener('click', function () {
-                            var i = naceSelected.findIndex(function (x) { return naceNorm(x) === naceNorm(pr); });
-                            if (i >= 0) { if (naceSelected.length === 1) return; naceSelected.splice(i, 1); }
-                            else naceSelected.push(pr);
-                            naceWriteSelection();
-                        });
-                        holder.appendChild(b);
-                    });
-                });
-            }
-            boxes.forEach(function (b) { b.hidden = false; });
-            naceWriteSelection();
-        }
-
-        function naceSetValue(v) { naceFields.forEach(function (f) { f.input.value = v; }); naceRequired(); }
-        // NACE girildiyse sektor zorunlu degildir (kodun adi sektor olur).
-        function naceRequired() {
-            var has = naceFields[0].input.value.trim() !== '';
-            industryInputs.forEach(function (i) { i.required = !has; });
-        }
-
-        naceFields.forEach(function (f) {
-            f.input.addEventListener('input', function () {
-                naceSetValue(f.input.value);
-                clearTimeout(naceTimer);
-                naceTimer = setTimeout(function () { naceLookup(f.input.value); }, 600);
-            });
-            f.input.addEventListener('blur', function () { clearTimeout(naceTimer); naceLookup(f.input.value); });
-            f.btn.addEventListener('click', function (e) { e.preventDefault(); naceLookup(f.input.value); });
-        });
-        naceRequired();
-        if (naceFields[0].input.value.trim()) naceLookup(naceFields[0].input.value); else naceRender(null, '', '');
-
-        var smartToggle = document.getElementById('smartSearchToggle');
-        smartToggle.addEventListener('change', function () {
-            document.querySelectorAll('.smart-sync').forEach(function (i) { i.value = smartToggle.checked ? 'true' : 'false'; });
+            option.textContent = p.name + ' — ' + p.regionName;
+            option.setAttribute('data-profile', JSON.stringify(p));
+            select.value = p.id;
+            refresh();
         });
 
-        document.querySelectorAll('#segmentChips .segment-chip').forEach(function (chip) {
-            chip.addEventListener('click', function () {
-                var term = chip.getAttribute('data-term') || '';
-                document.getElementById('basicIndustry').value = term;
-                advIndustry.value = term;
-                var region = chip.getAttribute('data-region');
-                if (region) setRegion(region);
-                document.querySelectorAll('#segmentChips .segment-chip').forEach(function (c) { c.classList.toggle('is-active', c === chip); });
-                document.querySelectorAll('.segment-sync').forEach(function (i) { i.value = chip.getAttribute('data-id') || ''; });
-                basicButton.focus();
-            });
-        });
-        advRegion.addEventListener('change', function () { setRegion(advRegion.value); });
-
-        function selectedCities() {
-            return checkboxes.filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
-        }
-
-        function refreshRegionChips() {
-            var selected = selectedCities();
-            document.querySelectorAll('.region-chip').forEach(function (chip) {
-                var cities = chip.getAttribute('data-cities').split('|');
-                var all = cities.every(function (c) { return selected.indexOf(c) !== -1; });
-                chip.classList.toggle('is-active', all);
-            });
-        }
-
-        function syncCities() {
-            var selected = selectedCities();
-            if (!hiddenCity.disabled) hiddenCity.value = selected.join(', ');
-            countLabel.textContent = selected.length === 0 ? 'Türkiye geneli' : selected.length + ' il seçili';
-            refreshRegionChips();
-        }
-
-        function setCities(list) {
-            checkboxes.forEach(function (c) { c.checked = list.indexOf(c.value) !== -1; });
-            syncCities();
-        }
-
-        checkboxes.forEach(function (c) { c.addEventListener('change', syncCities); });
-        syncCities();
-        if (!subPanel.hidden) buildSub(advRegion.value, subHidden.value ? subHidden.value.split(',').map(function (x) { return x.trim(); }) : []);
-
-        document.getElementById('cityClear').addEventListener('click', function () { setCities([]); });
-
-        // Bolge cipi: bolgenin tum illeri seciliyse kaldirir, degilse hepsini ekler.
-        document.querySelectorAll('.region-chip').forEach(function (chip) {
-            chip.addEventListener('click', function () {
-                var cities = chip.getAttribute('data-cities').split('|');
-                var on = !chip.classList.contains('is-active');
-                checkboxes.forEach(function (c) {
-                    if (cities.indexOf(c.value) !== -1) c.checked = on;
-                });
-                syncCities();
-            });
-        });
-
-        var searchBox = document.getElementById('citySearchBox');
-        searchBox.addEventListener('input', function () {
-            var term = searchBox.value.trim().toLocaleLowerCase('tr');
-            document.querySelectorAll('.city-check').forEach(function (label) {
-                var name = label.querySelector('span').textContent.toLocaleLowerCase('tr');
-                label.style.display = name.indexOf(term) === -1 ? 'none' : '';
-            });
-        });
-
-        // Kayitli profile tiklayinca kriterleri forma yukler.
-        function bindProfileItem(item) {
-            item.addEventListener('click', function () {
-                advName.value = item.getAttribute('data-name') || '';
-                advIndustry.value = item.getAttribute('data-industry') || '';
-                nacePending = item.getAttribute('data-nace-products') || ''; naceChipsCode = null;
-                naceSetValue(item.getAttribute('data-nace') || ''); naceLookup(item.getAttribute('data-nace') || ''); // profilin NACE kodu ve urun secimi (yoksa bos)
-                var city = item.getAttribute('data-city') || '';
-                var list = city.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
-                setRegion(item.getAttribute('data-region') || 'TR');
-                if (advRegion.value === 'TR') setCities(list);
-                else if (SUBS[advRegion.value]) { setCities([]); buildSub(advRegion.value, list); }
-                else { setCities([]); freeText.value = list.join(', '); }
-                advProfileId.value = item.getAttribute('data-id') || '';
-                var mine = item.getAttribute('data-mine') === 'true';
-                advPublic.checked = mine && item.getAttribute('data-public') === 'true';
-                document.getElementById('profileEditHint').textContent = mine
-                    ? 'Düzenleme: "' + advName.value + '" — alanları değiştirip "Arama Profilini Kaydet"e basın (adı da değiştirebilirsiniz).'
-                    : 'Paylaşılan şablon: olduğu gibi arayabilirsiniz; değiştirip kaydederseniz size özel bir kopyası oluşur. Sonuçlar size özeldir.';
-                document.querySelectorAll('.profile-item').forEach(function (i) { i.classList.remove('is-active'); });
-                item.classList.add('is-active');
-            });
-        }
-        document.querySelectorAll('.profile-item').forEach(bindProfileItem);
-
-        // Acilirken temel formdaki sektoru tasi (kullanici tekrar yazmasin).
-        modalEl.addEventListener('show.bs.modal', function () {
-            var basic = document.getElementById('basicIndustry').value;
-            if (!advIndustry.value && basic) advIndustry.value = basic;
-            status.textContent = '';
-        });
-
-        advForm.addEventListener('submit', function (e) {
-            syncCities();
-            if (e.submitter && e.submitter.value === '@CompanySearchViewModel.ModeAdvancedSave' && !advName.value.trim()) {
-                e.preventDefault();
-                e.stopImmediatePropagation();
-                advName.focus();
-                showStatus('Kaydetmek için profil adı girin.', true);
-            }
-        });
-
-        function showStatus(text, isError) {
-            status.textContent = text;
-            status.className = 'small ' + (isError ? 'text-danger' : 'text-success');
-        }
-
-        function formatCities(city) {
-            var list = (city || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
-            if (list.length === 0) return 'Türkiye geneli';
-            if (list.length <= 3) return list.join(', ');
-            return list.slice(0, 3).join(', ') + ' +' + (list.length - 3);
-        }
-
-        function upsertProfileItem(p) {
-            var list = document.getElementById('profileList');
-            var empty = document.getElementById('profileEmpty');
-            if (empty) empty.remove();
-
-            var item = list.querySelector('.profile-item[data-id="' + p.id + '"]');
-            var isNew = !item;
-            if (isNew) {
-                item = document.createElement('button');
-                item.type = 'button';
-                item.className = 'profile-item';
-                item.setAttribute('data-id', p.id);
-                ['profile-item-name', 'profile-item-meta', 'profile-item-date'].forEach(function (cls) {
-                    var s = document.createElement('span');
-                    s.className = cls;
-                    item.appendChild(s);
-                });
-                bindProfileItem(item);
-            }
-            item.setAttribute('data-name', p.name);
-            item.setAttribute('data-industry', p.industry || '');
-            item.setAttribute('data-nace', p.naceCode || '');
-            item.setAttribute('data-nace-products', p.naceProducts || '');
-            item.setAttribute('data-city', p.city || '');
-            item.setAttribute('data-region', p.regionKey || 'TR');
-            item.setAttribute('data-public', p.isPublic ? 'true' : 'false');
-            item.setAttribute('data-mine', p.canEdit ? 'true' : 'false');
-            item.querySelector('.profile-item-name').textContent = p.name;
-            var reg = document.createElement('span');
-            reg.className = 'profile-region';
-            reg.textContent = p.regionName || '';
-            item.querySelector('.profile-item-name').appendChild(reg);
-            advProfileId.value = p.id;
-            item.querySelector('.profile-item-meta').textContent = (p.industry || '') + (p.naceCode ? ' · NACE ' + p.naceCode : '') + ' · ' + formatCities(p.city);
-            var date = item.querySelector('.profile-item-date');
-            date.textContent = 'Kaydedildi: ' + p.createdAt + ' ';
-            var share = document.createElement('span');
-            share.className = 'profile-share' + (p.isPublic ? ' is-public' : '');
-            share.textContent = p.isPublic ? 'Herkese açık' : 'Size özel';
-            date.appendChild(share);
-            list.prepend(item);
-
-            document.querySelectorAll('.profile-item').forEach(function (i) { i.classList.remove('is-active'); });
-            item.classList.add('is-active');
-            document.getElementById('profileCount').textContent = list.querySelectorAll('.profile-item').length;
-            return isNew;
-        }
-
-        // "Arama Profilini Kaydet": arama yapmadan sadece profili kaydeder.
-        document.getElementById('saveProfileOnly').addEventListener('click', function () {
-            syncCities();
-            if (!advIndustry.value.trim()) { advIndustry.focus(); showStatus('Sektör girin.', true); return; }
-            if (!advName.value.trim()) { advName.focus(); showStatus('Profil adı girin.', true); return; }
-
-            var button = this;
-            button.disabled = true;
-            fetch(button.getAttribute('data-url'), {
-                method: 'POST',
-                body: new FormData(advForm),
-                headers: { Accept: 'application/json' }
-            })
-                .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
-                .then(function (res) {
-                    if (!res.ok) { showStatus(res.data.error || 'Profil kaydedilemedi.', true); return; }
-                    var isNew = upsertProfileItem(res.data);
-                    showStatus('"' + res.data.name + '" ' + (isNew ? 'kaydedildi' : 'güncellendi') + ' (' + res.data.createdAt + ').', false);
-                })
-                .catch(function () { showStatus('Sunucuya ulaşılamadı.', true); })
-                .finally(function () { button.disabled = false; });
-        });
-
-        basicForm.addEventListener('submit', function () {
+        form.addEventListener('submit', function (e) {
+            if (!select.value) { e.preventDefault(); select.focus(); return; }
             if (window.EgebisProgress) return; // overlay bekleme durumunu yonetir
-            basicButton.disabled = true;
-            basicButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Aranıyor...';
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Aranıyor...';
         });
-
-        if (modalEl.getAttribute('data-reopen') === 'true' && window.bootstrap) {
-            bootstrap.Modal.getOrCreateInstance(modalEl).show();
-        }
-
-        var selectAll = document.getElementById('selectAllCompanies');
-        if (selectAll) {
-            selectAll.addEventListener('change', function () {
-                document.querySelectorAll('.company-select').forEach(function (c) {
-                    c.checked = selectAll.checked;
-                });
-            });
-        }
     })();
 </script>
 }

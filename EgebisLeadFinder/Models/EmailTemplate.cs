@@ -48,7 +48,7 @@ public class EmailTemplate
     /// <summary>Genel tanitim sablonunun anahtari (eslesme bulunmazsa bu kullanilir).</summary>
     public const string GeneralKey = "GENEL";
 
-    /// <summary>"Biz ne arıyoruz?" segmentine eslenen sablonun anahtari: "SEG:{segmentId}".</summary>
+    /// <summary>"Şirketimiz" segmentine eslenen sablonun anahtari: "SEG:{segmentId}".</summary>
     public const string SegmentKeyPrefix = "SEG:";
 
     public static string SegmentKey(string segmentId) => SegmentKeyPrefix + segmentId;

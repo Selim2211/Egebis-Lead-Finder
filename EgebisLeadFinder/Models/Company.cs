@@ -42,7 +42,7 @@ public class Company
     /// <summary>Sirket profiline uygunluk (0-100, yapay zeka). Profil tanimli degilken bos.</summary>
     public int? FitScore { get; set; }
 
-    /// <summary>Firmanin uydugu "Biz ne arıyoruz?" segmenti.</summary>
+    /// <summary>Firmanin uydugu "Şirketimiz" segmenti.</summary>
     [MaxLength(100)]
     public string? FitSegment { get; set; }
 

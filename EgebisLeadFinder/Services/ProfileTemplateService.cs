@@ -11,7 +11,7 @@ public record ProvisionResult(int Created, int Deactivated, string? Error)
 }
 
 /// <summary>
-/// "Biz ne arıyoruz?" profilinden e-posta taslaklarini otomatik hazirlar: genel tanitim, her hedef
+/// "Şirketimiz" profilinden e-posta taslaklarini otomatik hazirlar: genel tanitim, her hedef
 /// segment ve takip maili. Profil kaydedilince yalnizca EKSIK olanlar uretilir (yeni segment eklenince
 /// onun taslagi gelir); kullanicinin duzenledigi taslaklara dokunulmaz. Uretilen taslaklarin kimlikleri
 /// ayarlarda tutulur, boylece "hangisi otomatik uretildi" bilinir.

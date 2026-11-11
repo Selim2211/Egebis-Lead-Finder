@@ -24,7 +24,7 @@ public static class ExportService
         var firms = new ExportTable("Firmalar",
             new[]
             {
-                "Firma", "Web sitesi", "Adres", "Şehir", "Ülke", "Sektör", "NACE", "Puan", "Uygunluk (%)", "Segment", "Neden", "Sinyal", "Aşama",
+                "Firma", "Web sitesi", "Adres", "Şehir", "Ülke", "Sektör", "NACE", "Puan", "Uygunluk (%)", "Neden", "Sinyal", "Aşama",
                 "Kişi sayısı", "Lead sayısı", "AI özeti", "Satış önerisi", "Eklenme"
             },
             list.Select(c =>
@@ -34,7 +34,7 @@ public static class ExportService
                 return new object?[]
                 {
                     c.Name, c.Website, c.Address, c.City, c.Country, analysis?.Industry ?? c.Industry, c.NaceCode, c.Score,
-                    c.FitScore, c.FitSegment, c.FitReason,
+                    c.FitScore, c.FitReason,
                     RatingSignalDisplay.HasSignal(c.RatingSignal) ? RatingSignalDisplay.Label(c.RatingSignal) : null,
                     SalesforceRecordMapper.StageLabel(c), c.Contacts.Count, c.Leads.Count,
                     rating?.Summary ?? analysis?.Reason, rating?.SalesApproach, c.CreatedAt.ToLocalTime()
@@ -51,6 +51,19 @@ public static class ExportService
 
         return new List<ExportTable> { firms, people };
     }
+
+    public static ExportTable SearchProfileTable(IEnumerable<SearchProfile> profiles, int? me) => new("Arama Profilleri",
+        new[] { "Profil", "Sektör", "NACE", "Ürünler", "Ülke / bölge", "İl / bölge", "En fazla firma", "Paylaşım", "Oluşturma" },
+        profiles.Select(p =>
+        {
+            var dto = SearchProfileDto.From(p, me, false);
+            return new object?[]
+            {
+                p.Name, p.Industry, p.NaceCode, p.NaceProducts, dto.RegionName, p.City, p.MaxCompanies,
+                dto.OwnerName is not null ? $"Paylaşan: {dto.OwnerName}" : p.IsPublic ? "Herkese açık" : "Size özel",
+                p.CreatedAt.ToLocalTime()
+            };
+        }).ToList());
 
     public static ExportTable LeadTable(IEnumerable<Lead> leads, DateTime now)
     {

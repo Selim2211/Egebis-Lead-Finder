@@ -54,9 +54,7 @@ public class DashboardViewModel
 /// <summary>Firma Arama ekrani. Arama sonrasi sonuc ozeti de burada tasinir.</summary>
 public class CompanySearchViewModel
 {
-    public const string ModeBasic = "basic";
-    public const string ModeAdvanced = "advanced";
-    public const string ModeAdvancedSave = "advanced-save";
+    public const string ModeProfile = "profile";
     public const string ModeCompany = "company";
 
     /// <summary>Firma adiyla aramada islenecek en fazla aday site (ayni adli bayi/distributor vb.).</summary>
@@ -69,16 +67,23 @@ public class CompanySearchViewModel
     public HashSet<int> FavoriteIds { get; set; } = new();
     public string? Error { get; set; }
 
-    /// <summary>Hangi butonla gonderildi: temel arama, gelismis arama, gelismis + profil kaydet.</summary>
+    /// <summary>Hangi formla gonderildi: profil aramasi veya firma adiyla arama.</summary>
     public string? SubmitMode { get; set; }
 
-    /// <summary>Gelismis arama ekranindaki kayitli profiller (en yeni en ustte).</summary>
+    /// <summary>Secilebilir arama profilleri (kendi profilleri once).</summary>
     public List<SearchProfile> Profiles { get; set; } = new();
+
+    /// <summary>Kullanicinin varsayilan arama profili (firma adiyla arama bunu kullanir); yoksa null.</summary>
+    public SearchProfile? DefaultProfile { get; set; }
+
+    /// <summary>Aramanin calistigi profil. Formdan gelmez.</summary>
+    [Microsoft.AspNetCore.Mvc.ModelBinding.BindNever]
+    public SearchProfile? SelectedProfile { get; set; }
 
     /// <summary>Ayarlar'dan gelen azami firma sayisi (bilgi amacli gosterilir).</summary>
     public int MaxCompanies { get; set; } = SettingKeys.DefaultSearchMaxCompanies;
 
-    /// <summary>Bu arama icin ekrandan secilen azami firma sayisi (bossa Ayarlar'daki deger).</summary>
+    /// <summary>Arama Profili penceresindeki "en fazla firma" (bossa Ayarlar'daki deger).</summary>
     public int? MaxCompaniesOverride { get; set; }
 
     public string DefaultCountry { get; set; } = SettingKeys.DefaultSearchCountry;
@@ -89,6 +94,22 @@ public class CompanySearchViewModel
 
 /// <summary>Tum firmalar silinirse gidecek kayit sayilari (onay penceresinde gosterilir).</summary>
 public record PoolCounts(int Companies, int Contacts, int Leads, int Emails);
+
+/// <summary>Kullanilan Krediler ekrani.</summary>
+public class CreditsViewModel
+{
+    public required EgebisLeadFinder.Services.CreditsReport Report { get; init; }
+    public List<SearchRun> Runs { get; init; } = new();
+}
+
+/// <summary>Arama Profilleri ekrani.</summary>
+public class SearchProfilesViewModel
+{
+    public List<SearchProfile> Profiles { get; set; } = new();
+    public int? DefaultProfileId { get; set; }
+    public int DefaultMaxCompanies { get; set; }
+    public SearchRegion Region { get; set; } = SearchRegions.Default;
+}
 
 /// <summary>Firma listesi ve filtreleri.</summary>
 public class CompanyListViewModel
@@ -113,10 +134,6 @@ public class CompanyListViewModel
 
     public bool NotEvaluated { get; set; }
     public int NotEvaluatedCount { get; set; }
-
-    /// <summary>Secili "Biz ne arıyoruz?" segmenti (Company.FitSegment) ve segment basina firma sayisi.</summary>
-    public string? Segment { get; set; }
-    public Dictionary<string, int> SegmentCounts { get; set; } = new();
 
     public List<Company> Companies { get; set; } = new();
     public string? Search { get; set; }
@@ -405,7 +422,7 @@ public record MailEditorModel(
 /// <summary>Taslak Duzenleyici: soldaki liste + sagdaki editor.</summary>
 public class TemplateEditorViewModel
 {
-    /// <summary>"Biz ne arıyoruz?" profili: yapay zeka eslemesi secenekleri ve profilden taslak uretme icin.</summary>
+    /// <summary>"Şirketimiz" profili: yapay zeka eslemesi secenekleri ve profilden taslak uretme icin.</summary>
     public BusinessProfile Profile { get; set; } = new();
 
     public List<EmailTemplate> Templates { get; set; } = new();

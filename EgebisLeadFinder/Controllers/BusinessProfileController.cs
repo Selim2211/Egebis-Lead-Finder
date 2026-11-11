@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace EgebisLeadFinder.Controllers;
 
 /// <summary>
-/// "Biz ne arıyoruz?" — sirket profili ve hedef segmentler. Herkes gorur, yalniz yonetici degistirir.
+/// "Sirketimiz" — sirket profili. Herkes gorur, yalniz yonetici degistirir.
 /// </summary>
 public class BusinessProfileController : Controller
 {
@@ -45,13 +45,8 @@ public class BusinessProfileController : Controller
 
         await _profiles.SaveAsync(profile, IcpController.SplitList(form.TargetTitles), User.Identity?.Name, ct);
 
-        var message = $"Şirket profili kaydedildi ({profile.Segments.Count} segment). Firma araması, yapay zekâ analizi, araştırma ve mail önerileri artık bu tanıma göre çalışır. " +
+        var message = "Şirket profili kaydedildi. Firma araması, yapay zekâ analizi, araştırma ve mail önerileri artık bu tanıma göre çalışır. " +
                       "Daha önce bulunan firmaları güncellemek için firma detayında “Yeniden Analiz Et” ve “Araştır”ı kullanın; mail taslaklarını Taslak Düzenleyici'den profilinize göre oluşturabilirsiniz.";
-        if (form.ApplyToIcp)
-        {
-            var added = await _profiles.ApplySegmentsToIcpAsync(profile, ct);
-            message += added > 0 ? $" ICP'ye {added} yeni kriter eklendi." : " ICP zaten güncel.";
-        }
 
         // Puanlama anahtar kelimeleri bos birakildiysa yapay zeka tanimdan uretir (elle girilenlere dokunulmaz).
         var generated = await _signals.EnsureAsync(User.Identity?.Name, ct);
@@ -69,7 +64,7 @@ public class BusinessProfileController : Controller
             message += $" E-posta taslakları şimdi hazırlanamadı ({provision.Error}); Taslak Düzenleyici'den “Profilime göre oluştur”a basarak yeniden deneyebilirsiniz.";
 
         AuditActionFilter.SetAuditSummary(HttpContext,
-            $"Şirket profili kaydedildi: {profile.DisplayName}, {profile.Segments.Count} segment" + (form.ApplyToIcp ? ", ICP'ye aktarıldı" : ""));
+            $"Şirket profili kaydedildi: {profile.DisplayName}");
         TempData["ProfileSaved"] = message;
         return RedirectToAction(nameof(Index));
     }
@@ -125,19 +120,7 @@ public class BusinessProfileController : Controller
                 exampleCustomers = string.Join(", ", p.ExampleCustomers),
                 customerKind = p.CustomerKind,
                 buyingSignals = string.Join(", ", p.BuyingSignals),
-                scoringSignals = ScoringSignal.FormatLines(p.ScoringSignals),
-                segments = p.Segments.Select(s => new
-                {
-                    s.Id,
-                    s.Name,
-                    s.Description,
-                    s.SearchTerm,
-                    region = s.RegionKey,
-                    keywords = string.Join(", ", s.Keywords),
-                    nace = string.Join(", ", s.NaceCodes),
-                    exclude = string.Join(", ", s.ExcludeKeywords),
-                    titles = string.Join(", ", s.TargetTitles)
-                })
+                scoringSignals = ScoringSignal.FormatLines(p.ScoringSignals)
             },
             titles = string.Join(", ", draft.TargetTitles)
         });

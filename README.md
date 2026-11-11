@@ -50,8 +50,8 @@ Canlıya çıkarken `cp .env.example .env` yapıp `POSTGRES_PASSWORD`'u değişt
 - Tablolar uygulama açılırken otomatik kurulur/güncellenir (elle migration gerekmez).
 - API anahtarları (Serper, Gemini, Apollo), SMTP, IMAP ve Salesforce bilgileri uygulamadaki
   **Ayarlar** ekranından girilir ve veritabanında saklanır.
-- Kurulumdan sonra üst menüdeki **Biz ne arıyoruz?** ekranında şirketin ne sattığı, ideal müşterisi ve
-  hedef segmentleri tanımlanır (site adresi yazılınca yapay zekâ taslak doldurur). Yapay zekâ analizi, akıllı arama,
+- Kurulumdan sonra üst menüdeki **Şirketimiz** ekranında şirketin ne sattığı ve ideal müşterisi
+  tanımlanır (site adresi yazılınca yapay zekâ taslak doldurur). Yapay zekâ analizi, akıllı arama,
   uygunluk puanı ve mail yazımı bu tanıma göre çalışır; boş bırakılırsa eski Egebis (SAP/MES) tanımı geçerlidir.
 - Yeni özellikler (Faz-II): kişiye özel arama şablonları ve favoriler, firma karşılaştırma, NACE sektör analizi, siteden ICP önerisi,
   audit Excel, alan şifreleme ve ekran görüntülü kullanıcı kılavuzu (üst menüde **?**). Ek kurulum gerekmez; tablolar

@@ -9,7 +9,7 @@ public class SearchCriteria
 
     /// <summary>
     /// Sorgu kaliplari: true = uretici/fabrika ("üreticileri", "fabrikası"), false = her tur firma
-    /// ("firmaları", "şirketleri"). Formdan gelmez; arama oncesi "Biz ne arıyoruz?" profilinden doldurulur.
+    /// ("firmaları", "şirketleri"). Formdan gelmez; arama oncesi "Şirketimiz" profilinden doldurulur.
     /// </summary>
     [Microsoft.AspNetCore.Mvc.ModelBinding.BindNever]
     public bool ManufacturerQueries { get; set; } = true;
@@ -29,15 +29,14 @@ public class SearchCriteria
     public int MaxCompanies { get; set; } = 20;
 
     /// <summary>
-    /// "Gelismis Ayarlar" altinda girilen arama profili adi. Doluysa bu isimde bir
-    /// SearchProfile bulunur/olusturulur; arama sonucundaki firmalar kullanici
-    /// "Kaydet" dedikten sonra bu profilin listesine eklenir (bkz. CompanyController).
+    /// Arama Profili penceresinde girilen profil adi. Bu isimde bir SearchProfile
+    /// bulunur/olusturulur (bkz. CompanyController.SaveProfile).
     /// </summary>
     public string? ProfileName { get; set; }
 
     /// <summary>
-    /// Duzenlenen kayitli profilin Id'si. Doluysa profil adi da dahil tum alanlar bu
-    /// kaydin uzerine yazilir (ad degisikligi yeni profil olusturmaz).
+    /// Aramada: secilen profilin Id'si (zorunlu). Profil penceresinde: duzenlenen kaydin Id'si;
+    /// doluysa profil adi da dahil tum alanlar bu kaydin uzerine yazilir.
     /// </summary>
     public int? ProfileId { get; set; }
 
@@ -86,13 +85,11 @@ public class SearchCriteria
         ? Industry
         : $"{Industry} (şu ürünlerden en az birini üreten firmalar: {string.Join(", ", ProductList)})";
 
-    /// <summary>Firma Ara'da tiklanan "Biz ne arıyoruz?" segmenti (BusinessProfile.Segments[].Id).</summary>
-    public string? SegmentId { get; set; }
-
     /// <summary>
-    /// Akilli arama: yapay zeka sektore/segmente gore ek arama terimleri onerir ve
-    /// siteler okunmadan once hedef disi adaylari eler (bkz. SearchPlanService).
+    /// Akilli arama: yapay zeka sektore gore ek arama terimleri onerir ve siteler okunmadan once
+    /// hedef disi adaylari eler (bkz. SearchPlanService). Her aramada acik; formdan gelmez.
     /// </summary>
+    [BindNever]
     public bool SmartSearch { get; set; } = true;
 
     /// <summary>

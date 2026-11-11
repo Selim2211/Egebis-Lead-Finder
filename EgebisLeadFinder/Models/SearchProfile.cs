@@ -3,9 +3,9 @@ using System.ComponentModel.DataAnnotations;
 namespace EgebisLeadFinder.Models;
 
 /// <summary>
-/// Kullanicinin isimlendirip kaydettigi bir arama tanimi (sektor + iller + ulke).
-/// Firma Ara'da "Gelismis Ayarlar" altinda profil adi girilince olusturulur/yeniden
-/// kullanilir; Firmalar ekraninda bu profile eklenmis firmalari filtrelemek icin kullanilir.
+/// Kullanicinin isimlendirip kaydettigi arama tanimi (sektor, NACE, ulke, iller, firma sayisi).
+/// Firma araması yalnizca bir profil secilerek baslatilir; profiller "Arama Profilleri" ekranindan
+/// yonetilir. Firmalar ekraninda bu profile eklenmis firmalari filtrelemek icin de kullanilir.
 /// Sablon varsayilan olarak sahibine ozeldir; sahibi isterse herkese acar (IsPublic).
 /// Herkese acik sablonu baskasi kullanabilir ama sonuclar (firma baglari) yine kisiye ozeldir.
 /// </summary>
@@ -32,6 +32,9 @@ public class SearchProfile
     /// <summary>Arama bolgesi anahtari (bkz. SearchRegions); eski kayitlarda bos olabilir.</summary>
     [MaxLength(8)]
     public string? RegionKey { get; set; }
+
+    /// <summary>Bu profille en fazla kac firma getirilecegi; bossa Ayarlar'daki varsayilan.</summary>
+    public int? MaxCompanies { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

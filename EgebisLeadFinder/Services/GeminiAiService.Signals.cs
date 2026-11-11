@@ -4,7 +4,7 @@ using EgebisLeadFinder.Models;
 
 namespace EgebisLeadFinder.Services;
 
-/// <summary>"Biz ne arıyoruz?" tanımından puanlama anahtar kelimeleri (puan veren ölçütler) üretir.</summary>
+/// <summary>"Şirketimiz" tanımından puanlama anahtar kelimeleri (puan veren ölçütler) üretir.</summary>
 public interface IScoringSignalAi
 {
     Task<ScoringSignalResult> SuggestSignalsAsync(BusinessProfile profile, CancellationToken ct = default);

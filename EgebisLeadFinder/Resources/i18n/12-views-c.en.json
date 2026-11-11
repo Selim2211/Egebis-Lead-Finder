@@ -251,7 +251,7 @@
   "Yazdığınız kelimeye uyan NACE kodlarını hem resmi listeden hem yapay zekâdan getiririz.": "We fetch the NACE codes matching your keyword from both the official list and the AI.",
   "2. Analiz edilecek sektörleri seçin": "2. Select the sectors to analyse",
   "seçili": "selected",
-  "Yapay zekâ, seçilen sektörleri “Biz ne arıyoruz?” şirket profilimize göre puanlar ve raporlar.": "The AI scores and reports the selected sectors against our “What are we looking for?” company profile.",
+  "Yapay zekâ, seçilen sektörleri “Şirketimiz” şirket profilimize göre puanlar ve raporlar.": "The AI scores and reports the selected sectors against our “Our Company” company profile.",
   "Kayıtlı raporlar": "Saved reports",
   "Henüz rapor yok. Analiz ettiğiniz sektörler burada saklanır.": "No reports yet. The sectors you analyse are stored here.",
   "ör. plastik ambalaj, otomotiv yan sanayi, süt ürünleri, 22.22": "e.g. plastic packaging, automotive suppliers, dairy products, 22.22",
