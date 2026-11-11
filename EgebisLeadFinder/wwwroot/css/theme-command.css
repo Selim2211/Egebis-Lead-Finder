@@ -264,7 +264,7 @@ main.container > *:nth-child(n+6) { animation-delay: 300ms; }
     background: conic-gradient(from 0deg, transparent 0deg, rgba(245, 158, 11, .0) 250deg, rgba(245, 158, 11, .28) 360deg);
     animation: eg-sweep 3.2s linear infinite;
 }
-.eg-progress__ring svg, .eg-progress__pct { position: relative; z-index: 1; }
+.eg-progress__ring svg, .eg-progress__pct { z-index: 1; }
 .eg-progress__ring svg { position: absolute; inset: 0; }
 @keyframes eg-sweep { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .eg-progress .eg-progress__ring::before { animation: none; } }
