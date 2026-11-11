@@ -42,14 +42,14 @@
 
 /* ---------- Gece Studyosu (koyu) ---------- */
 :root[data-theme="dark"] {
-    --eg-bg: #0e1424;
-    --eg-surface: #171f33;
-    --eg-surface-alt: #1e2840;
-    --eg-border: #2b3652;
-    --eg-border-strong: #3d4a6b;
-    --eg-text: #f1f4fb;
-    --eg-text-muted: #b6c0d6;
-    --eg-text-faint: #8f9ab2;
+    --eg-bg: #0d1428;
+    --eg-surface: #1b2745;
+    --eg-surface-alt: #243357;
+    --eg-border: #34456e;
+    --eg-border-strong: #4a5d8c;
+    --eg-text: #f4f7fd;
+    --eg-text-muted: #c1cbe0;
+    --eg-text-faint: #9aa7c2;
     --accent: #d8b877;            /* sampanya altini: koyu zeminde 9:1 */
     --accent-ink: #1a1305;
     --accent-hover: #e6cb93;
@@ -61,11 +61,11 @@
     --eg-shadow: 0 1px 0 rgba(255, 255, 255, .03);
     --good: #5fd3a1; --warn: #e0b95f; --bad: #f08a80;
 
-    --side-bg: #0b1120;
-    --side-bg-2: #0b1120;
+    --side-bg: #0a1022;
+    --side-bg-2: #0a1022;
     --side-ink: #c4cde0;
     --side-ink-dim: #8f9ab2;
-    --side-line: #2b3652;
+    --side-line: #34456e;
 }
 
 /* ---------- Sabit zemin: hareketsiz, yalnizca atmosfer ---------- */
@@ -77,7 +77,6 @@ body.eg-app::before {
         radial-gradient(1000px 560px at 74% -10%, #ffffff 0%, rgba(255, 255, 255, .6) 38%, rgba(255, 255, 255, 0) 72%),
         linear-gradient(to right, rgba(14, 20, 32, .07) 1px, transparent 1px) 0 0 / 72px 72px,
         linear-gradient(to bottom, rgba(14, 20, 32, .07) 1px, transparent 1px) 0 0 / 72px 72px;
-    -webkit-mask-image: linear-gradient(#000, #000); mask-image: linear-gradient(#000, #000);
 }
 body.eg-app::after {
     background: radial-gradient(ellipse 70% 60% at 50% 38%, var(--eg-bg) 30%, transparent 100%);
@@ -91,7 +90,7 @@ body.eg-app::after {
 }
 :root[data-theme="dark"] body.eg-app::after {
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-    opacity: .055; mask-image: none; -webkit-mask-image: none;
+    opacity: .055;
 }
 
 /* ---------- Tipografi ---------- */
@@ -363,3 +362,22 @@ a:not(.btn):not(.action-btn):not(.eg-side-link):not(.tb-btn):hover { color: var(
 .offcanvas-backdrop, .offcanvas-backdrop.show, .modal-backdrop { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; background-color: #070c18; }
 .offcanvas-backdrop.show { opacity: .55; }
 main.container > .offcanvas, main.container > .modal { animation: none !important; }
+
+
+/* Koyu tema: kartlar zeminden net ayrilsin (acik ic cizgi + derinlik) */
+:root[data-theme="dark"] .card, :root[data-theme="dark"] .stat-card, :root[data-theme="dark"] .company-card,
+:root[data-theme="dark"] .lead-card, :root[data-theme="dark"] .fav-card, :root[data-theme="dark"] .profile-pick {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .09), 0 10px 28px -14px rgba(0, 0, 0, .75);
+    border-color: var(--eg-border-strong);
+}
+:root[data-theme="dark"] .card-header { background: color-mix(in srgb, var(--blue) 14%, var(--eg-surface-alt)); }
+:root[data-theme="dark"] .tag, :root[data-theme="dark"] .meta-chip { background: rgba(255, 255, 255, .07) !important; border-color: var(--eg-border-strong) !important; color: var(--eg-text) !important; }
+:root[data-theme="dark"] .company-card, :root[data-theme="dark"] .lead-card { background: color-mix(in srgb, var(--tier) 9%, var(--eg-surface)); }
+:root[data-theme="dark"] .form-control, :root[data-theme="dark"] .form-select, :root[data-theme="dark"] .name-search-input,
+:root[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]), :root[data-theme="dark"] select, :root[data-theme="dark"] textarea {
+    background-color: #131d38; border-color: var(--eg-border-strong);
+}
+:root[data-theme="dark"] .table thead th { color: var(--eg-text-muted); }
+
+/* Arama kutularinin ici sarmalayicisiyla ayni renk (ic dikdortgen gorunmesin) */
+.list-search input, .list-search .form-control, .name-search-input, .name-search input, .fd-search input { background: transparent !important; border-color: transparent !important; box-shadow: none !important; }
