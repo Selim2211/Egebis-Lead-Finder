@@ -51,6 +51,11 @@ public class IcpProfile
     {
         if (string.IsNullOrWhiteSpace(code)) return false;
         var normalized = code.Trim();
-        return NaceCodes.Any(n => normalized.StartsWith(n.Trim(), StringComparison.Ordinal));
+        // Iki yonlu onek: ICP "27" firma "27.51.08" eslesir; ICP "27.51.08" firma "27.51" (daha genel) de eslesir.
+        return NaceCodes.Any(n =>
+        {
+            var t = n.Trim();
+            return t.Length > 0 && (normalized.StartsWith(t, StringComparison.Ordinal) || t.StartsWith(normalized, StringComparison.Ordinal));
+        });
     }
 }

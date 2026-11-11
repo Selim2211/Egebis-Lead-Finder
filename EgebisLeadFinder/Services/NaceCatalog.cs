@@ -56,6 +56,50 @@ public static class NaceCatalog
         return d.Length is >= 3 and <= 6 && Activities.Keys.Any(k => k.StartsWith(d, StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// Yapay zekanin verdigi firma/sektor kodunu en ayrintili gecerli bicime getirir: resmi 6 haneli kod oldugu gibi;
+    /// resmi listede olmayan (uydurma) 6 haneli kod 4 haneli sinifa (varsa) iner; diger kodlar resmi listede varsa kalir.
+    /// Hicbiri gecerli degilse null.
+    /// </summary>
+    public static string? ResolveCode(string? raw)
+    {
+        var n = Normalize(raw);
+        if (n is null) return null;
+        var digits = new string(n.Where(char.IsDigit).ToArray());
+        if (digits.Length == 6)
+        {
+            if (Activities.ContainsKey(digits)) return n;
+            n = $"{digits[..2]}.{digits[2..4]}";
+        }
+        return Exists(n) ? n : null;
+    }
+
+    /// <summary>Kodun okunur adi: 6 haneli resmi faaliyet adi, yoksa bolum adi.</summary>
+    public static string? NameOf(string? code) => Activity(code) ?? Division(code)?.Name;
+
+    /// <summary>Anahtar kelimeye ya da koda uyan resmi 6 haneli faaliyetler (en cok kelimesi tutan once).</summary>
+    public static List<KeyValuePair<string, string>> SearchActivities(string? query, int take = 15)
+    {
+        var q = (query ?? string.Empty).Trim();
+        if (q.Length < 2) return new();
+        if (q.All(ch => char.IsDigit(ch) || ch == '.' || ch == ' '))
+            return ActivitiesUnder(q).Take(take).ToList();
+
+        var words = TurkishText.Normalize(q)
+            .Split(new[] { ' ', ',', '-', '/' }, StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => w.Length >= 3).Select(w => w.Length > 5 ? w[..5] : w).Distinct().ToList();
+        if (words.Count == 0) return new();
+        return Activities
+            .Select(a =>
+            {
+                var name = " " + TurkishText.Normalize(a.Value);
+                return (Item: a, Hits: words.Count(w => name.Contains(" " + w, StringComparison.Ordinal)));
+            })
+            .Where(x => x.Hits > 0)
+            .OrderByDescending(x => x.Hits).ThenBy(x => x.Item.Key, StringComparer.Ordinal)
+            .Take(take).Select(x => x.Item).ToList();
+    }
+
     /// <summary>"275108" -> "27.51.08".</summary>
     public static string FormatSixDigit(string digits) => $"{digits[..2]}.{digits[2..4]}.{digits[4..6]}";
 

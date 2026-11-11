@@ -3,6 +3,8 @@
     ViewData["Title"] = "İdeal Müşteri Profili";
     var naceCounts = (Dictionary<string, int>)ViewBag.NaceCounts;
     var selected = new HashSet<string>(Model.NaceCodes);
+    var divisionCodes = new HashSet<string>(NaceCatalog.Divisions.Select(d => d.Code));
+    var extraCodes = Model.NaceCodes.Where(c => !divisionCodes.Contains(c)).ToList();
     var sections = NaceCatalog.Divisions.GroupBy(d => (d.SectionCode, d.SectionName));
     var suggestion = ViewBag.Suggestion as EgebisLeadFinder.Services.IcpSuggestion;
 }
@@ -100,7 +102,8 @@
             </div>
             <script type="application/json" id="icpSuggestionData">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(new
             {
-                nace = suggestion.DivisionCodes,
+                nace = suggestion.FullCodes,
+                naceNames = suggestion.Nace.GroupBy(n => n.Code).ToDictionary(g => g.Key, g => g.First().Name),
                 industries = suggestion.IndustryKeywords,
                 cities = suggestion.Cities,
                 countries = suggestion.Countries,
@@ -136,6 +139,23 @@
                     <div class="small text-muted-2 mb-3">
                         Seçilen bölümlerdeki firmalar "hedef sektör" puanı alır. Firmanın NACE kodunu yapay zeka
                         site analizinde belirler; eski firmalarda boşsa firma sayfasındaki "Yeniden Analiz Et" ile dolar.
+                    </div>
+                    <div class="mb-3" id="icpSixBox">
+                        <label class="form-label fw-semibold mb-1" for="icpSixSearch">Alt faaliyet (6 haneli kod) ekle</label>
+                        <input type="search" class="form-control" id="icpSixSearch" autocomplete="off"
+                               placeholder="Kod (27.51.08) ya da kelime (buzdolabı) yazın" />
+                        <div class="list-group mt-1 d-none" id="icpSixResults"></div>
+                        <div class="d-flex flex-wrap gap-2 mt-2" id="icpSixChips">
+                            @foreach (var code in extraCodes)
+                            {
+                                <span class="tag tag-muted d-inline-flex align-items-center gap-1" data-six-chip="@code">
+                                    <input type="hidden" name="nace" value="@code" />
+                                    <strong>@code</strong> @NaceCatalog.NameOf(code)
+                                    <button type="button" class="btn-close btn-close-sm ms-1" aria-label="Kaldır" data-six-remove></button>
+                                </span>
+                            }
+                        </div>
+                        <div class="form-text">Bölüm yerine daha dar bir faaliyet seçerseniz yalnızca o faaliyetteki firmalar "hedef sektör" puanı alır.</div>
                     </div>
                     @foreach (var sec in sections)
                     {
@@ -233,6 +253,54 @@
         var form = document.getElementById('icpForm');
 
         function split(v) { return (v || '').split(/[,;\n]/).map(function (x) { return x.trim(); }).filter(Boolean); }
+        var sixInput = document.getElementById('icpSixSearch');
+        var sixResults = document.getElementById('icpSixResults');
+        var sixChips = document.getElementById('icpSixChips');
+        var sixTimer = null;
+
+        function addSixChip(code, name) {
+            if (sixChips.querySelector('[data-six-chip="' + code + '"]')) return;
+            var chip = document.createElement('span');
+            chip.className = 'tag tag-muted d-inline-flex align-items-center gap-1';
+            chip.setAttribute('data-six-chip', code);
+            var hidden = document.createElement('input');
+            hidden.type = 'hidden'; hidden.name = 'nace'; hidden.value = code;
+            var strong = document.createElement('strong'); strong.textContent = code;
+            var btn = document.createElement('button');
+            btn.type = 'button'; btn.className = 'btn-close btn-close-sm ms-1'; btn.setAttribute('aria-label', 'Kaldır'); btn.setAttribute('data-six-remove', '');
+            chip.appendChild(hidden); chip.appendChild(strong); chip.appendChild(document.createTextNode(' ' + name)); chip.appendChild(btn);
+            sixChips.appendChild(chip);
+        }
+
+        sixChips.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-six-remove]');
+            if (b) b.closest('[data-six-chip]').remove();
+        });
+
+        sixInput.addEventListener('input', function () {
+            clearTimeout(sixTimer);
+            var q = sixInput.value.trim();
+            if (q.length < 2) { sixResults.classList.add('d-none'); return; }
+            sixTimer = setTimeout(function () {
+                fetch('@Url.Action("NaceSearch")?q=' + encodeURIComponent(q))
+                    .then(function (r) { return r.json(); })
+                    .then(function (items) {
+                        sixResults.innerHTML = '';
+                        items.forEach(function (it) {
+                            var a = document.createElement('button');
+                            a.type = 'button'; a.className = 'list-group-item list-group-item-action py-1 small text-start';
+                            a.textContent = it.code + ' · ' + it.name;
+                            a.addEventListener('click', function () {
+                                addSixChip(it.code, it.name);
+                                sixResults.classList.add('d-none'); sixInput.value = '';
+                            });
+                            sixResults.appendChild(a);
+                        });
+                        sixResults.classList.toggle('d-none', items.length === 0);
+                    }).catch(function () { });
+            }, 250);
+        });
+
         function setList(name, values, merge) {
             var input = form.querySelector('[name="' + name + '"]');
             var list = merge ? split(input.value) : [];
@@ -246,10 +314,14 @@
         document.querySelectorAll('[data-icp-apply]').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var merge = btn.getAttribute('data-icp-apply') === 'merge';
-                form.querySelectorAll('input[name="nace"]').forEach(function (cb) {
+                form.querySelectorAll('input[type="checkbox"][name="nace"]').forEach(function (cb) {
                     var on = s.nace.indexOf(cb.value) !== -1;
                     if (on || !merge) cb.checked = on || (merge && cb.checked);
                     if (on) { var d = cb.closest('details'); if (d) d.open = true; cb.closest('label').classList.add('icp-filled'); }
+                });
+                if (!merge) document.querySelectorAll('[data-six-chip]').forEach(function (c) { c.remove(); });
+                s.nace.forEach(function (code) {
+                    if (code.length > 2) addSixChip(code, (s.naceNames || {})[code] || '');
                 });
                 setList('industries', s.industries, merge);
                 setList('cities', s.cities, merge);

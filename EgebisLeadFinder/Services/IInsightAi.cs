@@ -46,6 +46,9 @@ public class IcpSuggestion
     public bool Success => Error is null;
 
     /// <summary>ICP ekranindaki NACE secimleri bolum (2 hane) duzeyinde.</summary>
+    /// <summary>Onerilen kodlar oldugu gibi (6 haneli dahil); ICP'ye bu kodlar uygulanir.</summary>
+    public List<string> FullCodes => Nace.Select(n => n.Code).Distinct().ToList();
+
     public List<string> DivisionCodes => Nace.Select(n => NaceCatalog.DivisionCode(n.Code)).OfType<string>().Distinct().ToList();
 }
 

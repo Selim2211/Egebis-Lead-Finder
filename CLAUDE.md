@@ -14,7 +14,7 @@ ASP.NET Core 10 MVC + EF Core/PostgreSQL. Repo: Selim2211/Egebis-Lead-Finder (br
 ## Çalıştırma
 - "localde başlat" = preview config `egebis` (port 5087).
 - build/test/ef öncesi preview sunucusunu durdur (build çıktısını kilitler). Migration eklediysen `ef database update --no-build` öncesi yeniden derle.
-- Testler: `dotnet test` (692 test geçmeli).
+- Testler: `dotnet test` (707 test geçmeli).
 
 ## Mimari notlar
 - Arama Profili (SearchProfile) merkezli akış: arama için profil zorunlu; kullanıcı başına varsayılan profil (`AppUser.DefaultSearchProfileId`).

@@ -38,6 +38,11 @@ public class IcpController : Controller
         return View(await _icp.GetAsync(ct));
     }
 
+    /// <summary>ICP ekranindaki 6 haneli faaliyet aramasi: kod ya da kelimeye uyan resmi faaliyetler.</summary>
+    [HttpGet]
+    public IActionResult NaceSearch(string? q) =>
+        Json(NaceCatalog.SearchActivities(q, 15).Select(a => new { code = NaceCatalog.FormatSixDigit(a.Key), name = a.Value }));
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Index(
@@ -46,7 +51,8 @@ public class IcpController : Controller
     {
         await _icp.SaveAsync(new IcpProfile
         {
-            NaceCodes = nace ?? new List<string>(),
+            NaceCodes = (nace ?? new List<string>()).Select(NaceCatalog.NormalizeFull).OfType<string>()
+                .Where(NaceCatalog.Exists).Distinct().ToList(),
             IndustryKeywords = SplitList(industries),
             Cities = SplitList(cities),
             Countries = SplitList(countries),

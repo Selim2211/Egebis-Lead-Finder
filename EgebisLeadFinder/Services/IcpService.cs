@@ -88,8 +88,8 @@ public class IcpService
             var companies = await _db.Companies.Include(c => c.Contacts).Where(c => ids.Contains(c.Id)).ToListAsync(ct);
             foreach (var company in companies)
             {
-                var code = NaceCatalog.Normalize(codes[company.Id]);
-                if (code is null || !NaceCatalog.Exists(code)) continue;   // resmi listede olmayan (uydurma) kod atanmaz
+                var code = NaceCatalog.ResolveCode(codes[company.Id]);
+                if (code is null) continue;   // resmi listede olmayan (uydurma) kod atanmaz
                 company.NaceCode = code;
                 await ScoreAsync(company, CompanyController.ParseAnalysis(company.AiAnalysis), site: null, ct);
                 filled++;
@@ -338,8 +338,8 @@ public class IcpService
         {
             // Yapay zekanin serbest urettigi kod resmi listede yoksa (ör. 20.22, 28.32) kullanilmaz: kod bos kalir ve
             // sonradan resmi listeden secilir.
-            var proposed = NaceCatalog.Normalize(analysis.NaceCode);
-            if (NaceCatalog.Exists(proposed)) company.NaceCode = proposed;
+            var proposed = NaceCatalog.ResolveCode(analysis.NaceCode);
+            if (proposed is not null) company.NaceCode = proposed;
         }
 
         return breakdown;

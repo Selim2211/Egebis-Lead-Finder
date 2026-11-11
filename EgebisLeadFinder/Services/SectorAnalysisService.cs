@@ -91,6 +91,11 @@ public class SectorAnalysisService
         foreach (var d in LocalMatches(keyword))
             if (list.All(x => x.Code != d.Code))
                 list.Add((d.Code, d.Name, "Bölüm adında geçiyor", false));
+        foreach (var a in NaceCatalog.SearchActivities(keyword, 8))
+        {
+            var code = NaceCatalog.FormatSixDigit(a.Key);
+            if (list.All(x => x.Code != code)) list.Add((code, a.Value, "Resmî faaliyet adında geçiyor", false));
+        }
 
         var counts = await CountsAsync(list.Select(x => x.Code), ct);
         var matches = list.Select(x => new NaceMatch(x.Code, x.Name, x.Reason, x.FromAi, counts.GetValueOrDefault(x.Code))).ToList();
@@ -138,9 +143,9 @@ public class SectorAnalysisService
         foreach (var raw in values ?? Enumerable.Empty<string>())
         {
             var parts = raw.Split('|', 2);
-            var code = NaceCatalog.Normalize(parts[0]);
-            if (code is null || NaceCatalog.Division(code) is null || result.Any(x => x.Item1 == code)) continue;
-            var name = parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1]) ? parts[1].Trim() : NaceCatalog.Division(code)!.Name;
+            var code = NaceCatalog.ResolveCode(parts[0]);
+            if (code is null || result.Any(x => x.Item1 == code)) continue;
+            var name = parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1]) ? parts[1].Trim() : NaceCatalog.NameOf(code)!;
             result.Add((code, name.Length > 150 ? name[..150] : name));
         }
         return result;

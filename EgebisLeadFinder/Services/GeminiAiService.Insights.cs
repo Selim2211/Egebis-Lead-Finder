@@ -121,7 +121,7 @@ public partial class GeminiAiService : IInsightAi
             {
                 codes = ObjectArray(new
                 {
-                    code = new { type = "string", description = "NACE Rev.2 kodu: bölüm \"22\" veya sınıf \"22.22\"" },
+                    code = new { type = "string", description = "Türkiye NACE Rev.2 6 haneli kod, ör. 22.22.01" },
                     name = new { type = "string", description = "Kodun resmi Türkçe adı" },
                     reason = new { type = "string", description = "Anahtar kelimeyle ilişkisi, kısa" }
                 }, new[] { "code", "name" })
@@ -222,12 +222,12 @@ public partial class GeminiAiService : IInsightAi
             if (!doc.RootElement.TryGetProperty("codes", out var codes) || codes.ValueKind != JsonValueKind.Array) return result;
             foreach (var item in codes.EnumerateArray())
             {
-                var code = NaceCatalog.Normalize(item.TryGetProperty("code", out var c) ? c.GetString() : null);
-                if (code is null || NaceCatalog.Division(code) is null) continue; // uydurma kodlari at
+                var code = NaceCatalog.ResolveCode(item.TryGetProperty("code", out var c) ? c.GetString() : null);
+                if (code is null) continue; // uydurma kodlari at
                 if (result.Codes.Any(x => x.Code == code)) continue;
                 var name = item.TryGetProperty("name", out var n) ? n.GetString() : null;
                 var reason = item.TryGetProperty("reason", out var r) ? r.GetString() : null;
-                result.Codes.Add(new NaceSuggestion(code, string.IsNullOrWhiteSpace(name) ? NaceCatalog.Division(code)!.Name : name!.Trim(), reason));
+                result.Codes.Add(new NaceSuggestion(code, string.IsNullOrWhiteSpace(name) ? NaceCatalog.NameOf(code)! : name!.Trim(), reason));
             }
         }
         catch (JsonException)
@@ -243,8 +243,8 @@ public partial class GeminiAiService : IInsightAi
         sektöre karşılık gelen kodları bul.
 
         - En alakalı 3-8 kodu, en alakalı en başta olacak şekilde döndür.
-        - Hem bölüm (2 hane, "22") hem sınıf (4 hane, "22.22") kullanabilirsin; mümkünse
-          sınıf düzeyinde ol, genel bir kelimede bölümü de ekle.
+        - Kodları 6 haneli "22.22.01" biçiminde ver (TÜİK/GİB altılı liste); 6 haneliyi
+          bilmiyorsan 4 haneli sınıfı yaz. Bölüm (2 hane) yalnızca çok genel kelimelerde.
         - name: kodun resmi Türkçe adı (TÜİK NACE Rev.2).
         - reason: bu kodun anahtar kelimeyle ilişkisi, en fazla 12 kelime.
         - Var olmayan kod uydurma.
@@ -359,7 +359,7 @@ public partial class GeminiAiService : IInsightAi
                 idealCustomer = new { type = "string", description = "İdeal müşteri tanımı, 2-3 cümle" },
                 nace = ObjectArray(new
                 {
-                    code = new { type = "string", description = "Müşteri sektörünün NACE Rev.2 kodu (\"22\" veya \"22.22\")" },
+                    code = new { type = "string", description = "Müşteri sektörünün Türkiye NACE Rev.2 6 haneli kodu, ör. 22.22.01" },
                     name = new { type = "string" },
                     reason = new { type = "string" }
                 }, new[] { "code", "name", "reason" }),
@@ -426,11 +426,11 @@ public partial class GeminiAiService : IInsightAi
             {
                 foreach (var item in nace.EnumerateArray())
                 {
-                    var code = NaceCatalog.Normalize(item.TryGetProperty("code", out var c) ? c.GetString() : null);
-                    if (code is null || NaceCatalog.Division(code) is null || result.Nace.Any(x => x.Code == code)) continue;
+                    var code = NaceCatalog.ResolveCode(item.TryGetProperty("code", out var c) ? c.GetString() : null);
+                    if (code is null || result.Nace.Any(x => x.Code == code)) continue;
                     var name = item.TryGetProperty("name", out var nm) ? nm.GetString() : null;
                     var reason = item.TryGetProperty("reason", out var r) ? r.GetString() : null;
-                    result.Nace.Add(new NaceSuggestion(code, string.IsNullOrWhiteSpace(name) ? NaceCatalog.Division(code)!.Name : name!.Trim(), reason));
+                    result.Nace.Add(new NaceSuggestion(code, string.IsNullOrWhiteSpace(name) ? NaceCatalog.NameOf(code)! : name!.Trim(), reason));
                 }
             }
 
@@ -450,7 +450,7 @@ public partial class GeminiAiService : IInsightAi
 
         - companySummary: şirket ne satıyor, 1-2 cümle.
         - idealCustomer: bu ürünleri kim satın alır; sektör, ölçek, özellikler; 2-3 cümle.
-        - nace: müşterilerin faaliyet gösterdiği 3-8 NACE Rev.2 kodu, en önemlisi başta;
+        - nace: müşterilerin faaliyet gösterdiği 3-8 NACE Rev.2 6 haneli kodu ("22.22.01"), en önemlisi başta;
           her biri için kısa gerekçe. Şirketin kendi NACE kodunu değil, müşterilerinkini yaz.
         - industryKeywords: müşteri sektörlerini tanıyan 4-10 Türkçe kelime ("plastik", "kalıp").
         - countries / cities: site belirli bir pazarı işaret ediyorsa hedef ülke(ler) ve

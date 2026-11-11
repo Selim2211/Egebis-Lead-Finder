@@ -424,9 +424,10 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         companyName alanı: sitenin sahibi olan firmanın adı.
         Haber başlığı veya ilan başlığı değil, firmanın kendi ticari adı.
 
-        naceCode alanı: firmanın ana faaliyetine en uygun NACE Rev.2 sınıf kodu,
-        "22.19" biçiminde (bölüm.sınıf). Sınıftan emin değilsen yalnızca bölüm
-        kodunu yaz ("22"). Faaliyet belirsizse boş bırak.
+        naceCode alanı: firmanın ana faaliyetine en uygun Türkiye NACE Rev.2 6 haneli
+        faaliyet kodu, "27.51.08" biçiminde (bölüm.sınıf.alt faaliyet; TÜİK/GİB altılı
+        liste). 6 haneli kodu bilmiyorsan 4 haneli sınıf ("27.51"), o da belli değilse
+        bölüm ("27") yaz. Kod uydurma. Faaliyet belirsizse boş bırak.
 
         """;
 
@@ -477,7 +478,7 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
         {
             companyName = new { type = "string", description = "Sitenin sahibi firmanın ticari adı" },
             industry = new { type = "string", description = "Firmanın sektörü" },
-            naceCode = new { type = "string", description = "NACE Rev.2 kodu, ör. 22.19" },
+            naceCode = new { type = "string", description = "Türkiye NACE Rev.2 6 haneli kod, ör. 27.51.08" },
             manufacturer = new { type = "boolean", description = "Üretim yapıyor mu" },
             products = new
             {
@@ -907,8 +908,8 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
           name kısa ad; description bu segmentte neyi neden sattığımız; searchTerm firma
           aramasında kullanılacak kısa sektör terimi (Türkçe, ör. "Otomotiv yan sanayi");
           region verilen bölge anahtarlarından biri (şirket belirli bir pazarı hedefliyorsa),
-          değilse boş; keywords sektörü tanıyan 3-8 kelime; nace NACE Rev.2 kodları
-          ("29" veya "29.32"); exclude bu segmentte elenecek kelimeler; titles bu
+          değilse boş; keywords sektörü tanıyan 3-8 kelime; nace NACE Rev.2 6 haneli kodları
+          ("29.32.01"); exclude bu segmentte elenecek kelimeler; titles bu
           segmentteki firmalarda ulaşılacak 2-5 karar verici unvanı.
         - targetTitles: satış için ulaşılacak karar verici unvanları, 5-12 adet; Türkçe ve
           İngilizce karışık olabilir (ör. "Genel Müdür", "IT Müdürü", "CIO", "Plant Manager").
@@ -1242,8 +1243,8 @@ public partial class GeminiAiService : IAiService, ICompanyRatingAi, IEmailWrite
     private const string NaceSystemPrompt = """
         Her satırda köşeli parantez içinde firma numarası ve firma hakkında kısa bilgi
         (ad, sektör, ürünler, açıklama) var. Her firma için ana faaliyetine en uygun NACE
-        Rev.2 kodunu "22.19" biçiminde (bölüm.sınıf) ver. Sınıftan emin değilsen yalnızca
-        bölüm kodunu yaz ("22"). Bilgi faaliyeti anlamaya yetmiyorsa naceCode boş olsun.
+        Rev.2 kodunu 6 haneli "27.51.08" biçiminde (TÜİK/GİB altılı liste) ver. 6 haneliyi
+        bilmiyorsan 4 haneli sınıfı ("27.51"), o da belli değilse bölümü ("27") yaz. Kod uydurma. Bilgi faaliyeti anlamaya yetmiyorsa naceCode boş olsun.
         Her firma için verilen numarayı id alanına aynen yaz.
         """;
 
