@@ -261,3 +261,61 @@ h2, h3, .card-header, .eg-top-title, .stat-value { font-weight: 600; }
 
 /* Cip sayaci: cipin rengini izler (aktif cipte de okunur) */
 .stage-chip-count { background: color-mix(in srgb, currentColor 16%, transparent) !important; color: inherit !important; }
+
+/* =====================================================================
+   Duzeltme turu: normal yazi tipi + tiklanan yerler renkle secilsin
+   ===================================================================== */
+
+/* Yazi tipi: serif yok, her yerde Inter */
+:root { --font-display: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; --blue: #2563eb; --blue-ink: #1d4ed8; }
+:root[data-theme="dark"] { --blue: #6ea0ff; --blue-ink: #8db4ff; }
+h1, .page-head h1 { font-weight: 700; letter-spacing: -.02em; font-variation-settings: normal; }
+h2, h3, .card-header, .eg-top-title { font-weight: 650; letter-spacing: -.01em; }
+.stat-value { font-weight: 700; letter-spacing: -.02em; font-variation-settings: normal; font-size: 2rem; }
+.eg-side-brand-text, .eg-ring-n, .avatar, [class*="avatar-hue-"], .score { font-family: var(--font-display); font-weight: 650; }
+.eg-side-brand-text { font-size: 1rem; }
+body.eg-app { font-weight: 400; }
+.stat-label, .page-sub, .form-text, .stat-note { font-weight: 400; }
+.eg-side-link { font-weight: 500; }
+
+/* Kutular: hafif renk tonu; basliklar bantli */
+.card { background: color-mix(in srgb, var(--blue) 3%, var(--eg-surface)); }
+.card-header { background: color-mix(in srgb, var(--blue) 7%, var(--eg-surface-alt)); border-bottom: 1px solid var(--eg-border); }
+.stat-card { background: color-mix(in srgb, var(--blue) 6%, var(--eg-surface)); border-left: 3px solid var(--blue); }
+.stat-card.is-success { background: color-mix(in srgb, var(--good) 8%, var(--eg-surface)); border-left-color: var(--good); }
+.stat-card.is-amber { background: color-mix(in srgb, var(--accent) 11%, var(--eg-surface)); border-left-color: var(--accent); }
+.stat-card.is-info { background: color-mix(in srgb, var(--blue) 9%, var(--eg-surface)); border-left-color: var(--blue); }
+.stat-card.is-success .stat-value { color: var(--good); }
+
+/* Firma / lead kartlari: puan rengine gore sol serit + ton */
+.company-card, .lead-card, .fav-card { --tier: var(--eg-border-strong); border-left: 4px solid var(--tier); background: color-mix(in srgb, var(--tier) 6%, var(--eg-surface)); cursor: pointer; }
+.company-card:has(.ring-hot) { --tier: var(--good); }
+.company-card:has(.ring-warm) { --tier: var(--accent); }
+.company-card:has(.ring-cold) { --tier: var(--eg-text-faint); }
+.lead-card { --tier: var(--blue); }
+.company-card-actions, .lead-card-actions { background: color-mix(in srgb, var(--tier) 9%, var(--eg-surface-alt)); border-top: 1px solid var(--eg-border); }
+
+/* Tiklanabilir seyler: dolgulu, kenarli, hover'da vurgu */
+.action-btn { background: color-mix(in srgb, var(--blue) 8%, var(--eg-surface)) !important; border: 1px solid color-mix(in srgb, var(--blue) 35%, var(--eg-border-strong)) !important; color: var(--eg-text) !important; }
+.action-btn:hover { background: color-mix(in srgb, var(--blue) 20%, var(--eg-surface)) !important; border-color: var(--blue) !important; color: var(--eg-text) !important; }
+.action-btn.is-active { background: color-mix(in srgb, var(--accent) 22%, var(--eg-surface)) !important; border-color: var(--accent) !important; color: var(--eg-text) !important; }
+.stage-chip { background: color-mix(in srgb, var(--blue) 7%, var(--eg-surface)) !important; border: 1px solid color-mix(in srgb, var(--blue) 30%, var(--eg-border-strong)) !important; color: var(--eg-text) !important; cursor: pointer; }
+.stage-chip:hover { background: color-mix(in srgb, var(--blue) 18%, var(--eg-surface)) !important; border-color: var(--blue) !important; }
+.stage-chip.active, .stage-chip.is-active, .stage-chip[aria-current], .stage-chip.is-current { background: var(--blue) !important; border-color: var(--blue) !important; color: #fff !important; }
+.btn-outline-secondary, .btn-light, .btn-secondary, .list-filter-btn, .list-sort-btn {
+    background: color-mix(in srgb, var(--blue) 7%, var(--eg-surface)) !important; border: 1px solid color-mix(in srgb, var(--blue) 35%, var(--eg-border-strong)) !important; color: var(--eg-text) !important;
+}
+.btn-outline-secondary:hover, .btn-light:hover, .btn-secondary:hover, .list-filter-btn:hover, .list-sort-btn:hover { background: color-mix(in srgb, var(--blue) 18%, var(--eg-surface)) !important; border-color: var(--blue) !important; }
+.btn-accent, .btn-primary, .btn-lead { background: var(--accent) !important; border-color: var(--accent) !important; color: var(--accent-ink) !important; }
+.btn-accent:hover, .btn-primary:hover, .btn-lead:hover { background: var(--accent-hover) !important; border-color: var(--accent-hover) !important; color: #fff !important; }
+:root[data-theme="dark"] .btn-accent:hover, :root[data-theme="dark"] .btn-primary:hover { color: var(--accent-ink) !important; }
+.card-link, .stat-link, a.funnel-row, .todo-item, a.todo-item { cursor: pointer; }
+.todo-item, a.funnel-row { background: color-mix(in srgb, var(--blue) 6%, var(--eg-surface)); border: 1px solid color-mix(in srgb, var(--blue) 22%, var(--eg-border)); border-radius: 10px; }
+.todo-item:hover, a.funnel-row:hover { background: color-mix(in srgb, var(--blue) 14%, var(--eg-surface)); border-color: var(--blue); }
+.todo-go { color: var(--blue); }
+.form-control, .form-select, .name-search-input { background-color: color-mix(in srgb, var(--blue) 3%, var(--eg-surface)); border-color: color-mix(in srgb, var(--blue) 25%, var(--eg-border-strong)); }
+.table tbody tr:hover > * { background: color-mix(in srgb, var(--blue) 7%, transparent); }
+.tag, .meta-chip { background: color-mix(in srgb, var(--eg-text) 5%, transparent) !important; }
+.eg-side .eg-side-link:hover { background: color-mix(in srgb, var(--blue) 12%, transparent); }
+.eg-side-ind { background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
+a:not(.btn):not(.action-btn):not(.eg-side-link):not(.tb-btn):hover { color: var(--blue-ink); }
