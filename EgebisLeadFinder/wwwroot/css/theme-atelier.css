@@ -319,3 +319,15 @@ body.eg-app { font-weight: 400; }
 .eg-side .eg-side-link:hover { background: color-mix(in srgb, var(--blue) 12%, transparent); }
 .eg-side-ind { background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
 a:not(.btn):not(.action-btn):not(.eg-side-link):not(.tb-btn):hover { color: var(--blue-ink); }
+
+/* Logo: kendi kose yuvarlagiyla cerceveye tam oturur, ek cerceve/parilti yok; 512 px kaynak keskin kalir */
+.eg-brand-mark, .eg-side-brand .eg-brand-mark, .eg-top-brand .eg-brand-mark {
+    width: 40px; height: 40px; padding: 0; border-radius: 10px; overflow: hidden; flex: 0 0 auto;
+    background: none !important; box-shadow: none !important; border: 0;
+}
+.eg-brand-mark img, .eg-side-brand .eg-brand-mark img, .eg-top-brand .eg-brand-mark img {
+    display: block; width: 100% !important; height: 100% !important; border-radius: 0; background: none;
+    object-fit: contain; image-rendering: auto;
+}
+.eg-brand-mark::after { display: none; }
+.eg-top-brand .eg-brand-mark { width: 34px; height: 34px; }
