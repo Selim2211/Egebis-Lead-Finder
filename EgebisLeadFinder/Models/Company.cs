@@ -57,6 +57,11 @@ public class Company
 
     public int Score { get; set; }
 
+    /// <summary>Son 30 gunun olumlu (yatirim) haberlerinden gelen puan artisi (0-15); puan dokumunde "Haber sinyali" olarak gorunur.</summary>
+    public int NewsBoost { get; set; }
+
+    public DateTime? NewsBoostAt { get; set; }
+
     /// <summary>Scrape veya AI adiminda olusan hata. Null ise sorun yok.</summary>
     public string? ProcessingError { get; set; }
 

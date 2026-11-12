@@ -471,6 +471,10 @@ else
                             <div class="company-card-name">@company.Name</div>
                             <div class="company-card-domain">
                                 @company.Domain
+                                @if (company.NewsBoost > 0)
+                                {
+                                    <span class="tag tag-success run-tag" title="Son 30 gündeki olumlu haberler puanı yükseltti (Haber Ajanı)">▲ +@company.NewsBoost haber</span>
+                                }
                                 @if (Model.SelectedRun is not null)
                                 {
                                     @if (Model.RunNewIds.Contains(company.Id))
@@ -562,6 +566,15 @@ else
                             <span class="action-date">@(a.At?.ToLocalTime().ToString("dd.MM"))</span>
                         </button>
                     }
+                    <button type="submit" form="stageForm"
+                            formaction="@Url.Action("ToggleWatch", "News", new { id = company.Id })"
+                            class="action-btn action-watch @(Model.WatchedIds.Contains(company.Id) ? "is-active" : "")"
+                            title="@(Model.WatchedIds.Contains(company.Id) ? "Takipte — haberleri Haber Akışı'nda; çıkarmak için tıklayın" : "Takip et: bu firmanın haberlerini Haber Akışı'nda göster")">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" />
+                        </svg>
+                        <span class="action-label">@(Model.WatchedIds.Contains(company.Id) ? "Takipte" : "Takip et")</span>
+                    </button>
                     <button type="submit" form="stageForm"
                             formaction="@Url.Action("AddToBlacklist", new { id = company.Id })"
                             class="action-btn action-blacklist"

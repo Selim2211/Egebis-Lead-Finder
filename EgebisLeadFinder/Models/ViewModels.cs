@@ -149,6 +149,9 @@ public class CompanyListViewModel
 
     /// <summary>Bu sayfadaki firmalardan kullanicinin favorisinde olanlar; Favorites = yalnizca favoriler suzgeci.</summary>
     public HashSet<int> FavoriteIds { get; set; } = new();
+
+    /// <summary>Bu sayfadaki firmalardan kullanicinin "Takip et" dedikleri (haber akisi).</summary>
+    public HashSet<int> WatchedIds { get; set; } = new();
     public bool Favorites { get; set; }
     public int FavoriteCount { get; set; }
     public SearchRun? SelectedRun { get; set; }

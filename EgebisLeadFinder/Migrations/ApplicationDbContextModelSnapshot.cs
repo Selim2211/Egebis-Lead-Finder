@@ -156,6 +156,9 @@ namespace EgebisLeadFinder.Migrations
                     b.Property<bool>("MustChangePassword")
                         .HasColumnType("boolean");
 
+                    b.Property<DateTime?>("NewsSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -315,6 +318,12 @@ namespace EgebisLeadFinder.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
+                    b.Property<int>("NewsBoost")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("NewsBoostAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("ProcessingError")
                         .HasColumnType("text");
 
@@ -397,6 +406,33 @@ namespace EgebisLeadFinder.Migrations
                     NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("CompanyId", "SearchProfileId", "UserId"), false);
 
                     b.ToTable("CompanySearchProfiles");
+                });
+
+            modelBuilder.Entity("EgebisLeadFinder.Models.CompanyWatch", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CompanyId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("UserId", "CompanyId")
+                        .IsUnique();
+
+                    b.ToTable("CompanyWatches");
                 });
 
             modelBuilder.Entity("EgebisLeadFinder.Models.Contact", b =>
@@ -869,6 +905,158 @@ namespace EgebisLeadFinder.Migrations
                     b.ToTable("LeadSequences");
                 });
 
+            modelBuilder.Entity("EgebisLeadFinder.Models.NewsFeedItem", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int?>("CompanyId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("FetchedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Importance")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("MentionedCompany")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("RadarTopicId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SourceName")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Summary")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("TitleKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("UrlHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("PublishedAt");
+
+                    b.HasIndex("RadarTopicId");
+
+                    b.HasIndex("TitleKey");
+
+                    b.HasIndex("UrlHash")
+                        .IsUnique();
+
+                    b.ToTable("NewsItems");
+                });
+
+            modelBuilder.Entity("EgebisLeadFinder.Models.NewsScanCursor", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("LastScannedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RefId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Kind", "RefId")
+                        .IsUnique();
+
+                    b.ToTable("NewsScanCursors");
+                });
+
+            modelBuilder.Entity("EgebisLeadFinder.Models.NewsScanRun", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AiCalls")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Found")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("NewCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Queries")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SerperCredits")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartedAt");
+
+                    b.ToTable("NewsScanRuns");
+                });
+
             modelBuilder.Entity("EgebisLeadFinder.Models.Notification", b =>
                 {
                     b.Property<int>("Id")
@@ -909,6 +1097,37 @@ namespace EgebisLeadFinder.Migrations
                     b.HasIndex("UserId", "ReadAt");
 
                     b.ToTable("Notifications");
+                });
+
+            modelBuilder.Entity("EgebisLeadFinder.Models.RadarTopic", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("City")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Query")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("RadarTopics");
                 });
 
             modelBuilder.Entity("EgebisLeadFinder.Models.SearchProfile", b =>
@@ -1258,6 +1477,25 @@ namespace EgebisLeadFinder.Migrations
                     b.Navigation("SearchProfile");
                 });
 
+            modelBuilder.Entity("EgebisLeadFinder.Models.CompanyWatch", b =>
+                {
+                    b.HasOne("EgebisLeadFinder.Models.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EgebisLeadFinder.Models.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("EgebisLeadFinder.Models.Contact", b =>
                 {
                     b.HasOne("EgebisLeadFinder.Models.Company", "Company")
@@ -1355,6 +1593,23 @@ namespace EgebisLeadFinder.Migrations
                     b.Navigation("Lead");
 
                     b.Navigation("Sequence");
+                });
+
+            modelBuilder.Entity("EgebisLeadFinder.Models.NewsFeedItem", b =>
+                {
+                    b.HasOne("EgebisLeadFinder.Models.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("EgebisLeadFinder.Models.RadarTopic", "RadarTopic")
+                        .WithMany()
+                        .HasForeignKey("RadarTopicId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Company");
+
+                    b.Navigation("RadarTopic");
                 });
 
             modelBuilder.Entity("EgebisLeadFinder.Models.Notification", b =>

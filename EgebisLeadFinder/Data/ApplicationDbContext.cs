@@ -1,4 +1,4 @@
-using EgebisLeadFinder.Models;
+﻿using EgebisLeadFinder.Models;
 using EgebisLeadFinder.Services.Auth;
 using EgebisLeadFinder.Services.Security;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +39,11 @@ public class ApplicationDbContext : DbContext
     public DbSet<InboundEmail> InboundEmails => Set<InboundEmail>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<SectorReport> SectorReports => Set<SectorReport>();
+    public DbSet<NewsFeedItem> NewsItems => Set<NewsFeedItem>();
+    public DbSet<CompanyWatch> CompanyWatches => Set<CompanyWatch>();
+    public DbSet<RadarTopic> RadarTopics => Set<RadarTopic>();
+    public DbSet<NewsScanRun> NewsScanRuns => Set<NewsScanRun>();
+    public DbSet<NewsScanCursor> NewsScanCursors => Set<NewsScanCursor>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -302,6 +307,28 @@ public class ApplicationDbContext : DbContext
             e.HasIndex(x => new { x.UserId, x.CreatedAt });
             e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.SetNull);
         });
+
+        // Haber akışı: aynı haber (adres özeti) bir kez; firma silinirse haberleri de gider, radar konusu silinirse haber kalır.
+        b.Entity<NewsFeedItem>(e =>
+        {
+            e.HasIndex(x => x.UrlHash).IsUnique();
+            e.HasIndex(x => x.PublishedAt);
+            e.HasIndex(x => x.CompanyId);
+            e.HasIndex(x => x.TitleKey);
+            e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.RadarTopic).WithMany().HasForeignKey(x => x.RadarTopicId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<CompanyWatch>(e =>
+        {
+            e.HasIndex(x => new { x.UserId, x.CompanyId }).IsUnique();
+            e.HasIndex(x => x.CompanyId);
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<NewsScanRun>().HasIndex(x => x.StartedAt);
+        b.Entity<NewsScanCursor>().HasIndex(x => new { x.Kind, x.RefId }).IsUnique();
 
         b.Entity<EmailTemplate>().HasData(EmailTemplateSeed.All);
     }

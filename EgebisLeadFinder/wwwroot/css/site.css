@@ -1719,6 +1719,7 @@ body.eg-progress-lock {
 .company-card-actions .action-btn svg { flex-shrink: 0; }
 .company-card-actions .action-label { overflow: hidden; text-overflow: ellipsis; }
 .action-salesforce { --c: #0176d3; --c-bg: #eaf5fe; --c-border: #b7dcfb; --c-shadow: rgba(1, 118, 211, .3); }
+.action-watch { --c: #0f766e; --c-bg: #f0fdfa; --c-border: #99f6e4; --c-shadow: rgba(15, 118, 110, .3); }
 .action-blacklist { --c: #b42318; --c-bg: #fef3f2; --c-border: #fecdca; --c-shadow: rgba(180, 35, 24, .3); }
 .company-card-actions .action-delete .action-label { display: none; }
 

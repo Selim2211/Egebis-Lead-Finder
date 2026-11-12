@@ -33,4 +33,5 @@ public class Notification
 public static class NotificationKinds
 {
     public const string Reply = "reply";
+    public const string News = "news";
 }

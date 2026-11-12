@@ -1,4 +1,4 @@
-namespace EgebisLeadFinder.Configuration;
+﻿namespace EgebisLeadFinder.Configuration;
 
 public class SearchOptions
 {
@@ -345,4 +345,57 @@ public class ResearchOptions
     /// elle guncellenen referans dosyasi. ContentRoot'a gore cozulur.
     /// </summary>
     public string CompanyListDataPath { get; set; } = "Data/reference/company-lists.json";
+}
+
+/// <summary>Haber akışı (arka plan haber taraması) ayarları. appsettings "News" bölümü.</summary>
+public class NewsOptions
+{
+    public const string Section = "News";
+
+    /// <summary>Kapaliysa arka plan ajani hic calismaz.</summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>Ajan kac dakikada bir tur atar.</summary>
+    public int TickMinutes { get; set; } = 10;
+
+    /// <summary>Tur basina en fazla sorgu (donusumlu tarama): her turda siradaki dilim taranir.</summary>
+    public int QueriesPerTick { get; set; } = 12;
+
+    /// <summary>Radar konusu en erken kac dakikada bir yeniden taranir.</summary>
+    public int TopicMinutes { get; set; } = 30;
+
+    /// <summary>Takip edilen firma en erken kac dakikada bir yeniden taranir.</summary>
+    public int CompanyMinMinutes { get; set; } = 60;
+
+    /// <summary>Izlenecek en fazla firma (kuyruk uzunlugu tavani).</summary>
+    public int MaxWatchedCompanies { get; set; } = 150;
+
+    /// <summary>Kuyruga alinacak en fazla radar konusu.</summary>
+    public int MaxRadarTopics { get; set; } = 30;
+
+    /// <summary>RSS istekleri arasindaki bekleme (ms); Google'i yormamak icin.</summary>
+    public int RequestDelayMs { get; set; } = 2000;
+
+    /// <summary>RSS bir dinlenmeden sonra da hata verirse Serper yedegi kullanilsin mi (kredi harcar)?</summary>
+    public bool SerperFallback { get; set; } = true;
+
+    /// <summary>Bir turda yedek kaynaga en fazla bu kadar istek atilir.</summary>
+    public int MaxSerperPerRun { get; set; } = 5;
+
+    /// <summary>Gunde (Turkiye gunu) yedek kaynaga en fazla bu kadar istek atilir.</summary>
+    public int MaxSerperPerDay { get; set; } = 60;
+
+    public string SerperNewsEndpoint { get; set; } = "https://google.serper.dev/news";
+
+    /// <summary>Tur basina yapay zekaya gonderilecek toplu cagri sayisi.</summary>
+    public int MaxAiBatchesPerRun { get; set; } = 1;
+
+    /// <summary>Tek yapay zeka cagrisindaki haber sayisi.</summary>
+    public int AiBatchSize { get; set; } = 15;
+
+    /// <summary>Gunde (Turkiye gunu) en fazla bu kadar haber yapay zeka cagrisi; dolunca kural puaniyla devam edilir.</summary>
+    public int MaxAiCallsPerDay { get; set; } = 40;
+
+    /// <summary>Sorguya eklenen zaman penceresi (Google "when:" isleci).</summary>
+    public string Window { get; set; } = "3d";
 }

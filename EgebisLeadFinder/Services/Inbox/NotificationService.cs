@@ -50,6 +50,30 @@ public class NotificationService
         }
     }
 
+    /// <summary>"Önemli haber" bildirimi (haber akışından). Kaydetmez; cagiran SaveChanges yapar.</summary>
+    public void AddNews(int userId, string? company, string title)
+    {
+        _db.Notifications.Add(new Notification
+        {
+            UserId = userId,
+            Kind = NotificationKinds.News,
+            CompanyName = company is { Length: > 300 } ? company[..300] : company,
+            Preview = title.Length > 200 ? title[..200] : title
+        });
+        _cache.Remove(CountKey(userId));
+    }
+
+    /// <summary>Bildirimi okundu yapar; (lead, tür) doner. Baskasinin bildirimi ise (null, null).</summary>
+    public async Task<(int? LeadId, string? Kind)> OpenWithKindAsync(int userId, int id, CancellationToken ct = default)
+    {
+        var n = await _db.Notifications.FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId, ct);
+        if (n is null) return (null, null);
+        n.ReadAt ??= DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        _cache.Remove(CountKey(userId));
+        return (n.LeadId, n.Kind);
+    }
+
     public async Task<int> UnreadCountAsync(int userId, CancellationToken ct = default)
     {
         if (_cache.TryGetValue(CountKey(userId), out int cached)) return cached;

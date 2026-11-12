@@ -1,0 +1,12 @@
+@model List<NewsRow>
+@foreach (var row in Model)
+{
+    if (ViewData["Compact"] is true)
+    {
+        <partial name="_NewsMini" model="row" view-data="ViewData" />
+    }
+    else
+    {
+        <partial name="_NewsCard" model="row" view-data="ViewData" />
+    }
+}

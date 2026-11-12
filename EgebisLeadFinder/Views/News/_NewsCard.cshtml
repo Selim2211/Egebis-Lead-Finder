@@ -1,0 +1,73 @@
+@model NewsRow
+@{
+    var n = Model.Item;
+    var forceNew = ViewData["ForceNew"] is true;
+    var seenAt = ViewData["SeenAt"] as DateTime?;
+    var isNew = forceNew || (seenAt is not null && n.FetchedAt > seenAt);
+    var hot = n.Importance >= 5;
+
+    string Ago(DateTime utc) => EgebisLeadFinder.Services.News.NewsFormat.Ago(utc);
+}
+<article class="nc nc-cat-@n.Category imp-@n.Importance @(isNew ? "is-new" : "") @(hot ? "nc-hot" : "")" data-news-id="@n.Id">
+    <div class="nc-rail" aria-hidden="true"></div>
+    <div class="nc-body">
+        <header class="nc-head">
+            <span class="nc-badge">@NewsCategories.Label(n.Category)</span>
+            <span class="nx-sent s-@NewsCategories.Sentiment(n.Category)">@NewsCategories.SentimentLabel(n.Category)</span>
+            <span class="nc-imp" title="Önem @n.Importance / 5" aria-label="Önem @n.Importance / 5">
+                @for (var i = 1; i <= 5; i++)
+                {
+                    <i class="@(i <= n.Importance ? "on" : "")"></i>
+                }
+            </span>
+            @if (hot)
+            {
+                <span class="nc-flag">Acil fırsat</span>
+            }
+            @if (Model.CompanyBoost > 0 && n.CompanyId is not null)
+            {
+                <span class="nc-boost" title="Bu firmanın puanı son 30 gündeki olumlu haberlerle yükseldi">▲ +@Model.CompanyBoost puan</span>
+            }
+            <time class="nc-time" datetime="@n.PublishedAt.ToString("o")" title="@n.PublishedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")">@Ago(n.PublishedAt)</time>
+        </header>
+
+        <a class="nc-title" href="@n.Url" target="_blank" rel="noopener noreferrer">@n.Title</a>
+        @if (!string.IsNullOrWhiteSpace(n.Summary) && n.Summary != n.Title)
+        {
+            <p class="nc-sum">@n.Summary</p>
+        }
+
+        <footer class="nc-foot">
+            <span class="nc-chips">
+                @if (n.CompanyId is int cid)
+                {
+                    <a class="nc-chip nc-chip-co" asp-controller="Company" asp-action="Details" asp-route-id="@cid">@Model.CompanyName</a>
+                }
+                else
+                {
+                    <span class="nc-chip nc-chip-radar">Radar</span>
+                    @if (!string.IsNullOrWhiteSpace(n.MentionedCompany))
+                    {
+                        <span class="nc-chip nc-chip-co">@n.MentionedCompany</span>
+                    }
+                }
+                @if (!string.IsNullOrWhiteSpace(n.City))
+                {
+                    <span class="nc-chip">@n.City</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(n.SourceName))
+                {
+                    <span class="nc-chip nc-chip-src">@n.SourceName</span>
+                }
+            </span>
+            <span class="nc-actions">
+                <a class="nc-act" href="@n.Url" target="_blank" rel="noopener noreferrer">Habere git ↗</a>
+                @if (n.CompanyId is null && !string.IsNullOrWhiteSpace(n.MentionedCompany))
+                {
+                    <a class="nc-act nc-act-primary" asp-controller="Company" asp-action="Index" asp-route-search="@n.MentionedCompany"
+                       title="Firma havuzunuzda bu firmayı arayın">Firmalarda ara</a>
+                }
+            </span>
+        </footer>
+    </div>
+</article>

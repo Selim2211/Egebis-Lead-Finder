@@ -1,0 +1,25 @@
+@model NewsRow
+@using EgebisLeadFinder.Services.News
+@{
+    var n = Model.Item;
+    var subject = NewsFormat.Subject(Model);
+    var flag = ViewData["Flag"] is true
+        ? (n.Importance >= 5 && DateTime.UtcNow - n.PublishedAt < TimeSpan.FromHours(6) ? "SON DAKİKA" : n.Importance >= 4 ? "ÖZEL" : null)
+        : null;
+}
+<article class="nf cat-@n.Category imp-@n.Importance" data-news-id="@n.Id">
+    <div class="nf-cover">
+        <partial name="_NewsCover" model="n.Category" />
+        @if (flag is not null) { <span class="nf-flag @(flag == "ÖZEL" ? "is-ozel" : "is-son")">@flag</span> }
+        <span class="nf-cat">@NewsCategories.Label(n.Category)</span>
+    </div>
+    <div class="nf-body">
+        <a class="nf-title" href="@n.Url" target="_blank" rel="noopener noreferrer">@n.Title</a>
+        @if (!string.IsNullOrWhiteSpace(n.Summary) && n.Summary != n.Title) { <p class="nf-sum">@n.Summary</p> }
+        <div class="nf-foot">
+            <span class="nx-sent s-@NewsCategories.Sentiment(n.Category)">@NewsCategories.SentimentLabel(n.Category)</span>
+            <span class="nf-who">@subject</span>
+            <span class="nf-ago">@NewsFormat.Ago(n.PublishedAt)</span>
+        </div>
+    </div>
+</article>

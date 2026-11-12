@@ -1,0 +1,165 @@
+@model NewsOverviewViewModel
+@using EgebisLeadFinder.Services.News
+@{
+    ViewData["Title"] = "Haber Akışı";
+    ViewData["SeenAt"] = Model.Shell.SeenAt;
+    var now = DateTime.UtcNow;
+    string Key(CompanyMover m) => m.CompanyId is int id ? "c" + id : "r" + m.Name.ToLowerInvariant();
+    string Signed(int v) => v > 0 ? "+" + v : v.ToString();
+    string Dir(int v) => v > 0 ? "is-up" : v < 0 ? "is-down" : "is-flat";
+    var tr = new System.Globalization.CultureInfo("tr-TR");
+    var selected = Model.Weekly.Concat(Model.Daily).GroupBy(Key).Select(g => g.First()).ToList();
+    var firstKey = Model.Weekly.Count > 0 ? Key(Model.Weekly[0]) : null;
+    var icons = new[] { "i-a", "i-b", "i-c", "i-d", "i-e" };
+}
+
+<div class="nx nx-term">
+    <partial name="_NewsShell" model="Model.Shell" />
+
+    <div class="tx-grid">
+        @* ---------- Sol: canlı haber akışı ---------- *@
+        <section class="tx-panel tx-live" aria-labelledby="txLiveH">
+            <header class="tx-h">
+                <h2 id="txLiveH"><span class="tx-dot"></span>Canlı haber akışı</h2>
+                <small>Son 7 gün</small>
+            </header>
+            <div class="tx-scroll" id="nxLiveList">
+                @foreach (var r in Model.Live) { <partial name="_NewsMini" model="r" /> }
+            </div>
+            @if (Model.Live.Count == 0) { <div class="nx-empty" id="nxLiveEmpty">Henüz haber yok. Ajan her @Model.Shell.TickMinutes dakikada yeni tur atar.</div> }
+        </section>
+
+        @* ---------- Orta: manşet + liderlik tablosu ---------- *@
+        <div class="tx-center">
+            <section class="tx-hero" aria-label="Manşet" data-hero>
+                <canvas class="tx-globe" aria-hidden="true"></canvas>
+                <div class="tx-hero-shade" aria-hidden="true"></div>
+                <div class="tx-hero-in">
+                    @if (Model.Hero.Count == 0)
+                    {
+                        <div class="tx-slide is-on">
+                            <span class="tx-badge">Haber ajanı</span>
+                            <h2>Şirket haberleri burada canlı olarak akacak</h2>
+                            <p>Ajan her @Model.Shell.TickMinutes dakikada takip ettiğiniz firmaları ve radar konularını tarar.</p>
+                        </div>
+                    }
+                    @for (var i = 0; i < Model.Hero.Count; i++)
+                    {
+                        var h = Model.Hero[i];
+                        var n = h.Item;
+                        var hasSum = !string.IsNullOrWhiteSpace(n.Summary) && n.Summary != n.Title;
+                        <article class="tx-slide @(i == 0 ? "is-on" : "")" aria-hidden="@(i == 0 ? "false" : "true")">
+                            <div class="tx-slide-meta">
+                                <span class="tx-badge @(n.Category == NewsCategories.Risk ? "is-neg" : "")">@(n.Importance >= 4 ? "Flaş gelişme" : "Son gelişme")</span>
+                                <span>@NewsFormat.Ago(n.PublishedAt, now)</span>
+                                <span class="tx-slide-sub">@NewsFormat.Subject(h)</span>
+                            </div>
+                            <h2>@n.Title</h2>
+                            @if (hasSum) { <p>@n.Summary</p> }
+                            <a class="tx-btn-light" href="@n.Url" target="_blank" rel="noopener noreferrer" tabindex="@(i == 0 ? "0" : "-1")">Haberi oku</a>
+                        </article>
+                    }
+                </div>
+                @if (Model.Hero.Count > 1)
+                {
+                    <div class="tx-dots" role="tablist" aria-label="Manşetler">
+                        @for (var i = 0; i < Model.Hero.Count; i++)
+                        {
+                            <button type="button" class="@(i == 0 ? "is-on" : "")" data-slide="@i" aria-label="Manşet @(i + 1)"></button>
+                        }
+                    </div>
+                }
+            </section>
+
+            <section class="tx-panel tx-board" aria-labelledby="txBoardH">
+                <header class="tx-h">
+                    <h2 id="txBoardH">İtibar liderlik tablosu</h2>
+                    <div class="tx-toggle" role="group" aria-label="Dönem">
+                        <button type="button" data-board-btn="daily">Günlük</button>
+                        <button type="button" data-board-btn="weekly" class="is-on">Haftalık</button>
+                    </div>
+                </header>
+                @foreach (var (board, rows) in new[] { ("weekly", Model.Weekly), ("daily", Model.Daily) })
+                {
+                    <ol class="tx-rank" data-board="@board" @(board == "daily" ? "hidden" : "")>
+                        @for (var i = 0; i < rows.Count; i++)
+                        {
+                            var m = rows[i];
+                            var val = board == "daily" ? m.DayImpact : m.WeekImpact;
+                            var key = Key(m);
+                            <li>
+                                <button type="button" class="tx-row @Dir(val) @(key == firstKey ? "is-sel" : "")" data-pick="@key">
+                                    <span class="tx-no">@((i + 1).ToString("00"))</span>
+                                    <span class="tx-ico @icons[i % icons.Length]" aria-hidden="true">@NewsFormat.Initials(m.Name)</span>
+                                    <span class="tx-name">@m.Name<small>@(string.IsNullOrWhiteSpace(m.Industry) ? "Sektör belirtilmemiş" : m.Industry.ToUpper(tr))</small></span>
+                                    <span class="tx-val"><b>@Signed(val)</b><small>@(m.Score is int s ? s + " puan" : (board == "daily" ? m.CountToday : m.Count7) + " haber")</small></span>
+                                </button>
+                            </li>
+                        }
+                    </ol>
+                }
+                @if (Model.Weekly.Count == 0) { <div class="nx-empty">Henüz firma hareketi yok.</div> }
+                <a class="tx-btn-outline" asp-action="Companies">Tüm sıralamayı gör</a>
+            </section>
+        </div>
+
+        @* ---------- Sağ: seçili şirket analizi ---------- *@
+        <aside class="tx-panel tx-side" aria-label="Seçili şirket analizi">
+            @foreach (var m in selected)
+            {
+                var key = Key(m);
+                // Puanı olmayan (radar) firmada seri 0'dan başlayıp haftalık etkide biter.
+                var series = NewsImpact.Series(m.Score ?? m.WeekImpact, m.Daily);
+                <div class="tx-co" data-co="@key" @(key == firstKey ? "" : "hidden")>
+                    <header class="tx-co-h">
+                        <span class="tx-co-ava">@m.Name.Trim()[..1].ToUpper(tr)</span>
+                        <div><b>@m.Name</b><small>Seçili şirket analizi</small></div>
+                    </header>
+                    <div class="tx-kpis">
+                        @if (m.Score is int sc)
+                        {
+                            <div><small>Genel skor</small><b class="is-up">@sc</b></div>
+                        }
+                        else
+                        {
+                            <div><small>7 gün haber</small><b class="is-up">@m.Count7</b></div>
+                        }
+                        <div><small>Haftalık etki</small><b class="@Dir(m.WeekImpact)">@(m.WeekImpact > 0 ? "↗" : m.WeekImpact < 0 ? "↘" : "→") @Signed(m.WeekImpact)</b></div>
+                    </div>
+                    <h3 class="tx-sub">İtibar trend grafiği</h3>
+                    <partial name="_TrendChart" model="series" />
+                    <h3 class="tx-sub"><span class="tx-spark-ico" aria-hidden="true">✦</span>Yapay zeka özetleri</h3>
+                    <div class="tx-ai">
+                        <blockquote class="tx-quote">@(m.Summary ?? (m.Latest?.Title ?? "Bu firma için son 7 günde haber bulunmadı. Ajan sonraki turlarda taramaya devam edecek."))</blockquote>
+                        <div class="tx-signal is-pos">
+                            <small>Pozitif sinyal</small>
+                            @if (m.Positive is { } pos) { <a href="@pos.Url" target="_blank" rel="noopener noreferrer">@pos.Title</a> }
+                            else { <span>Son 7 günde yatırım veya büyüme haberi yok.</span> }
+                        </div>
+                        <div class="tx-signal is-neg">
+                            <small>Risk analizi</small>
+                            @if (m.Risk is { } neg) { <a href="@neg.Url" target="_blank" rel="noopener noreferrer">@neg.Title</a> }
+                            else { <span>Belirgin bir risk haberi görülmedi.</span> }
+                        </div>
+                    </div>
+                    @if (m.CompanyId is int cid)
+                    {
+                        <a class="tx-btn-green" asp-controller="Company" asp-action="Details" asp-route-id="@cid">Tam istihbarat raporu</a>
+                    }
+                    else
+                    {
+                        <a class="tx-btn-green" asp-action="List" asp-route-q="@m.Name">Tüm haberleri gör</a>
+                    }
+                </div>
+            }
+            @if (selected.Count == 0) { <div class="nx-empty">Firma seçmek için önce firmaları takibe alın.</div> }
+        </aside>
+    </div>
+
+    <footer class="tx-foot">© @DateTime.UtcNow.Year Egebis haber terminali · Veriler haber ajanı tarafından gerçek zamanlı analiz edilmektedir.</footer>
+</div>
+
+@section Scripts {
+    <script src="~/js/news-live.js" asp-append-version="true"></script>
+    <script src="~/js/news-terminal.js" asp-append-version="true"></script>
+}
