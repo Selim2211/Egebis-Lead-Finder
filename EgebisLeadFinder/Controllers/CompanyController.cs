@@ -1073,6 +1073,25 @@ public class CompanyController : Controller
         return RedirectToLocal(returnUrl);
     }
 
+    /// <summary>Firmanin alan adini Black List'e ekler; firma aramalarda bir daha cikmaz. Mevcut kayit silinmez.</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddToBlacklist(int id, string? returnUrl, CancellationToken ct)
+    {
+        var company = await _db.Companies.AsNoTracking().Where(c => c.Id == id)
+            .Select(c => new { c.Name, c.Domain }).FirstOrDefaultAsync(ct);
+        if (company is null) return NotFound();
+
+        var entry = string.IsNullOrWhiteSpace(company.Domain) ? company.Name : company.Domain;
+        var current = await _settings.GetAsync(SettingKeys.ExtraBlockedDomains, ct);
+        var updated = SearchBlacklist.Add(current, entry);
+        await _settings.SetManyAsync(new Dictionary<string, string?> { [SettingKeys.ExtraBlockedDomains] = updated }, ct);
+
+        EgebisLeadFinder.Services.Auth.AuditActionFilter.SetAuditSummary(HttpContext, $"Black List'e eklendi: {entry} ({company.Name})");
+        TempData["SettingsSaved"] = "Firma Black List'e eklendi. Soldaki Black List sayfasından geri çıkarabilirsiniz.";
+        return RedirectToLocal(returnUrl);
+    }
+
     private bool WantsJson() =>
         Request.Headers.Accept.Any(a => a?.Contains("application/json", StringComparison.OrdinalIgnoreCase) == true);
 

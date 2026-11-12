@@ -1,0 +1,122 @@
+@model UserSpendViewModel
+@using System.Globalization
+@using EgebisLeadFinder.Services
+@{
+    ViewData["Title"] = "Kullanıcı Harcama Profili";
+    var tr = new CultureInfo("tr-TR");
+    var inv = CultureInfo.InvariantCulture;
+    var maxDay = Math.Max(1, Model.Days.Select(d => Math.Max(d.Serper, d.AiCalls)).DefaultIfEmpty(0).Max());
+    string N(int n) => n.ToString("N0", tr);
+    double H(int v) => Math.Round(100.0 * v / maxDay, 1);
+    var totalSearches = Model.Days.Sum(d => d.Searches);
+    var totalSerper = Model.Days.Sum(d => d.Serper);
+    var totalAi = Model.Days.Sum(d => d.AiCalls);
+    var daily = Model.Period.Kind == CreditsPeriod.Month ? "d" : "ddd";
+}
+
+<div class="page-head">
+    <div>
+        <h1>@Model.UserName</h1>
+        <div class="page-sub">API harcama profili: günlük Serper kredisi ve yapay zekâ çağrısı</div>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Users" asp-route-period="@Model.Period.Kind" asp-route-date="@Model.Period.From.ToString("yyyy-MM-dd")">← Tüm kullanıcılar</a>
+    </div>
+</div>
+
+<partial name="_SpendPeriodBar" model="Model" />
+
+<div class="row g-3 mb-3 text-center">
+    <div class="col-4"><div class="card h-100"><div class="card-body">
+        <div class="stat-label">Arama</div>
+        <div class="stat-value" style="font-size:1.8rem">@N(totalSearches)</div>
+        <div class="cell-sub">yapılan arama</div>
+    </div></div></div>
+    <div class="col-4"><div class="card h-100"><div class="card-body">
+        <div class="stat-label">Serper</div>
+        <div class="stat-value" style="font-size:1.8rem">@N(totalSerper)</div>
+        <div class="cell-sub">kredi · aramada ortalama @(totalSearches == 0 ? "—" : (totalSerper / (double)totalSearches).ToString("0.#", tr))</div>
+    </div></div></div>
+    <div class="col-4"><div class="card h-100"><div class="card-body">
+        <div class="stat-label">Yapay zekâ</div>
+        <div class="stat-value" style="font-size:1.8rem">@N(totalAi)</div>
+        <div class="cell-sub">çağrı · aramada ortalama @(totalSearches == 0 ? "—" : (totalAi / (double)totalSearches).ToString("0.#", tr))</div>
+    </div></div></div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span>Gün gün harcama</span>
+        <span class="chart-legend">
+            <span class="legend-dot" style="background:#2563eb"></span> Serper (kredi)
+            <span class="legend-dot" style="background:#7c3aed"></span> Yapay zekâ (çağrı)
+        </span>
+    </div>
+    <div class="card-body">
+        @if (totalSerper == 0 && totalAi == 0)
+        {
+            <div class="text-muted-2 small">Bu dönemde harcama yok.</div>
+        }
+        else
+        {
+            <div class="spend-cols" role="img" aria-label="Günlük harcama grafiği">
+                @foreach (var d in Model.Days)
+                {
+                    <div class="spend-col" title="@d.Date.ToString("d MMMM dddd", tr): @d.Serper Serper kredisi, @d.AiCalls yapay zekâ çağrısı, @d.Searches arama">
+                        <div class="spend-col-bars">
+                            <span class="spend-vbar" style="height:@H(d.Serper).ToString("0.#", inv)%;background:#2563eb"></span>
+                            <span class="spend-vbar" style="height:@H(d.AiCalls).ToString("0.#", inv)%;background:#7c3aed"></span>
+                        </div>
+                        <div class="spend-col-label">@d.Date.ToString(daily, tr)</div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Bu dönemdeki aramalar</div>
+    @if (Model.Runs.Count == 0)
+    {
+        <div class="card-body text-muted-2">Bu dönemde arama yapılmadı.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Tarih</th>
+                        <th>Arama</th>
+                        <th class="text-end">Serper (kredi)</th>
+                        <th class="text-end">Yapay zekâ (çağrı)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var r in Model.Runs)
+                {
+                    <tr>
+                        <td class="text-nowrap small">@r.StartedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                        <td>@(r.ProfileName ?? r.Industry ?? r.CompanyName ?? "—")</td>
+                        <td class="text-end">@N(r.SerperCredits)</td>
+                        <td class="text-end">@N(r.AiCalls)</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        @if (totalSearches > Model.Runs.Count)
+        {
+            <div class="card-body small text-muted-2">İlk @Model.Runs.Count arama gösteriliyor.</div>
+        }
+    }
+</div>
+
+<style>
+    .spend-cols { display: flex; align-items: stretch; gap: .35rem; height: 14rem; }
+    .spend-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
+    .spend-col-bars { flex: 1; display: flex; align-items: flex-end; justify-content: center; gap: 2px; border-bottom: 1px solid var(--bs-border-color, #dee2e6); }
+    .spend-vbar { width: 40%; max-width: 18px; min-height: 0; border-radius: 3px 3px 0 0; }
+    .spend-col-label { text-align: center; font-size: .7rem; color: var(--bs-secondary-color, #6c757d); padding-top: .25rem; white-space: nowrap; overflow: hidden; }
+</style>

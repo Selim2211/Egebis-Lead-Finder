@@ -1,0 +1,10 @@
+{
+  "Firma adı yazın…": "Type a company name…",
+  "Eşleşen firma yok": "No matching company",
+  "Listeden iki firma seçin.": "Pick two companies from the list.",
+  "Yapay zekâ, iki firmayı şirket profilimize göre yorumlar; hangisine önce gidilmesi gerektiğini, güçlü yanları, riskleri ve sonraki adımları yazar. Yorum rapora eklenir.": "The AI compares the two companies against our company profile: which to approach first, strengths, risks and next steps. The comment is added to the report.",
+  "Gemini tahmini maliyet (TL)": "Gemini estimated cost (TRY)",
+  "TL tutarları gerçek fatura değil, tahmindir: Gemini çağrı sayısı × çağrı başına tahmini ücret (dolar), güncel dolar kuruyla Türk lirasına çevrilir. Serper ve Apollo kredi olarak gösterilir, TL karşılığı hesaplanmaz.": "TRY amounts are estimates, not actual invoices: Gemini call count × estimated price per call (USD), converted to Turkish lira at the current USD rate. Serper and Apollo are shown as credits; no TRY value is calculated for them.",
+  "En fazla 16 tane 6 haneli NACE kodu ekleyebilirsiniz.": "You can add at most 16 six-digit NACE codes.",
+  "En fazla 16 kod eklenebilir; ilk 4'ü görünür, fazlası için kaydırın.": "At most 16 codes can be added; the first 4 are visible, scroll for more."
+}

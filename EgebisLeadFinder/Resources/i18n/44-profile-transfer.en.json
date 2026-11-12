@@ -1,0 +1,15 @@
+{
+  "İçe aktar ▾": "Import ▾",
+  "Şablonu indir (.xlsx)": "Download template (.xlsx)",
+  "Excel dosyası yükle…": "Upload Excel file…",
+  "Örnek satırlar ve alan açıklamaları içeren Excel dosyası": "Excel file with example rows and field descriptions",
+  "Seçilenler (.xlsx)": "Selected (.xlsx)",
+  "Tablodaki kutucuklarla seçtiğiniz profiller": "Profiles you ticked in the table",
+  "Tümü · Excel (.xlsx)": "All · Excel (.xlsx)",
+  "Tümü · CSV (.csv)": "All · CSV (.csv)",
+  "Tümünü seç": "Select all",
+  "Profili seç": "Select profile",
+  "Önce tablodan en az bir profil seçin.": "First select at least one profile in the table.",
+  "İçe aktarmak için bir Excel (.xlsx) dosyası seçin.": "Choose an Excel (.xlsx) file to import.",
+  "Yalnızca 1 MB'a kadar .xlsx dosyası yüklenebilir. Şablonu indirip onu doldurun.": "Only .xlsx files up to 1 MB can be uploaded. Download the template and fill it in."
+}

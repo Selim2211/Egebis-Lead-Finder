@@ -102,6 +102,30 @@ public class CreditsViewModel
     public List<SearchRun> Runs { get; init; } = new();
 }
 
+/// <summary>Black List ekrani: filtrelenmis, siralanmis tek sayfa.</summary>
+public class BlacklistViewModel
+{
+    public List<string> Items { get; init; } = new();
+    public string? Q { get; init; }
+    public string? Type { get; init; }
+    public string Sort { get; init; } = "newest";
+    public int AllCount { get; init; }
+    public required PagerModel Pager { get; init; }
+}
+
+/// <summary>Kullanici API harcamasi: tum kullanicilar (liste) ya da tek kullanici (profil).</summary>
+public class UserSpendViewModel
+{
+    public required EgebisLeadFinder.Services.CreditsPeriod Period { get; init; }
+    public List<EgebisLeadFinder.Services.UserSpendRow> Users { get; init; } = new();
+
+    // Tek kullanici profili (UserId doluysa)
+    public int? UserId { get; init; }
+    public string? UserName { get; init; }
+    public List<EgebisLeadFinder.Services.UserSpendDay> Days { get; init; } = new();
+    public List<SearchRun> Runs { get; init; } = new();
+}
+
 /// <summary>Arama Profilleri ekrani.</summary>
 public class SearchProfilesViewModel
 {

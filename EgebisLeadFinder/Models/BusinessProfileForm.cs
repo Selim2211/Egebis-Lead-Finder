@@ -29,6 +29,8 @@ public class BusinessProfileForm
     public string? UpdatedBy { get; set; }
     public bool IsConfigured { get; set; }
 
+    public const string DefaultExampleCustomers = "Vestel, Simfer, Polat Makina";
+
     public static BusinessProfileForm From(BusinessProfile p, IEnumerable<string> titles) => new()
     {
         CompanyName = p.CompanyName,
@@ -38,7 +40,10 @@ public class BusinessProfileForm
         IdealCustomer = p.IdealCustomer,
         NotCustomers = p.NotCustomers,
         Competitors = p.Competitors,
-        ExampleCustomers = string.Join(", ", p.ExampleCustomers),
+        // Hic kaydedilmemis profilde ornek musteri alani bos kalmasin; kullanici duzeltip kaydeder.
+        ExampleCustomers = p.ExampleCustomers.Count == 0 && p.UpdatedAt is null
+            ? DefaultExampleCustomers
+            : string.Join(", ", p.ExampleCustomers),
         CustomerKind = p.CustomerKind,
         BuyingSignals = string.Join(", ", p.BuyingSignals),
         ScoringSignals = ScoringSignal.FormatLines(p.ScoringSignals),

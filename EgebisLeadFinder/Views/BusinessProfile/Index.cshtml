@@ -131,11 +131,26 @@
                                         Yapay zekâ ile öner
                                     </button>
                                 </div>
-                                <textarea class="form-control mt-1" asp-for="ScoringSignals" rows="6" spellcheck="false"
-                                          placeholder="Üretim yapıyor | fabrika, imalat, üretim tesisi | 15"></textarea>
+                                @* Asil deger gizli alanda: sunucu "Ad | kelime, kelime | puan" satirlarini okur; satirlari asagidaki editor yazar. *@
+                                <textarea asp-for="ScoringSignals" class="d-none" id="ScoringSignals"></textarea>
+                                <div class="sig-editor mt-2" id="sigEditor">
+                                    <div class="sig-row sig-head">
+                                        <div>Ölçüt adı</div>
+                                        <div>Kelimeler (virgülle ayırın)</div>
+                                        <div>Puan</div>
+                                        <div></div>
+                                    </div>
+                                    <div id="sigRows"></div>
+                                    <div class="sig-empty text-muted-2 small d-none" id="sigEmpty">Henüz ölçüt yok. "Ölçüt ekle"ye basın.</div>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 mt-2">
+                                    <button type="button" class="btn btn-sm btn-primary" id="sigAdd">+ Ölçüt ekle</button>
+                                    <span class="small text-muted-2" id="sigCount"></span>
+                                </div>
                                 <div class="form-text">
-                                    Her satır bir ölçüttür: <code>Ad | kelime, kelime | puan</code>. Firma bu ölçüte uyuyorsa puan alır ve puan dökümünde
-                                    “Anahtar kelime: Ad” olarak görünür (en fazla 25 puan). Boş bırakırsanız yapay zekâ tanımınızdan üretir.
+                                    Her satır bir ölçüttür. Firma bu kelimelerden birine uyuyorsa puan alır ve puan dökümünde
+                                    “Anahtar kelime: Ölçüt adı” olarak görünür (puan 3-20, en fazla 12 ölçüt). Hücreye tıklayıp doğrudan düzenleyin.
+                                    Boş bırakırsanız yapay zekâ tanımınızdan üretir.
                                 </div>
                                 <div class="small mt-1" id="signalsStatus"></div>
                             </div>
@@ -178,6 +193,110 @@
 </form>
 
 @section Scripts {
+<style>
+    .sig-editor { border: 1px solid var(--bs-border-color, #dee2e6); border-radius: .5rem; overflow: hidden; }
+    .sig-row { display: grid; grid-template-columns: 1.2fr 2fr 5.5rem 2.5rem; align-items: stretch; border-top: 1px solid var(--bs-border-color, #dee2e6); }
+    .sig-row > div { border-left: 1px solid var(--bs-border-color, #dee2e6); padding: 0; min-width: 0; }
+    .sig-row > div:first-child { border-left: 0; }
+    .sig-head { background: var(--bs-tertiary-bg, #f1f3f5); font-size: .78rem; font-weight: 600; border-top: 0; }
+    .sig-head > div { padding: .35rem .6rem; }
+    .sig-row input.sig-cell { width: 100%; border: 0; border-radius: 0; background: transparent; padding: .45rem .6rem; box-shadow: none; }
+    .sig-row input.sig-cell:focus { outline: 2px solid var(--bs-primary, #0d6efd); outline-offset: -2px; background: var(--bs-body-bg, #fff); }
+    .sig-row input.sig-points { text-align: center; font-weight: 600; }
+    .sig-del { width: 100%; height: 100%; border: 0; background: transparent; color: #b42318; font-size: 1.1rem; line-height: 1; cursor: pointer; }
+    .sig-del:hover { background: #fef3f2; }
+    .sig-empty { padding: .75rem; }
+    @@media (max-width: 575.98px) { .sig-row { grid-template-columns: 1fr 4.5rem 2.2rem; } .sig-row > div:nth-child(2) { grid-column: 1 / -1; grid-row: 2; border-left: 0; border-top: 1px solid var(--bs-border-color, #dee2e6); } .sig-head > div:nth-child(2) { display: none; } }
+</style>
+<script>
+    (function () {
+        var store = document.getElementById('ScoringSignals');
+        var rowsEl = document.getElementById('sigRows');
+        if (!store || !rowsEl) return;
+        var MAX = 12, MIN_P = 3, MAX_P = 20;
+        var emptyEl = document.getElementById('sigEmpty');
+        var countEl = document.getElementById('sigCount');
+        var addBtn = document.getElementById('sigAdd');
+
+        function clean(v) { return (v || '').replace(/[|\r\n]+/g, ' ').trim(); }
+
+        function serialize() {
+            var lines = [];
+            rowsEl.querySelectorAll('.sig-row').forEach(function (row) {
+                var name = clean(row.querySelector('[data-f=name]').value);
+                var terms = clean(row.querySelector('[data-f=terms]').value);
+                var pts = parseInt(row.querySelector('[data-f=points]').value, 10);
+                if (!name && terms) name = terms.split(',')[0].trim();
+                if (!name) return;
+                if (isNaN(pts)) pts = 10;
+                pts = Math.min(MAX_P, Math.max(MIN_P, pts));
+                lines.push(name + ' | ' + terms + ' | ' + pts);
+            });
+            store.value = lines.join('\n');
+        }
+
+        function refresh() {
+            var n = rowsEl.children.length;
+            emptyEl.classList.toggle('d-none', n > 0);
+            countEl.textContent = n + ' / ' + MAX;
+            if (addBtn) addBtn.disabled = n >= MAX || addBtn.closest('fieldset[disabled]') !== null;
+        }
+
+        function addRow(name, terms, points) {
+            if (rowsEl.children.length >= MAX) return null;
+            var row = document.createElement('div');
+            row.className = 'sig-row';
+            function cell(field, type, value, placeholder, cls) {
+                var d = document.createElement('div');
+                var i = document.createElement('input');
+                i.type = type; i.value = value; i.className = 'form-control sig-cell ' + (cls || '');
+                i.setAttribute('data-f', field); i.placeholder = placeholder;
+                if (type === 'number') { i.min = MIN_P; i.max = MAX_P; i.step = 1; }
+                else i.maxLength = field === 'name' ? 80 : 300;
+                i.addEventListener('input', serialize);
+                i.addEventListener('blur', function () {
+                    if (field === 'points') {
+                        var p = parseInt(i.value, 10);
+                        i.value = isNaN(p) ? 10 : Math.min(MAX_P, Math.max(MIN_P, p));
+                        serialize();
+                    }
+                });
+                d.appendChild(i);
+                return d;
+            }
+            row.appendChild(cell('name', 'text', name || '', 'Örn. Üretim yapıyor'));
+            row.appendChild(cell('terms', 'text', terms || '', 'fabrika, imalat, üretim tesisi'));
+            row.appendChild(cell('points', 'number', points || 10, '10', 'sig-points'));
+            var del = document.createElement('div');
+            var b = document.createElement('button');
+            b.type = 'button'; b.className = 'sig-del'; b.title = 'Bu ölçütü sil'; b.setAttribute('aria-label', 'Bu ölçütü sil'); b.textContent = '×';
+            b.addEventListener('click', function () { row.remove(); serialize(); refresh(); });
+            del.appendChild(b); row.appendChild(del);
+            rowsEl.appendChild(row);
+            return row;
+        }
+
+        function load() {
+            rowsEl.innerHTML = '';
+            (store.value || '').split('\n').forEach(function (line) {
+                if (!line.trim()) return;
+                var p = line.split('|').map(function (x) { return x.trim(); });
+                if (!p[0]) return;
+                var pts = parseInt(p[2], 10);
+                addRow(p[0], p[1] || '', isNaN(pts) ? 10 : pts);
+            });
+            refresh();
+        }
+
+        if (addBtn) addBtn.addEventListener('click', function () {
+            var row = addRow('', '', 10);
+            if (row) { refresh(); row.querySelector('[data-f=name]').focus(); }
+        });
+        // Yapay zeka onerisi / site taslagi alani doldurunca satirlar yeniden cizilir.
+        store.addEventListener('signals:reload', load);
+        load();
+    })();
+</script>
 @if (isAdmin)
 {
     <script>
@@ -219,6 +338,7 @@
                         setField('CustomerKind', p.customerKind || '');
                         setField('BuyingSignals', p.buyingSignals);
                         setField('ScoringSignals', p.scoringSignals);
+                        document.getElementById('ScoringSignals').dispatchEvent(new Event('signals:reload'));
                         setField('TargetTitles', res.titles);
                         status.className = 'small mt-2 text-success';
                         status.textContent = 'Taslak dolduruldu. Kontrol edip düzeltin, ardından Kaydet\'e basın.';
@@ -250,6 +370,7 @@
                     .then(function (res) {
                         if (!res.ok) throw new Error(res.error || 'Öneri alınamadı.');
                         existing.value = res.lines;
+                        existing.dispatchEvent(new Event('signals:reload'));
                         signalsStatus.className = 'small mt-1 text-success';
                         signalsStatus.textContent = 'Öneri dolduruldu. Kontrol edip düzeltin, ardından Kaydet\'e basın.';
                     })

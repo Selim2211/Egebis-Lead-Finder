@@ -43,6 +43,15 @@ public class IcpController : Controller
     public IActionResult NaceSearch(string? q) =>
         Json(NaceCatalog.SearchActivities(q, 15).Select(a => new { code = NaceCatalog.FormatSixDigit(a.Key), name = a.Value }));
 
+    /// <summary>6 haneli (bölüm altı) kodlar en fazla 16 tane; 2 haneli bölümler bu sınıra girmez.</summary>
+    public const int MaxSixDigitNace = 16;
+
+    public static List<string> LimitSixDigit(List<string> codes)
+    {
+        var six = 0;
+        return codes.Where(c => c.Length <= 2 || ++six <= MaxSixDigitNace).ToList();
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Index(
@@ -51,8 +60,8 @@ public class IcpController : Controller
     {
         await _icp.SaveAsync(new IcpProfile
         {
-            NaceCodes = (nace ?? new List<string>()).Select(NaceCatalog.NormalizeFull).OfType<string>()
-                .Where(NaceCatalog.Exists).Distinct().ToList(),
+            NaceCodes = LimitSixDigit((nace ?? new List<string>()).Select(NaceCatalog.NormalizeFull).OfType<string>()
+                .Where(NaceCatalog.Exists).Distinct().ToList()),
             IndustryKeywords = SplitList(industries),
             Cities = SplitList(cities),
             Countries = SplitList(countries),

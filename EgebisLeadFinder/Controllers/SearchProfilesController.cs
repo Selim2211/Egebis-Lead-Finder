@@ -89,14 +89,90 @@ public class SearchProfilesController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    /// <summary>Gorunen profilleri Excel veya CSV olarak indirir.</summary>
+    private const string XlsxType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    /// <summary>
+    /// Gorunen profilleri (ids verilirse yalnizca secilenleri) indirir. Excel, "İçe aktar" ile geri
+    /// yuklenebilen bicimdedir (aciklama sayfasiyla); CSV yalnizca okumak icindir.
+    /// </summary>
     [HttpGet]
-    public async Task<IActionResult> Export(string? format, CancellationToken ct)
+    public async Task<IActionResult> Export(string? format, int[]? ids, CancellationToken ct)
     {
-        var table = ExportService.SearchProfileTable(await VisibleAsync(ct), User.UserId());
+        var profiles = await VisibleAsync(ct);
+        if (ids is { Length: > 0 }) profiles = profiles.Where(p => ids.Contains(p.Id)).ToList();
+
         var stamp = DateTime.Now.ToString("yyyyMMdd-HHmm");
-        return string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase)
-            ? File(ExportService.ToCsv(table), "text/csv; charset=utf-8", $"arama-profilleri-{stamp}.csv")
-            : File(ExportService.ToXlsx(new[] { table }), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"arama-profilleri-{stamp}.xlsx");
+        AuditActionFilter.SetAuditSummary(HttpContext, $"Arama profilleri dışa aktarıldı ({profiles.Count} profil)");
+        if (string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase))
+            return File(ExportService.ToCsv(ExportService.SearchProfileTable(profiles, User.UserId())), "text/csv; charset=utf-8", $"arama-profilleri-{stamp}.csv");
+        return File(SearchProfileTransfer.Build(profiles, template: false), XlsxType, $"arama-profilleri-{stamp}.xlsx");
+    }
+
+    /// <summary>Ice aktarma sablonu: ornek satirlar ve alan aciklamalari.</summary>
+    [HttpGet]
+    public IActionResult Template() =>
+        File(SearchProfileTransfer.Build(Array.Empty<SearchProfile>(), template: true), XlsxType, "arama-profili-sablonu.xlsx");
+
+    /// <summary>Excel'deki profilleri ice aktarir. Hatali satirlar atlanir, ayni adli profil varsa o satir atlanir.</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [RequestSizeLimit(2_000_000)]
+    public async Task<IActionResult> Import(IFormFile? file, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+        {
+            TempData["ProfilesError"] = "İçe aktarmak için bir Excel (.xlsx) dosyası seçin.";
+            return RedirectToAction(nameof(Index));
+        }
+        if (!Path.GetExtension(file.FileName).Equals(".xlsx", StringComparison.OrdinalIgnoreCase) || file.Length > SearchProfileTransfer.MaxFileBytes)
+        {
+            TempData["ProfilesError"] = "Yalnızca 1 MB'a kadar .xlsx dosyası yüklenebilir. Şablonu indirip onu doldurun.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        SearchProfileTransfer.ParseResult parsed;
+        await using (var stream = file.OpenReadStream())
+            parsed = SearchProfileTransfer.Parse(stream);
+        if (parsed.FileError is not null && parsed.Rows.Count == 0)
+        {
+            TempData["ProfilesError"] = parsed.FileError;
+            return RedirectToAction(nameof(Index));
+        }
+
+        var me = User.UserId();
+        var mine = await _db.SearchProfiles.Where(p => p.OwnerUserId == me).Select(p => p.Name).ToListAsync(ct);
+        var names = new HashSet<string>(mine, StringComparer.OrdinalIgnoreCase);
+
+        var created = 0;
+        var problems = new List<string>();
+        foreach (var row in parsed.Rows)
+        {
+            if (row.Error is not null) { problems.Add($"Satır {row.LineNo}: {row.Error}"); continue; }
+            if (!names.Add(row.Name!)) { problems.Add($"Satır {row.LineNo}: \"{row.Name}\" adlı profiliniz zaten var, atlandı."); continue; }
+
+            _db.SearchProfiles.Add(new SearchProfile
+            {
+                Name = row.Name!,
+                Industry = row.Industry,
+                NaceCode = row.Nace,
+                RegionKey = row.RegionKey,
+                Country = row.Country,
+                City = row.City,
+                MaxCompanies = row.MaxCompanies,
+                IsPublic = row.IsPublic,
+                OwnerUserId = me
+            });
+            created++;
+        }
+        if (created > 0) await _db.SaveChangesAsync(ct);
+
+        AuditActionFilter.SetAuditSummary(HttpContext, $"Arama profili içe aktarıldı: {created} eklendi, {problems.Count} satır atlandı");
+        TempData["ProfilesOk"] = created > 0 ? $"{created} arama profili eklendi." : null;
+        var notes = parsed.FileError is null ? problems : problems.Append(parsed.FileError).ToList();
+        if (notes.Count > 0)
+            TempData[created > 0 ? "ProfilesNotes" : "ProfilesError"] = created > 0
+                ? string.Join("\n", notes.Take(10))
+                : "Hiçbir profil eklenmedi. " + string.Join(" ", notes.Take(5));
+        return RedirectToAction(nameof(Index));
     }
 }

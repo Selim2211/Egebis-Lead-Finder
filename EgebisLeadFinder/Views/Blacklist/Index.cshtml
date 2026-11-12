@@ -1,0 +1,109 @@
+@model BlacklistViewModel
+@using EgebisLeadFinder.Services
+@{
+    ViewData["Title"] = "Black List";
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var filtered = !string.IsNullOrWhiteSpace(Model.Q) || !string.IsNullOrWhiteSpace(Model.Type);
+}
+
+<div class="page-head">
+    <div>
+        <h1>Black List</h1>
+        <div class="page-sub">Aramada bulunsa dahi gösterilmeyecek firmalar. Firma kartındaki "Blackliste ekle" düğmesi buraya ekler; listeden çıkarırsanız firma aramalarda tekrar görünebilir.</div>
+    </div>
+</div>
+
+@if (TempData["SettingsSaved"] is string saved)
+{
+    <div class="alert alert-success" data-flash="success">@saved</div>
+}
+@if (TempData["SettingsError"] is string err)
+{
+    <div class="alert alert-danger" data-flash="error">@err</div>
+}
+
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="post" asp-action="Add" class="d-flex gap-2">
+            @Html.AntiForgeryToken()
+            <input class="form-control" name="entry" maxlength="200" spellcheck="false" autocomplete="off"
+                   placeholder="ornek-firma.com veya Örnek Makina" aria-label="Eklenecek alan adı veya firma adı" />
+            <button type="submit" class="btn btn-primary text-nowrap">Ekle</button>
+        </form>
+    </div>
+</div>
+
+<form method="get" class="card mb-3">
+    <div class="card-body row g-2 align-items-end">
+        <div class="col-12 col-md-5">
+            <label class="form-label small" for="q">Ara</label>
+            <input class="form-control form-control-sm" id="q" name="q" value="@Model.Q" placeholder="Alan adı veya firma adı" autocomplete="off" />
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label small" for="type">Tür</label>
+            <select class="form-select form-select-sm" id="type" name="type">
+                <option value="">Tümü</option>
+                <option value="@BlacklistListing.TypeDomain" selected="@(Model.Type == BlacklistListing.TypeDomain)">Alan adı</option>
+                <option value="@BlacklistListing.TypeName" selected="@(Model.Type == BlacklistListing.TypeName)">Firma adı</option>
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small" for="sort">Sırala</label>
+            <select class="form-select form-select-sm" id="sort" name="sort">
+                <option value="@BlacklistListing.Newest" selected="@(Model.Sort == BlacklistListing.Newest)">En yeni</option>
+                <option value="@BlacklistListing.Oldest" selected="@(Model.Sort == BlacklistListing.Oldest)">En eski</option>
+                <option value="@BlacklistListing.AZ" selected="@(Model.Sort == BlacklistListing.AZ)">Ada göre A → Z</option>
+                <option value="@BlacklistListing.ZA" selected="@(Model.Sort == BlacklistListing.ZA)">Ada göre Z → A</option>
+            </select>
+        </div>
+        <div class="col-12 col-md-2 d-flex gap-1">
+            <button class="btn btn-sm btn-primary flex-grow-1" type="submit">Filtrele</button>
+            <a class="btn btn-sm btn-outline-secondary" asp-action="Index" title="Temizle">×</a>
+        </div>
+    </div>
+</form>
+
+<div class="card">
+    @if (Model.Items.Count == 0)
+    {
+        <div class="empty-state">
+            <div class="empty-title">@(filtered ? "Eşleşen kayıt yok" : "Black List boş")</div>
+            <div>@(filtered ? "Filtreyi değiştirin veya temizleyin." : "Firma kartından \"Blackliste ekle\" ile ya da yukarıdan elle ekleyin.")</div>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Kayıt</th>
+                        <th style="width:9rem">Tür</th>
+                        <th style="width:7rem" class="text-end">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var item in Model.Items)
+                {
+                    <tr>
+                        <td class="text-break">@item</td>
+                        <td><span class="tag tag-muted">@(SearchBlacklist.IsDomain(item) ? "Alan adı" : "Firma adı")</span></td>
+                        <td class="text-end">
+                            <form method="post" asp-action="Remove" class="d-inline m-0">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="entry" value="@item" />
+                                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                        data-confirm="Bu kayıt listeden çıkarılır; firma aramalarda tekrar görünebilir."
+                                        data-confirm-title="Black List'ten çıkarılsın mı?" data-confirm-subject="@item"
+                                        data-confirm-ok="Listeden çıkar" data-confirm-tone="danger">Çıkar</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+<partial name="_Pager" model="Model.Pager" />

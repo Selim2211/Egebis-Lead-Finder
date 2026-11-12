@@ -23,16 +23,28 @@
         <div class="page-sub">Firma aramaları bu profillerle yapılır. Varsayılan profil, firma adıyla aramada kullanılır.</div>
     </div>
     <div class="d-flex gap-2 align-items-center">
+        <details class="export-menu">
+            <summary class="btn btn-outline-secondary btn-sm">İçe aktar ▾</summary>
+            <div class="export-menu-list">
+                <a asp-action="Template" title="Örnek satırlar ve alan açıklamaları içeren Excel dosyası">Şablonu indir (.xlsx)</a>
+                <a href="#" id="profileImportPick">Excel dosyası yükle…</a>
+            </div>
+        </details>
         @if (Model.Profiles.Count > 0)
         {
             <details class="export-menu">
                 <summary class="btn btn-outline-secondary btn-sm">Dışa aktar ▾</summary>
                 <div class="export-menu-list">
-                    <a asp-action="Export" asp-route-format="xlsx">Excel (.xlsx)</a>
-                    <a asp-action="Export" asp-route-format="csv">CSV (.csv)</a>
+                    <a href="#" id="profileExportSelected" title="Tablodaki kutucuklarla seçtiğiniz profiller">Seçilenler (.xlsx)</a>
+                    <a asp-action="Export" asp-route-format="xlsx">Tümü · Excel (.xlsx)</a>
+                    <a asp-action="Export" asp-route-format="csv">Tümü · CSV (.csv)</a>
                 </div>
             </details>
         }
+        <form method="post" asp-action="Import" enctype="multipart/form-data" class="d-none" id="profileImportForm">
+            @Html.AntiForgeryToken()
+            <input type="file" name="file" id="profileImportFile" accept=".xlsx" />
+        </form>
         <button type="button" class="btn btn-accent" data-profile-new>Yeni Arama Profili</button>
     </div>
 </div>
@@ -44,6 +56,10 @@
 @if (TempData["ProfilesError"] is string err)
 {
     <div class="alert alert-danger" data-flash="error">@err</div>
+}
+@if (TempData["ProfilesNotes"] is string notes)
+{
+    <div class="alert alert-warning" data-flash="warning" style="white-space:pre-line">@notes</div>
 }
 @if (TempData["SettingsSaved"] is string saved)
 {
@@ -69,6 +85,7 @@
             <table class="table table-hover align-middle mb-0" id="profilesTable">
                 <thead>
                     <tr>
+                        <th style="width:2rem"><input type="checkbox" class="form-check-input" id="profileSelectAll" aria-label="Tümünü seç" /></th>
                         <th style="min-width:12rem">Profil</th>
                         <th style="min-width:9rem">Sektör / NACE</th>
                         <th>Ülke ve il</th>
@@ -83,6 +100,7 @@
                     var dto = SearchProfileDto.From(p, me, isAdmin);
                     var isDefault = Model.DefaultProfileId == p.Id;
                     <tr>
+                        <td><input type="checkbox" class="form-check-input profile-select" value="@p.Id" aria-label="Profili seç" /></td>
                         <td>
                             <div class="cell-title">
                                 @p.Name
@@ -165,5 +183,27 @@
     <partial name="_SearchProfileModalScript" />
     <script>
         document.addEventListener('searchprofile:saved', function () { location.reload(); });
+
+        // Ice aktar: dosya secilince form kendiliginden gonderilir.
+        (function () {
+            var pick = document.getElementById('profileImportPick');
+            var file = document.getElementById('profileImportFile');
+            if (pick && file) {
+                pick.addEventListener('click', function (e) { e.preventDefault(); file.click(); });
+                file.addEventListener('change', function () { if (file.files.length) document.getElementById('profileImportForm').submit(); });
+            }
+
+            // Secilenleri disa aktar
+            var all = document.getElementById('profileSelectAll');
+            var boxes = function () { return Array.prototype.slice.call(document.querySelectorAll('.profile-select')); };
+            if (all) all.addEventListener('change', function () { boxes().forEach(function (b) { b.checked = all.checked; }); });
+            var exp = document.getElementById('profileExportSelected');
+            if (exp) exp.addEventListener('click', function (e) {
+                e.preventDefault();
+                var ids = boxes().filter(function (b) { return b.checked; }).map(function (b) { return 'ids=' + encodeURIComponent(b.value); });
+                if (!ids.length) { alert('Önce tablodan en az bir profil seçin.'); return; }
+                location.href = '@Url.Action("Export")?format=xlsx&' + ids.join('&');
+            });
+        })();
     </script>
 }

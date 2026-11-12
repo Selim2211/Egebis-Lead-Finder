@@ -10,7 +10,7 @@ public static class ContactMerger
 {
     // Apollo listeleme artik kredisiz oldugu icin (bkz. HybridContactEnrichmentService)
     // TOFAŞ gibi buyuk firmalarda onlarca aday birikebilir; eski 10 siniri bunu keserdi.
-    private const int MaxContactsPerCompany = 60;
+    private const int MaxContactsPerCompany = 16;
 
     /// <summary>Arama motorunun unvani kirptigini gosteren sonekler.</summary>
     private static readonly string[] EllipsisSuffixes = { "...", "…" };

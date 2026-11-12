@@ -140,7 +140,7 @@ public class ContactMergerTests
     [Fact]
     public void Azami_kisi_sinirinin_uzeri_kesilir()
     {
-        // Apollo listelemesi kredisiz oldugu icin sinir yuksek tutulur (60);
+        // Apollo listelemesi kredisiz oldugu icin sinir 16 tutulur;
         // burada sinirin var oldugunu ve en yuksek puanlilarin kaldigini dogrularz.
         var existing = Enumerable.Range(1, 40)
             .Select(i => new Contact { Name = $"Kişi {i}", TitleScore = i })
@@ -152,7 +152,7 @@ public class ContactMergerTests
 
         var merged = ContactMerger.Merge(existing, incoming);
 
-        Assert.Equal(60, merged.Count);
+        Assert.Equal(16, merged.Count);
         // En yuksek unvan puanlilar tutulur.
         Assert.Equal(80, merged[0].TitleScore);
     }

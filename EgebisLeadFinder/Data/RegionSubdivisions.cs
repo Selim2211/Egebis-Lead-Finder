@@ -11,6 +11,19 @@ public static class RegionSubdivisions
 
     private static readonly Dictionary<string, Group[]> Data = new(StringComparer.OrdinalIgnoreCase)
     {
+        // ABD eyaletleri (ABD Nüfus Sayımı bölgelerine göre); sorgular İngilizce kurulduğu için adlar İngilizce.
+        ["US"] = new[]
+        {
+            new Group("Kuzeydoğu", new[] { "Connecticut", "Maine", "Massachusetts", "New Hampshire", "Rhode Island", "Vermont",
+                "New Jersey", "New York", "Pennsylvania" }),
+            new Group("Orta Batı", new[] { "Illinois", "Indiana", "Michigan", "Ohio", "Wisconsin", "Iowa", "Kansas", "Minnesota",
+                "Missouri", "Nebraska", "North Dakota", "South Dakota" }),
+            new Group("Güney", new[] { "Delaware", "Florida", "Georgia", "Maryland", "North Carolina", "South Carolina", "Virginia",
+                "West Virginia", "District of Columbia", "Alabama", "Kentucky", "Mississippi", "Tennessee", "Arkansas", "Louisiana",
+                "Oklahoma", "Texas" }),
+            new Group("Batı", new[] { "Arizona", "Colorado", "Idaho", "Montana", "Nevada", "New Mexico", "Utah", "Wyoming",
+                "Alaska", "California", "Hawaii", "Oregon", "Washington" })
+        },
         ["DE"] = new[]
         {
             new Group("Güney", new[] { "Baden-Württemberg", "Bayern" }),

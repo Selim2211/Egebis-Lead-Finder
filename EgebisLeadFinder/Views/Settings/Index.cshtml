@@ -1,4 +1,4 @@
-@model SettingsViewModel
+﻿@model SettingsViewModel
 @{
     ViewData["Title"] = "Ayarlar";
 }
@@ -24,9 +24,19 @@
     <a class="btn btn-outline-secondary btn-sm" asp-controller="Audit" asp-action="Index">Audit log</a>
     <a class="btn btn-outline-secondary btn-sm" asp-controller="Usage" asp-action="Index">API Kullanımı</a>
     <a class="btn btn-outline-secondary btn-sm" asp-controller="Usage" asp-action="Credits">Kullanılan Krediler</a>
+    <a class="btn btn-outline-secondary btn-sm" asp-controller="Usage" asp-action="Users">Kullanıcı Harcaması</a>
     <a class="btn btn-outline-secondary btn-sm" asp-controller="Diagnostics" asp-action="Index">Sistem Teşhisi ve Loglar</a>
 </div>
 
+<a class="card card-link mb-4 d-block text-decoration-none" asp-controller="Blacklist" asp-action="Index">
+    <div class="card-body d-flex align-items-center gap-3">
+        <div class="flex-grow-1">
+            <div class="fw-semibold">Black List</div>
+            <div class="small text-muted-2">Aramada gösterilmeyecek firmaları listeleyin, arayın ve yönetin. Firma kartındaki "Blackliste ekle" buraya ekler.</div>
+        </div>
+        <span aria-hidden="true">→</span>
+    </div>
+</a>
 <a class="card card-link mb-4 d-block text-decoration-none" asp-controller="Usage" asp-action="Credits">
     <div class="card-body d-flex align-items-center gap-3">
         <div class="flex-grow-1">
@@ -115,16 +125,6 @@
                         Aramalar bu bölgede yapılır: Google sonuçları o ülkeden gelir ve sorgular o ülkenin
                         dilinde kurulur (ör. Almanya'da "Hersteller", İngiltere'de "manufacturers").
                         Türkiye'de il seçimi kutucuklarla yapılır; diğer bölgelerde şehir adını elle yazarsınız.
-                    </div>
-                </div>
-                <div class="col-12">
-                    <label class="form-label" asp-for="ExtraBlockedDomains">Black List</label>
-                    <textarea class="form-control" asp-for="ExtraBlockedDomains" rows="4" spellcheck="false"
-                              placeholder="ornek-firma.com&#10;Örnek Makina"></textarea>
-                    <div class="form-text">
-                        Aramada bulunsa dahi gösterilmeyecek firmalar. Her satıra bir alan adı veya firma adı yazın.
-                        Haber siteleri, rehberler, pazaryerleri ve sosyal medya zaten eleniyor; burası ek liste.
-                        Listeye eklemek daha önce havuza girmiş firmaları silmez.
                     </div>
                 </div>
             </div>

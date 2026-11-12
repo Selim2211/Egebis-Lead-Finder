@@ -157,8 +157,8 @@ public static class SettingKeys
     public const string GeneratedTemplateIds = "Templates:GeneratedIds";
 
 
-    public const int DefaultSearchMaxCompanies = 100;
-    public const int SearchMaxCompaniesUpperLimit = 200;
+    public const int DefaultSearchMaxCompanies = 32;
+    public const int SearchMaxCompaniesUpperLimit = 64;
     public const string DefaultSearchCountry = "Türkiye";
 
     /// <summary>Ayarlar ekranindaki tum anahtarlar.</summary>

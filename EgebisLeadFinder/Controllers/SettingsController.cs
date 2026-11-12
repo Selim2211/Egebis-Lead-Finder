@@ -1,4 +1,4 @@
-using EgebisLeadFinder.Data;
+﻿using EgebisLeadFinder.Data;
 using EgebisLeadFinder.Configuration;
 using EgebisLeadFinder.Models;
 using EgebisLeadFinder.Services;
@@ -83,7 +83,7 @@ public class SettingsController : Controller
             [SettingKeys.FollowUpAfterDays] = form.FollowUpAfterDays is > 0 and < 365
                 ? form.FollowUpAfterDays.ToString()
                 : null,
-            [SettingKeys.ExtraBlockedDomains] = Clean(form.ExtraBlockedDomains),
+            // Black List artik ayri ekleme/silme islemleriyle yonetilir (BlacklistAdd / BlacklistRemove); buradan ezilmez.
 
             [SettingKeys.SmtpFromAddress] = Clean(form.SmtpFromAddress),
             [SettingKeys.SmtpFromName] = Clean(form.SmtpFromName),

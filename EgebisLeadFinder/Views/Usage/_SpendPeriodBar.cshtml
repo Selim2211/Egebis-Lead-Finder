@@ -1,0 +1,24 @@
+@model UserSpendViewModel
+@using EgebisLeadFinder.Services
+@{
+    var action = (string)ViewContext.RouteData.Values["action"]!;
+    var p = Model.Period;
+    string Url2(string kind, DateOnly date) => Model.UserId is int uid
+        ? Url.Action(action, "Usage", new { id = uid, period = kind, date = date.ToString("yyyy-MM-dd") })!
+        : Url.Action(action, "Usage", new { period = kind, date = date.ToString("yyyy-MM-dd") })!;
+}
+<div class="card mb-3">
+    <div class="card-body d-flex flex-wrap align-items-center gap-3">
+        <div class="btn-group" role="group" aria-label="Dönem">
+            <a class="btn btn-sm @(p.Kind == CreditsPeriod.Day ? "btn-accent" : "btn-outline-secondary")" href="@Url2(CreditsPeriod.Day, p.From)">Gün</a>
+            <a class="btn btn-sm @(p.Kind == CreditsPeriod.Week ? "btn-accent" : "btn-outline-secondary")" href="@Url2(CreditsPeriod.Week, p.From)">Hafta</a>
+            <a class="btn btn-sm @(p.Kind == CreditsPeriod.Month ? "btn-accent" : "btn-outline-secondary")" href="@Url2(CreditsPeriod.Month, p.From)">Ay</a>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <a class="btn btn-sm btn-outline-secondary" href="@Url2(p.Kind, p.Prev)" aria-label="Önceki dönem" title="Önceki">‹</a>
+            <strong class="credits-label">@p.Label</strong>
+            <a class="btn btn-sm btn-outline-secondary" href="@Url2(p.Kind, p.Next)" aria-label="Sonraki dönem" title="Sonraki">›</a>
+        </div>
+        <a class="btn btn-sm btn-outline-secondary ms-lg-auto" href="@Url2(p.Kind, UsageService.Today)">Bugün</a>
+    </div>
+</div>

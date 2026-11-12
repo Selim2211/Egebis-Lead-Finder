@@ -43,6 +43,30 @@ public sealed partial class SearchBlacklist
         return new SearchBlacklist(domains, names);
     }
 
+    /// <summary>Kayitli metindeki ogeler (alan adi ya da firma adi), girildigi haliyle ve tekrarsiz.</summary>
+    public static List<string> Entries(string? text) =>
+        (text ?? string.Empty)
+            .Split(new[] { '\n', '\r', ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    /// <summary>Oge bir alan adi mi (aksi halde firma adi)?</summary>
+    public static bool IsDomain(string entry) => AsDomain(entry) is not null;
+
+    /// <summary>Yeni ogeyi listeye ekler (adres yazildiysa alan adina cevrilir); zaten varsa metni degistirmez.</summary>
+    public static string Add(string? text, string? entry)
+    {
+        var list = Entries(text);
+        var value = (entry ?? string.Empty).Trim();
+        if (value.Length == 0) return string.Join('\n', list);
+        value = AsDomain(value) ?? value;
+        if (!list.Contains(value, StringComparer.OrdinalIgnoreCase)) list.Add(value);
+        return string.Join('\n', list);
+    }
+
+    public static string Remove(string? text, string? entry) =>
+        string.Join('\n', Entries(text).Where(e => !string.Equals(e, (entry ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase)));
+
     /// <summary>Tek harfli gibi cok kisa adlar butun sonuclari elemesin.</summary>
     private const int MinNameLength = 2;
 

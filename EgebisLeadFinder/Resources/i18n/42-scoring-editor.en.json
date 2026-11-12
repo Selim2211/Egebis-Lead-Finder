@@ -1,0 +1,9 @@
+{
+  "Ölçüt adı": "Criterion name",
+  "Kelimeler (virgülle ayırın)": "Keywords (comma separated)",
+  "Henüz ölçüt yok. \"Ölçüt ekle\"ye basın.": "No criteria yet. Press \"Add criterion\".",
+  "+ Ölçüt ekle": "+ Add criterion",
+  "Her satır bir ölçüttür. Firma bu kelimelerden birine uyuyorsa puan alır ve puan dökümünde “Anahtar kelime: Ölçüt adı” olarak görünür (puan 3-20, en fazla 12 ölçüt). Hücreye tıklayıp doğrudan düzenleyin. Boş bırakırsanız yapay zekâ tanımınızdan üretir.": "Each row is one criterion. A company earns the points if it matches one of these keywords, and it shows in the score breakdown as “Keyword: Criterion name” (3-20 points, at most 12 criteria). Click a cell to edit it directly. If left empty, the AI generates them from your description.",
+  "Örn. Üretim yapıyor": "e.g. Does manufacturing",
+  "Bu ölçütü sil": "Delete this criterion"
+}

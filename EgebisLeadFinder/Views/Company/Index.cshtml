@@ -563,16 +563,13 @@ else
                         </button>
                     }
                     <button type="submit" form="stageForm"
-                            formaction="@Url.Action("SyncToSalesforce", new { id = company.Id })"
-                            class="action-btn action-salesforce @(company.SalesforceId is not null ? "is-active" : "")"
-                            title="@(company.SalesforceId is not null
-                                       ? $"Salesforce'ta kayıtlı · {company.SalesforceSyncedAt?.ToLocalTime():dd.MM.yyyy} — tekrar göndermek için tıklayın"
-                                       : "Salesforce'a Aktar")">
+                            formaction="@Url.Action("AddToBlacklist", new { id = company.Id })"
+                            class="action-btn action-blacklist"
+                            title="@($"{company.Domain} alan adını Black List'e ekle; bu firma bir daha aramalarda çıkmaz")">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
-                            <path d="m3.3 7 8.7 5 8.7-5M12 22V12" />
+                            <circle cx="12" cy="12" r="9" /><path d="m5.6 5.6 12.8 12.8" />
                         </svg>
-                        <span class="action-label">@(company.SalesforceId is not null ? "SF'de" : "Salesforce")</span>
+                        <span class="action-label">Blackliste ekle</span>
                     </button>
                     <button type="button" class="action-btn action-compare" title="Karşılaştırmaya ekle (iki firma seçin)"
                             data-compare-add="@company.Id" data-company-name="@company.Name">

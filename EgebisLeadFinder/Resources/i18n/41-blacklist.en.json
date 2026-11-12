@@ -1,0 +1,13 @@
+{
+  "Black List'e eklemek için bir alan adı veya firma adı yazın.": "Type a domain or company name to add to the Black List.",
+  "Black List'e eklendi.": "Added to the Black List.",
+  "Black List'ten çıkarıldı.": "Removed from the Black List.",
+  "Firma Black List'e eklendi. Ayarlar'dan geri çıkarabilirsiniz.": "Company added to the Black List. You can remove it again in Settings.",
+  "kayıt": "entries",
+  "Aramada bulunsa dahi gösterilmeyecek firmalar. Alan adı (ornek-firma.com) veya firma adı (Örnek Makina) ekleyin. Firmalar ekranındaki \"Blackliste ekle\" düğmesi de buraya ekler. Listeden silerseniz firma aramalarda tekrar çıkabilir. Listeye eklemek daha önce havuza girmiş firmaları silmez.": "Companies that will not be shown even if found in a search. Add a domain (example-company.com) or a company name (Example Machinery). The \"Add to blacklist\" button on the Companies screen also adds here. If you remove an entry, the company can appear in searches again. Adding to the list does not delete companies already in the pool.",
+  "ornek-firma.com veya Örnek Makina": "example-company.com or Example Machinery",
+  "Black List boş.": "The Black List is empty.",
+  "Çıkar": "Remove",
+  "Listeden çıkar": "Remove from list",
+  "Blackliste ekle": "Add to blacklist"
+}

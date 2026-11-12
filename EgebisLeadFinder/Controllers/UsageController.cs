@@ -44,6 +44,51 @@ public class UsageController : Controller
         return View(new CreditsViewModel { Report = report, Runs = runs });
     }
 
+    private static CreditsPeriod ResolvePeriod(string? period, string? date)
+    {
+        var today = UsageService.Today;
+        var anchor = DateOnly.TryParseExact(date, "yyyy-MM-dd", out var d) ? d : today;
+        if (anchor < new DateOnly(2020, 1, 1)) anchor = new DateOnly(2020, 1, 1);
+        if (anchor > today.AddYears(1)) anchor = today;
+        return CreditsPeriod.Resolve(period, anchor);
+    }
+
+    /// <summary>Kullanici bazli API harcamasi (yonetici): kim, secilen donemde kac arama yapti, ne kadar kredi harcadi.</summary>
+    [HttpGet]
+    [Microsoft.AspNetCore.Authorization.Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<IActionResult> Users(string? period, string? date, [FromServices] Data.ApplicationDbContext db, CancellationToken ct)
+    {
+        var resolved = ResolvePeriod(period, date);
+        var (fromUtc, toUtc) = resolved.UtcRange();
+        var runs = await db.SearchRuns.AsNoTracking().Include(r => r.User)
+            .Where(r => r.StartedAt >= fromUtc && r.StartedAt < toUtc).ToListAsync(ct);
+
+        Response.Headers.CacheControl = "no-store";
+        return View(new UserSpendViewModel { Period = resolved, Users = UserSpendReport.ByUser(runs) });
+    }
+
+    /// <summary>Tek kullanicinin API harcama profili (yonetici): gun gun grafik ve o donemdeki aramalari.</summary>
+    [HttpGet]
+    [Microsoft.AspNetCore.Authorization.Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<IActionResult> UserProfile(int id, string? period, string? date, [FromServices] Data.ApplicationDbContext db, CancellationToken ct)
+    {
+        var name = await db.Users.AsNoTracking().Where(u => u.Id == id).Select(u => u.UserName).FirstOrDefaultAsync(ct);
+        if (name is null) return NotFound();
+
+        var resolved = ResolvePeriod(period, date);
+        var (fromUtc, toUtc) = resolved.UtcRange();
+        var runs = await db.SearchRuns.AsNoTracking()
+            .Where(r => r.UserId == id && r.StartedAt >= fromUtc && r.StartedAt < toUtc)
+            .OrderByDescending(r => r.StartedAt).ToListAsync(ct);
+
+        Response.Headers.CacheControl = "no-store";
+        return View(new UserSpendViewModel
+        {
+            Period = resolved, UserId = id, UserName = name,
+            Days = UserSpendReport.ByDay(runs, resolved), Runs = runs.Take(100).ToList()
+        });
+    }
+
     /// <summary>Acilis uyarisi penceresi (layout sayfa acildiktan sonra yukler; bos yanit = sorun yok).</summary>
     [HttpGet]
     public IActionResult StartupAlert()

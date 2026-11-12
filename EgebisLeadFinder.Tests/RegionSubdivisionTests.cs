@@ -32,6 +32,12 @@ public class RegionSubdivisionTests
         Assert.Equal(16, RegionSubdivisions.For("DE").Sum(g => g.Items.Length));
         Assert.Contains("Bayern", RegionSubdivisions.For("DE").SelectMany(g => g.Items));
         Assert.False(RegionSubdivisions.Has("TR"));
-        Assert.False(RegionSubdivisions.Has("US"));
+    }
+
+    [Fact]
+    public void ABD_icin_elli_eyalet_ve_Washington_DC_vardir()
+    {
+        Assert.Equal(51, RegionSubdivisions.For("US").Sum(g => g.Items.Length));
+        Assert.Contains("Texas", RegionSubdivisions.For("US").SelectMany(g => g.Items));
     }
 }

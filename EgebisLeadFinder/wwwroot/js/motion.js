@@ -27,8 +27,12 @@
         // Gosterge, genislik animasyonu bitince yeniden hizalanir.
         setTimeout(function () { if (window.egPlaceIndicator) window.egPlaceIndicator(); }, 260);
     }
-    if (store('get', 'eg-side') === 'collapsed' && isDesktop()) body.classList.add('side-collapsed');
-    if (collapseBtn) collapseBtn.addEventListener('click', function () { setCollapsed(true); });
+    if (store('get', 'eg-side') === 'collapsed' && isDesktop()) {
+        body.classList.add('side-collapsed');
+        if (collapseBtn) { collapseBtn.setAttribute('aria-label', 'Menüyü genişlet'); collapseBtn.title = 'Menüyü genişlet'; }
+    }
+    // Ok hem daraltir hem (daraltilmisken) menuyu acik halde sabitler.
+    if (collapseBtn) collapseBtn.addEventListener('click', function () { setCollapsed(!body.classList.contains('side-collapsed')); });
 
     // ---- Mobil cekmece ----
     var backdrop = document.getElementById('egSideBackdrop');

@@ -323,7 +323,9 @@ main.container > *:nth-child(n+6) { animation-delay: 300ms; }
     :root { --side-w-collapsed: 66px; }
     .eg-side-collapse { opacity: 0; pointer-events: none; }
     .eg-side:hover .eg-side-collapse, .eg-side-collapse:focus-visible { opacity: 1; pointer-events: auto; }
-    body.side-collapsed .eg-side-collapse { display: none; }
+    /* Daraltilmisken ok yalnizca menunun ustune gelince (gecici acilma) gorunur; ok saga bakar, tiklayinca menu acik kalir (sabitlenir). */
+    body.side-collapsed .eg-side:not(:hover) .eg-side-collapse { display: none; }
+    body.side-collapsed .eg-side-collapse svg { transform: rotate(180deg); }
     body.side-collapsed .eg-side:not(:hover) .eg-side-label,
     body.side-collapsed .eg-side:not(:hover) .eg-side-brand-text,
     body.side-collapsed .eg-side:not(:hover) .eg-side-title,

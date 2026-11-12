@@ -87,8 +87,8 @@ public class SmartSearchTests
     [Theory]
     [InlineData(20, 30)]
     [InlineData(4, 9)]
-    [InlineData(100, 150)]
-    [InlineData(200, 250)]
+    [InlineData(32, 48)]
+    [InlineData(64, 96)]
     public void Toplama_hedefi_on_eleme_payi_icerir(int max, int expected) =>
         Assert.Equal(expected, SearchPlanService.CollectTargetFor(max));
 

@@ -1,4 +1,4 @@
-@model DashboardViewModel
+﻿@model DashboardViewModel
 @inject EgebisLeadFinder.Services.UsageService Usage
 @inject EgebisLeadFinder.Services.BusinessProfileService SellerProfiles
 @{
@@ -155,40 +155,8 @@
             </div>
         </div>
 
-        @* ---------- 7 günlük aktivite ---------- *@
-        <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <span>Son 7 gün</span>
-                <span class="chart-legend">
-                    <span class="legend-dot legend-mail"></span> gönderilen mail
-                    <span class="legend-dot legend-company"></span> eklenen firma
-                </span>
-            </div>
-            <div class="card-body">
-                @if (Model.ActivityMax == 0)
-                {
-                    <div class="text-muted-2 small">Son 7 günde hareket yok.</div>
-                }
-                else
-                {
-                    <div class="spark">
-                        @foreach (var day in Model.Activity)
-                        {
-                            <div class="spark-day" title="@day.Day.ToString("d MMMM", tr): @day.Mails mail, @day.Companies firma">
-                                <div class="spark-bars">
-                                    <span class="spark-bar spark-mail" style="height:@(Pct(day.Mails, Model.ActivityMax))%"></span>
-                                    <span class="spark-bar spark-company" style="height:@(Pct(day.Companies, Model.ActivityMax))%"></span>
-                                </div>
-                                <div class="spark-label">@day.Day.ToString("ddd", tr)</div>
-                            </div>
-                        }
-                    </div>
-                }
-            </div>
-        </div>
-
         @* ---------- En yüksek puanlı firmalar ---------- *@
-        <div class="card">
+        <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span>En yüksek puanlı firmalar</span>
                 <a class="small fw-semibold" asp-controller="Company" asp-action="Index">Tümünü gör →</a>
@@ -233,6 +201,38 @@
                     }
                 </div>
             }
+        </div>
+
+        @* ---------- 7 günlük aktivite ---------- *@
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span>Son 7 gün</span>
+                <span class="chart-legend">
+                    <span class="legend-dot legend-mail"></span> gönderilen mail
+                    <span class="legend-dot legend-company"></span> eklenen firma
+                </span>
+            </div>
+            <div class="card-body">
+                @if (Model.ActivityMax == 0)
+                {
+                    <div class="text-muted-2 small">Son 7 günde hareket yok.</div>
+                }
+                else
+                {
+                    <div class="spark">
+                        @foreach (var day in Model.Activity)
+                        {
+                            <div class="spark-day" title="@day.Day.ToString("d MMMM", tr): @day.Mails mail, @day.Companies firma">
+                                <div class="spark-bars">
+                                    <span class="spark-bar spark-mail" style="height:@(Pct(day.Mails, Model.ActivityMax))%"></span>
+                                    <span class="spark-bar spark-company" style="height:@(Pct(day.Companies, Model.ActivityMax))%"></span>
+                                </div>
+                                <div class="spark-label">@day.Day.ToString("ddd", tr)</div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
         </div>
     </div>
 

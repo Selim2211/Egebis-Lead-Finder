@@ -1,0 +1,17 @@
+{
+  "Kullanıcı Harcaması": "User Spending",
+  "Kullanıcı API Harcaması": "User API Spending",
+  "Kim ne kadar Serper kredisi ve yapay zekâ çağrısı harcadı. Bir kullanıcıya tıklayarak harcama profilini görün.": "Who spent how many Serper credits and AI calls. Click a user to see their spending profile.",
+  "yapılan arama": "searches made",
+  "Yapay zekâ": "AI",
+  "çağrı": "calls",
+  "Kullanıcıya göre harcama": "Spending by user",
+  "Özet tablo": "Summary table",
+  "Son arama": "Last search",
+  "Bu sayfa aramalarla birlikte kaydedilen Serper ve yapay zekâ harcamasını gösterir. Apollo e-posta açma ve günlük Gemini token toplamı kullanıcıya bağlı tutulmaz; onlar için \"Kullanılan Krediler\" sayfasına bakın.": "This page shows the Serper and AI spending recorded with each search. Apollo email reveals and the daily Gemini token totals are not tied to a user; see the \"Credits Used\" page for those.",
+  "Kullanıcı Harcama Profili": "User Spending Profile",
+  "API harcama profili: günlük Serper kredisi ve yapay zekâ çağrısı": "API spending profile: daily Serper credits and AI calls",
+  "← Tüm kullanıcılar": "← All users",
+  "Bu dönemde harcama yok.": "No spending in this period.",
+  "Bu dönemdeki aramalar": "Searches in this period"
+}
