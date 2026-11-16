@@ -1,4 +1,4 @@
-﻿using EgebisLeadFinder.Configuration;
+using EgebisLeadFinder.Configuration;
 using EgebisLeadFinder.Data;
 using EgebisLeadFinder.Localization;
 using EgebisLeadFinder.Models;
@@ -273,18 +273,6 @@ builder.Services.AddScoped<EgebisLeadFinder.Services.CompanyIntel.ICompanyIntelS
 
 builder.Services.AddScoped<CompanyRatingEvaluator>();
 builder.Services.AddScoped<ICompanyResearchService, CompanyResearchService>();
-
-// ================= Haber akisi: arka plan haber ajani =================
-builder.Services.Configure<NewsOptions>(builder.Configuration.GetSection(NewsOptions.Section));
-builder.Services.AddHttpClient<EgebisLeadFinder.Services.News.GoogleNewsRssSource>(c => c.Timeout = TimeSpan.FromSeconds(15));
-builder.Services.AddHttpClient<EgebisLeadFinder.Services.News.SerperNewsSource>(c => c.Timeout = TimeSpan.FromSeconds(20));
-builder.Services.AddScoped<EgebisLeadFinder.Services.News.INewsSource>(sp => sp.GetRequiredService<EgebisLeadFinder.Services.News.GoogleNewsRssSource>());
-builder.Services.AddScoped<EgebisLeadFinder.Services.News.INewsSource>(sp => sp.GetRequiredService<EgebisLeadFinder.Services.News.SerperNewsSource>());
-builder.Services.AddSingleton<EgebisLeadFinder.Services.News.NewsSourceHealth>();
-builder.Services.AddSingleton<EgebisLeadFinder.Services.News.NewsAgentStatus>();
-builder.Services.AddScoped<INewsAi>(sp => (INewsAi)sp.GetRequiredService<IAiService>());
-builder.Services.AddScoped<EgebisLeadFinder.Services.News.NewsScanService>();
-builder.Services.AddHostedService<EgebisLeadFinder.Services.News.NewsWatchWorker>();
 
 // ================= CRM: Salesforce =================
 builder.Services.AddSingleton<IMxResolver, DnsMxResolver>();

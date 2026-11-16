@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using EgebisLeadFinder.Configuration;
 using EgebisLeadFinder.Data;
 using EgebisLeadFinder.Models;
@@ -730,9 +730,6 @@ public class CompanyController : Controller
         var favorites = HttpContext.RequestServices.GetRequiredService<FavoriteService>();
         model.Favorites = fav;
         model.FavoriteIds = await favorites.FavoriteIdsAsync(me, model.Companies.Select(c => c.Id), ct);
-        var watchPageIds = model.Companies.Select(c => c.Id).ToList();
-        model.WatchedIds = (await _db.CompanyWatches.AsNoTracking()
-            .Where(w => w.UserId == me && watchPageIds.Contains(w.CompanyId)).Select(w => w.CompanyId).ToListAsync(ct)).ToHashSet();
         // Kendi favorileri her zaman gorunur firmalardandir (bkz. CompanyVisibility).
         model.FavoriteCount = await _db.FavoriteCompanies.CountAsync(f => f.UserId == me, ct);
 

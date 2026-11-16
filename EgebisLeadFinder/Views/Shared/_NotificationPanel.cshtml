@@ -36,14 +36,7 @@ else
                     <span class="notif-dot" aria-hidden="true"></span>
                     <span class="notif-body">
                         <span class="notif-text">
-                            @if (n.Kind == EgebisLeadFinder.Models.NotificationKinds.News)
-                            {
-                                <strong class="notif-company">@n.CompanyName</strong> <span>hakkında önemli haber</span>
-                            }
-                            else
-                            {
-                                <strong class="notif-company">@n.CompanyName</strong> <span>firmasındaki</span> <strong class="notif-person">@n.PersonName</strong> <span>mailinize cevap verdi</span>
-                            }
+                            <strong class="notif-company">@n.CompanyName</strong> <span>firmasındaki</span> <strong class="notif-person">@n.PersonName</strong> <span>mailinize cevap verdi</span>
                         </span>
                         @if (!string.IsNullOrWhiteSpace(n.Preview))
                         {

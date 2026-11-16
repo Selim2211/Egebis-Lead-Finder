@@ -33,8 +33,7 @@ public class NotificationsController : Controller
     [HttpGet]
     public async Task<IActionResult> Open(int id, CancellationToken ct)
     {
-        var (leadId, kind) = await _notifications.OpenWithKindAsync(User.UserId() ?? 0, id, ct);
-        if (kind == EgebisLeadFinder.Models.NotificationKinds.News) return RedirectToAction("List", "News", new { importance = 4 });
+        var leadId = await _notifications.OpenAsync(User.UserId() ?? 0, id, ct);
         return leadId is int lead
             ? RedirectToAction("Index", "Inbox", new { lead })
             : RedirectToAction("Index", "Inbox");

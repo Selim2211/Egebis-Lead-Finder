@@ -169,10 +169,6 @@ public class LeadScoringService
         if (hasEmail)
             breakdown.Add("E-posta bulundu", _options.EmailFound);
 
-        // Haber akisindan gelen olumlu sinyal (yeni fabrika, yatirim...): son 30 gune bakar, eskidikce kendiliginden soner.
-        if (company is { NewsBoost: > 0 })
-            breakdown.Add("Haber sinyali (son 30 gün)", company.NewsBoost);
-
         return breakdown;
     }
 

@@ -52,9 +52,6 @@ public class AppUser
     /// <summary>Favori firma listesi tum kullanicilara acik mi (varsayilan: kisiye ozel).</summary>
     public bool FavoritesPublic { get; set; }
 
-    /// <summary>Haber Akışı'nı en son açtığı an: bundan yeni haberler "okunmamış" sayılır.</summary>
-    public DateTime? NewsSeenAt { get; set; }
-
     public string DisplayName => string.IsNullOrWhiteSpace(FullName) ? UserName : FullName!;
 }
 
