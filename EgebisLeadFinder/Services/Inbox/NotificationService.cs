@@ -100,6 +100,28 @@ public class NotificationService
         return n.LeadId;
     }
 
+    /// <summary>Tek bildirimi siler (yalnizca kendisinin). Silindiyse true.</summary>
+    public async Task<bool> DeleteAsync(int userId, int id, CancellationToken ct = default)
+    {
+        var n = await _db.Notifications.FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId, ct);
+        if (n is null) return false;
+        _db.Notifications.Remove(n);
+        await _db.SaveChangesAsync(ct);
+        _cache.Remove(CountKey(userId));
+        return true;
+    }
+
+    /// <summary>Kullanicinin tum bildirimlerini siler; silinen sayiyi doner. Baska kullanicilarin bildirimine dokunmaz.</summary>
+    public async Task<int> DeleteAllAsync(int userId, CancellationToken ct = default)
+    {
+        var all = await _db.Notifications.Where(n => n.UserId == userId).ToListAsync(ct);
+        if (all.Count == 0) return 0;
+        _db.Notifications.RemoveRange(all);
+        await _db.SaveChangesAsync(ct);
+        _cache.Remove(CountKey(userId));
+        return all.Count;
+    }
+
     public Task MarkAllReadAsync(int userId, CancellationToken ct = default) =>
         MarkReadAsync(_db.Notifications.Where(n => n.UserId == userId && n.ReadAt == null), userId, ct);
 

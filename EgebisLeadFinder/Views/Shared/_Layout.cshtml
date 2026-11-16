@@ -103,8 +103,8 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f3f4f7" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#070a12" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#e3eaf3" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#070d18" media="(prefers-color-scheme: dark)" />
     <link rel="icon" type="image/png" href="~/img/logo.png" asp-append-version="true" />
     <link rel="apple-touch-icon" href="~/img/logo.png" asp-append-version="true" />
     <title>@ViewData["Title"] - Egebis Lead Finder</title>
@@ -131,6 +131,7 @@
     <link rel="stylesheet" href="~/css/theme-2026.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/theme-command.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/theme-atelier.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/theme-ice.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/EgebisLeadFinder.styles.css" asp-append-version="true" />
 </head>
 <body class="eg-app @(signedIn ? "has-side" : "no-side")">
@@ -269,7 +270,7 @@
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
                             <span class="nav-count is-hot" data-count="notifications" @(notifCount == 0 ? "hidden" : "")>@notifCount</span>
                         </button>
-                        <div class="dropdown-menu dropdown-menu-end notif-menu" data-notif-panel data-url="@Url.Action("Panel", "Notifications")">
+                        <div class="dropdown-menu dropdown-menu-end notif-menu" data-notif-panel data-url="@Url.Action("Panel", "Notifications")" data-delete-url="@Url.Action("Delete", "Notifications")" data-deleteall-url="@Url.Action("DeleteAll", "Notifications")">
                             <div class="notif-empty">Yükleniyor…</div>
                         </div>
                     </div>
@@ -371,16 +372,50 @@
                         .then(function (html) {
                             if (!html) return;
                             panel.innerHTML = html;
+                            var form = document.getElementById('notifReadAllForm');
+                            function post(url, extra) {
+                                var fd = new FormData(form);
+                                if (extra) Object.keys(extra).forEach(function (k) { fd.append(k, extra[k]); });
+                                return fetch(url, { method: 'POST', credentials: 'same-origin', body: fd });
+                            }
                             var all = panel.querySelector('[data-notif-readall]');
                             if (all) all.addEventListener('click', function () {
-                                fetch(document.getElementById('notifReadAllForm').action, { method: 'POST', credentials: 'same-origin', body: new FormData(document.getElementById('notifReadAllForm')) })
-                                    .then(function () { setCount('notifications', 0); loadPanel(); });
+                                post(form.action).then(function () { setCount('notifications', 0); loadPanel(); });
+                            });
+                            // Tumunu sil: ilk tikta onay sorar (3 sn), ikinci tikta siler.
+                            var delAll = panel.querySelector('[data-notif-deleteall]');
+                            if (delAll) {
+                                var armed = null;
+                                delAll.addEventListener('click', function () {
+                                    if (!armed) {
+                                        delAll.textContent = 'Emin misiniz? Sil';
+                                        delAll.classList.add('is-armed');
+                                        armed = setTimeout(function () { armed = null; delAll.textContent = delAll.dataset.label; delAll.classList.remove('is-armed'); }, 3000);
+                                        return;
+                                    }
+                                    clearTimeout(armed); armed = null;
+                                    post(panel.dataset.deleteallUrl).then(function () { setCount('notifications', 0); loadPanel(); });
+                                });
+                            }
+                            // Tek bildirimi sil (carpi)
+                            panel.querySelectorAll('[data-notif-del]').forEach(function (btn) {
+                                btn.addEventListener('click', function (e) {
+                                    e.preventDefault(); e.stopPropagation();
+                                    var row = btn.closest('[data-notif-row]');
+                                    btn.disabled = true;
+                                    post(panel.dataset.deleteUrl, { id: btn.dataset.notifDel }).then(function (r) {
+                                        if (!r.ok) { btn.disabled = false; return; }
+                                        if (row) row.remove();
+                                        refresh(true);
+                                        if (!panel.querySelector('[data-notif-row]')) loadPanel();
+                                    });
+                                });
                             });
                         });
                 }
                 if (panel) panel.parentElement.addEventListener('show.bs.dropdown', loadPanel);
-                function refresh() {
-                    if (document.visibilityState !== 'visible') return;
+                function refresh(force) {
+                    if (force !== true && document.visibilityState !== 'visible') return;
                     fetch(countUrl, { credentials: 'same-origin', cache: 'no-store' })
                         .then(function (r) { return r.ok ? r.json() : null; })
                         .then(function (c) { if (c) { setCount('notifications', c.notifications); setCount('messages', c.messages); } })

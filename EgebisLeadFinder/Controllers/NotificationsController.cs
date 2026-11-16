@@ -15,7 +15,7 @@ public class NotificationsController : Controller
     public async Task<IActionResult> Panel(CancellationToken ct)
     {
         Response.Headers.CacheControl = "no-store";
-        return PartialView("_NotificationPanel", await _notifications.LatestAsync(User.UserId() ?? 0, 12, ct));
+        return PartialView("_NotificationPanel", await _notifications.LatestAsync(User.UserId() ?? 0, 100, ct));
     }
 
     /// <summary>Zil ve Mesajlar rozetleri (sayfa acikken dakikada bir yenilenir).</summary>
@@ -38,6 +38,24 @@ public class NotificationsController : Controller
         return leadId is int lead
             ? RedirectToAction("Index", "Inbox", new { lead })
             : RedirectToAction("Index", "Inbox");
+    }
+
+    /// <summary>Tek bildirimi siler (carpi dugmesi).</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(int id, CancellationToken ct)
+    {
+        await _notifications.DeleteAsync(User.UserId() ?? 0, id, ct);
+        return Ok();
+    }
+
+    /// <summary>Kullanicinin tum bildirimlerini siler ("Tumunu sil").</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteAll(CancellationToken ct)
+    {
+        await _notifications.DeleteAllAsync(User.UserId() ?? 0, ct);
+        return Ok();
     }
 
     [HttpPost]

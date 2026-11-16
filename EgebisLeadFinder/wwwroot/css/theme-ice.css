@@ -1,0 +1,321 @@
+/* ==========================================================================
+   Buz mavisi - Kırağı (açık) ve Gece buzu (koyu)
+   theme-atelier.css'den SONRA yüklenir. Amaç: sayfa, kart, kartın iç alanı ve butonlar
+   gözle rahat ayırt edilsin. Tek vurgu: buz mavisi. Durum renkleri (yeşil/kırmızı) aynı.
+   Katmanlar: sayfa < kart < iç alan (çukur) < buton (yükseltilmiş).
+   ========================================================================== */
+
+/* ---------- Kırağı (açık) ---------- */
+:root {
+    --eg-bg: #e3eaf3;
+    --eg-surface: #ffffff;
+    --eg-surface-alt: #eef3f9;
+    --eg-border: #c9d5e4;
+    --eg-border-strong: #b2c2d6;
+    --eg-text: #0b1626;
+    --eg-text-muted: #3d4f66;
+    --eg-text-faint: #55677e;
+    --accent: #0369a1;
+    --accent-ink: #ffffff;
+    --accent-hover: #075985;
+    --accent-soft: rgba(3, 105, 161, .10);
+    --btn-fill: #0369a1;
+    --btn-fill-hover: #075985;
+    --btn-ink: #ffffff;
+    --blue: #0369a1;
+    --blue-ink: #075985;
+    --good: #0d6a63; --warn: #854d0e; --bad: #b42318;
+    --side-bg: #f4f8fc; --side-bg-2: #f4f8fc; --side-line: #c9d5e4;
+    --ice-btn-bg: #ffffff;
+    --ice-btn-bd: #9db1c9;
+    --ice-btn-ink: #1d4f86;
+    --ice-btn-hover-bg: #e6f6ff;
+    --ice-btn-hover-bd: #38bdf8;
+    --ice-chip-bg: #e9f0f8;
+    --ice-chip-bd: #bccde1;
+    --ice-chip-ink: #2a3f58;
+    --ice-card-shadow: 0 1px 2px rgba(15, 35, 65, .06), 0 8px 20px -12px rgba(15, 35, 65, .20);
+    --ice-card-hover: 0 1px 2px rgba(15, 35, 65, .08), 0 14px 30px -12px rgba(3, 105, 161, .30);
+    --eg-shadow-sm: none;
+}
+
+/* ---------- Gece buzu (koyu) ---------- */
+:root[data-theme="dark"] {
+    --eg-bg: #070d18;
+    --eg-surface: #111b2e;
+    --eg-surface-alt: #0c1424;
+    --eg-border: #24344f;
+    --eg-border-strong: #33496d;
+    --eg-text: #eef4fc;
+    --eg-text-muted: #b4c3dc;
+    --eg-text-faint: #8ea1bf;
+    --accent: #7dd3fc;
+    --accent-ink: #04121f;
+    --accent-hover: #bae6fd;
+    --accent-soft: rgba(125, 211, 252, .12);
+    --btn-fill: #38bdf8;
+    --btn-fill-hover: #7dd3fc;
+    --btn-ink: #04121f;
+    --blue: #7dd3fc;
+    --blue-ink: #bae6fd;
+    --good: #5fd3a1; --warn: #e0b95f; --bad: #f08a80;
+    --side-bg: #0a1322; --side-bg-2: #0a1322; --side-line: #24344f;
+    --ice-btn-bg: #1b2a44;
+    --ice-btn-bd: #33496d;
+    --ice-btn-ink: #a5dcff;
+    --ice-btn-hover-bg: #223654;
+    --ice-btn-hover-bd: #7dd3fc;
+    --ice-chip-bg: #172640;
+    --ice-chip-bd: #2c4166;
+    --ice-chip-ink: #c9d8ee;
+    --ice-card-shadow: inset 0 1px 0 rgba(125, 211, 252, .06), 0 10px 26px -14px rgba(0, 0, 0, .85);
+    --ice-card-hover: 0 0 0 1px rgba(125, 211, 252, .28), 0 14px 32px -14px rgba(0, 0, 0, .9);
+}
+
+/* ---------- Zemin: sabit, hafif buz ışığı ---------- */
+body.eg-app::before {
+    background:
+        radial-gradient(900px 520px at 82% -12%, rgba(56, 189, 248, .17) 0%, rgba(56, 189, 248, .06) 45%, transparent 72%),
+        radial-gradient(760px 520px at 0% 108%, rgba(14, 116, 144, .08) 0%, transparent 68%);
+}
+:root[data-theme="dark"] body.eg-app::before {
+    background:
+        radial-gradient(1000px 620px at 86% -14%, rgba(56, 189, 248, .16) 0%, rgba(56, 189, 248, .06) 42%, transparent 72%),
+        radial-gradient(760px 560px at 2% 108%, rgba(125, 211, 252, .06) 0%, transparent 68%);
+}
+body.eg-app::after, :root[data-theme="dark"] body.eg-app::after { background: none; background-image: none; opacity: 0; }
+
+/* ---------- Kartlar: net kenar, belirgin yüzey ---------- */
+:root[data-theme] .card, :root[data-theme] .stat-card, :root[data-theme] .company-card, :root[data-theme] .lead-card,
+:root[data-theme] .fav-card, :root[data-theme] .profile-pick, :root[data-theme] .board-card {
+    background: var(--eg-surface);
+    border-color: var(--eg-border);
+    box-shadow: var(--ice-card-shadow);
+}
+:root[data-theme] .company-card, :root[data-theme] .lead-card, :root[data-theme] .fav-card {
+    background: color-mix(in srgb, var(--tier) 5%, var(--eg-surface));
+    border-left: 4px solid var(--tier);
+}
+:root[data-theme] .card-header { background: var(--eg-surface-alt); border-bottom: 1px solid var(--eg-border); }
+:root[data-theme] .stat-card { border-left: 3px solid var(--blue); }
+:root[data-theme] .stat-card.is-success { background: var(--eg-surface); border-left-color: var(--good); }
+:root[data-theme] .stat-card.is-amber { background: var(--eg-surface); border-left-color: var(--warn); }
+:root[data-theme] .stat-card.is-info { background: var(--eg-surface); border-left-color: var(--blue); }
+:root[data-theme] .board-col { background: var(--eg-surface-alt); border-color: var(--eg-border); }
+@media (hover: hover) and (pointer: fine) {
+    :root[data-theme] .card-link:hover, :root[data-theme] .stat-link:hover, :root[data-theme] .company-card:hover,
+    :root[data-theme] .lead-card:hover, :root[data-theme] .fav-card:hover, :root[data-theme] .profile-pick:hover {
+        box-shadow: var(--ice-card-hover);
+    }
+}
+
+/* Kartın iç alanı (buton şeridi): karttan gözle ayrı, çukur */
+:root[data-theme] .company-card-actions, :root[data-theme] .lead-card-actions {
+    background: var(--eg-surface-alt);
+    border-top: 1px solid var(--eg-border);
+}
+
+/* ---------- Kart butonları: şerit üzerinde yükseltilmiş ---------- */
+.action-btn {
+    background: var(--ice-btn-bg) !important;
+    border: 1px solid var(--ice-btn-bd) !important;
+    color: var(--ice-btn-ink) !important;
+    transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+}
+.action-btn:hover {
+    background: var(--ice-btn-hover-bg) !important;
+    border-color: var(--ice-btn-hover-bd) !important;
+    color: var(--ice-btn-ink) !important;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, .18);
+}
+.action-btn.is-active {
+    background: color-mix(in srgb, var(--accent) 18%, var(--ice-btn-bg)) !important;
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+}
+.action-btn.action-delete:hover, .action-btn.action-blacklist:hover {
+    background: color-mix(in srgb, var(--bad) 14%, var(--ice-btn-bg)) !important;
+    border-color: var(--bad) !important;
+    color: var(--bad) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 18%, transparent);
+}
+
+/* ---------- Butonlar ---------- */
+.btn-accent, .btn-primary, .btn-lead {
+    background: linear-gradient(180deg, #0284c7, #0369a1) !important;
+    border-color: #0369a1 !important;
+    color: #ffffff !important;
+    box-shadow: 0 6px 16px -8px rgba(2, 132, 199, .65) !important;
+}
+.btn-accent:hover, .btn-primary:hover, .btn-lead:hover {
+    background: linear-gradient(180deg, #0369a1, #075985) !important;
+    border-color: #075985 !important;
+    color: #ffffff !important;
+}
+:root[data-theme="dark"] .btn-accent, :root[data-theme="dark"] .btn-primary, :root[data-theme="dark"] .btn-lead {
+    background: linear-gradient(180deg, #7dd3fc, #38bdf8) !important;
+    border-color: #7dd3fc !important;
+    color: #04121f !important;
+    box-shadow: 0 0 0 1px rgba(125, 211, 252, .35), 0 6px 20px -8px rgba(56, 189, 248, .6) !important;
+}
+:root[data-theme="dark"] .btn-accent:hover, :root[data-theme="dark"] .btn-primary:hover, :root[data-theme="dark"] .btn-lead:hover {
+    background: linear-gradient(180deg, #bae6fd, #7dd3fc) !important;
+    border-color: #bae6fd !important;
+    color: #04121f !important;
+}
+.btn-outline-secondary, .btn-light, .btn-secondary, .list-filter-btn, .list-sort-btn, .collapse-toggle, .stage-chip {
+    background: var(--ice-btn-bg) !important;
+    border: 1px solid var(--ice-btn-bd) !important;
+    color: var(--eg-text) !important;
+}
+.btn-outline-secondary:hover, .btn-light:hover, .btn-secondary:hover, .list-filter-btn:hover, .list-sort-btn:hover,
+.collapse-toggle:hover, .stage-chip:hover {
+    background: var(--ice-btn-hover-bg) !important;
+    border-color: var(--ice-btn-hover-bd) !important;
+}
+.list-filter-btn.has-filters { background: color-mix(in srgb, var(--accent) 14%, var(--ice-btn-bg)) !important; border-color: var(--accent) !important; }
+.stage-chip.active, .stage-chip.is-active, .stage-chip[aria-current], .stage-chip.is-current {
+    background: var(--accent) !important; border-color: var(--accent) !important; color: var(--accent-ink) !important;
+}
+.btn-outline-danger {
+    background: transparent !important;
+    border: 1px solid color-mix(in srgb, var(--bad) 60%, transparent) !important;
+    color: var(--bad) !important;
+}
+.btn-outline-danger:hover { background: color-mix(in srgb, var(--bad) 14%, transparent) !important; border-color: var(--bad) !important; }
+.collapse-badge { background: var(--accent); color: var(--accent-ink); }
+
+/* ---------- Çipler ve rozetler: görünür zemin + kenar ---------- */
+.tag, .meta-chip {
+    background: var(--ice-chip-bg) !important;
+    border: 1px solid var(--ice-chip-bd) !important;
+    color: var(--ice-chip-ink) !important;
+}
+.tag-success, .meta-chip.fit-high { background: color-mix(in srgb, var(--good) 14%, var(--eg-surface)) !important; border-color: color-mix(in srgb, var(--good) 50%, transparent) !important; color: var(--good) !important; }
+.meta-chip.fit-good { background: color-mix(in srgb, var(--accent) 14%, var(--eg-surface)) !important; border-color: color-mix(in srgb, var(--accent) 50%, transparent) !important; color: var(--accent) !important; }
+.tag-amber, .meta-chip.fit-mid { background: color-mix(in srgb, var(--warn) 15%, var(--eg-surface)) !important; border-color: color-mix(in srgb, var(--warn) 50%, transparent) !important; color: var(--warn) !important; }
+.tag-danger, .meta-chip.fit-low { background: color-mix(in srgb, var(--bad) 12%, var(--eg-surface)) !important; border-color: color-mix(in srgb, var(--bad) 45%, transparent) !important; color: var(--bad) !important; }
+.tag-info, .tag-navy { color: var(--accent) !important; }
+.score { background: var(--ice-chip-bg) !important; border: 1px solid var(--ice-chip-bd) !important; }
+.score-hot { background: color-mix(in srgb, var(--good) 14%, var(--eg-surface)) !important; }
+.score-warm { background: color-mix(in srgb, var(--warn) 14%, var(--eg-surface)) !important; }
+.score-out { background: color-mix(in srgb, var(--bad) 10%, var(--eg-surface)) !important; color: var(--bad) !important; border-color: color-mix(in srgb, var(--bad) 40%, transparent) !important; }
+.score-unknown { background: color-mix(in srgb, var(--warn) 14%, var(--eg-surface)) !important; }
+[class*="lead-status"] { background: var(--ice-chip-bg) !important; border-color: var(--ice-chip-bd) !important; color: var(--ice-chip-ink) !important; }
+
+/* ---------- Baş harf kutuları: 6 soğuk ton ---------- */
+.avatar, [class*="avatar-hue-"] { --h: var(--accent); }
+.avatar-hue-0 { --h: #0369a1; } .avatar-hue-1 { --h: #0f766e; } .avatar-hue-2 { --h: #6d28d9; }
+.avatar-hue-3 { --h: #047857; } .avatar-hue-4 { --h: #be185d; } .avatar-hue-5 { --h: #b45309; }
+:root[data-theme="dark"] .avatar-hue-0 { --h: #7dd3fc; } :root[data-theme="dark"] .avatar-hue-1 { --h: #5eead4; }
+:root[data-theme="dark"] .avatar-hue-2 { --h: #c4b5fd; } :root[data-theme="dark"] .avatar-hue-3 { --h: #6ee7b7; }
+:root[data-theme="dark"] .avatar-hue-4 { --h: #f9a8d4; } :root[data-theme="dark"] .avatar-hue-5 { --h: #fcd34d; }
+.avatar, [class*="avatar-hue-"] {
+    background: color-mix(in srgb, var(--h) 16%, var(--eg-surface)) !important;
+    color: var(--h) !important;
+    border: 1px solid color-mix(in srgb, var(--h) 45%, transparent);
+}
+
+/* ---------- Formlar ve tablolar ---------- */
+:root[data-theme] .form-control, :root[data-theme] .form-select, :root[data-theme] .name-search-input {
+    background-color: var(--eg-surface-alt); border-color: var(--eg-border-strong);
+}
+:root[data-theme] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+:root[data-theme] select, :root[data-theme] textarea {
+    background-color: var(--eg-surface-alt); border-color: var(--eg-border-strong);
+}
+.form-control:focus, .form-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.list-search input, .list-search .form-control, .name-search-input, .name-search input, .fd-search input { background: transparent !important; border-color: transparent !important; box-shadow: none !important; }
+.list-search, .name-search { background: var(--eg-surface-alt); border-color: var(--eg-border-strong); }
+:root[data-theme] .todo-item, :root[data-theme] a.funnel-row { background: var(--eg-surface-alt); border: 1px solid var(--eg-border); }
+:root[data-theme] .todo-item:hover, :root[data-theme] a.funnel-row:hover { background: var(--ice-btn-hover-bg); border-color: var(--ice-btn-hover-bd); }
+.table tbody tr:hover > * { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+/* ---------- Kenar menü: seçili öğede buz çizgisi ---------- */
+.eg-side-ind { background: color-mix(in srgb, var(--accent) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); }
+:root[data-theme="dark"] .eg-side-ind { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent), 0 0 18px -6px rgba(56, 189, 248, .5); }
+.eg-side .eg-side-link:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.eg-side .eg-side-link.is-active { color: var(--accent); }
+.nav-badge, .nav-count { background: var(--accent); color: var(--accent-ink); }
+.company-card::before { background: var(--accent) !important; }
+
+/* Dropdown / modal: net kenar */
+.dropdown-menu, .modal-content, .eg-cmd-panel, .notif-menu { border-color: var(--eg-border-strong); }
+.dropdown-item:hover, .dropdown-item:focus { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+/* ---------- Gosterilen (arama secici): kutu icinde kutu yerine tek temiz satir ---------- */
+:root[data-theme] .run-picker {
+    background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0; border-radius: 0;
+    gap: .6rem .85rem; align-items: center;
+}
+.run-picker-label { color: var(--eg-text-muted); font-size: .72rem; font-weight: 700; letter-spacing: .08em; }
+.run-picker-menu { flex: 1 1 26rem; max-width: 52rem; }
+.run-picker-menu > summary {
+    background: var(--eg-surface); border: 1px solid var(--eg-border-strong); border-radius: 12px;
+    padding: .65rem 1rem; box-shadow: var(--ice-card-shadow);
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.run-picker-menu > summary:hover { border-color: var(--accent); }
+.run-picker-menu > summary svg { color: var(--eg-text-muted); transition: transform 200ms ease; }
+.run-picker-menu[open] > summary { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.run-picker-menu[open] > summary svg { transform: rotate(180deg); }
+.run-picker-title { color: var(--eg-text); font-size: .95rem; }
+.run-picker-list { background: var(--eg-surface); border-color: var(--eg-border-strong); box-shadow: 0 18px 44px -16px rgba(0, 0, 0, .45); }
+.run-picker-item:hover, .run-picker-row:hover { background: var(--eg-surface-alt); }
+.run-picker-item.is-active, .run-picker-row.is-active { background: color-mix(in srgb, var(--accent) 10%, var(--eg-surface)); box-shadow: inset 3px 0 0 var(--accent); }
+.run-picker > .btn { min-height: 2.6rem; padding: .45rem .95rem; font-size: .88rem; border-radius: 10px; }
+@media (max-width: 575.98px) {
+    .run-picker-label { flex: 1 0 100%; }
+    .run-picker-menu { flex-basis: 100%; max-width: none; }
+}
+
+/* ---------- Bildirim paneli: kayan liste, tekli silme (carpi), tumunu sil ---------- */
+.notif-menu.show { display: flex; flex-direction: column; max-height: min(34rem, 82vh); }
+.notif-head { flex: 0 0 auto; gap: .75rem; }
+.notif-actions { display: inline-flex; align-items: center; gap: .35rem; flex-wrap: wrap; justify-content: flex-end; }
+.notif-act {
+    border: 1px solid transparent; background: transparent; color: var(--accent); font-size: .76rem; font-weight: 600;
+    padding: .2rem .5rem; border-radius: 8px; cursor: pointer; transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.notif-act:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.notif-act-danger { color: var(--bad); }
+.notif-act-danger:hover, .notif-act-danger.is-armed { background: color-mix(in srgb, var(--bad) 14%, transparent); border-color: color-mix(in srgb, var(--bad) 55%, transparent); }
+.notif-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--eg-border-strong) transparent; }
+.notif-row { position: relative; border-bottom: 1px solid var(--eg-border); }
+.notif-row:last-child { border-bottom: 0; }
+.notif-row .notif-item { border-bottom: 0; padding-right: 2.7rem; }
+.notif-del {
+    position: absolute; top: .6rem; right: .65rem; width: 1.6rem; height: 1.6rem; padding: 0; display: grid; place-items: center;
+    border: 1px solid var(--ice-btn-bd); border-radius: 50%; background: var(--ice-btn-bg); color: var(--eg-text-muted); cursor: pointer;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.notif-del:hover, .notif-del:focus-visible { background: color-mix(in srgb, var(--bad) 14%, var(--ice-btn-bg)); border-color: var(--bad); color: var(--bad); }
+.notif-del:disabled { opacity: .5; cursor: default; }
+.notif-all { flex: 0 0 auto; border-top: 1px solid var(--eg-border); background: var(--eg-surface); }
+
+/* ---------- Kose bildirimleri (egToast): tema degiskenleriyle, koyu modda da uyumlu ---------- */
+:root[data-theme] .eg-toast {
+    background: var(--eg-surface);
+    border-color: var(--eg-border-strong);
+    box-shadow: 0 16px 40px -12px rgba(0, 0, 0, .45), 0 2px 4px rgba(0, 0, 0, .12);
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+:root[data-theme] .eg-toast-title { color: var(--eg-text); }
+:root[data-theme] .eg-toast-msg { color: var(--eg-text-muted); }
+:root[data-theme] .eg-toast-close { color: var(--eg-text-muted); }
+:root[data-theme] .eg-toast-close:hover { background: var(--eg-surface-alt); color: var(--eg-text); }
+:root[data-theme="dark"] .eg-toast.tone-success { --tone-bg: color-mix(in srgb, var(--good) 16%, var(--eg-surface)); }
+:root[data-theme="dark"] .eg-toast.tone-error { --tone-bg: color-mix(in srgb, var(--bad) 16%, var(--eg-surface)); }
+:root[data-theme="dark"] .eg-toast.tone-warning { --tone-bg: color-mix(in srgb, var(--warn) 16%, var(--eg-surface)); }
+:root[data-theme="dark"] .eg-toast:not(.tone-success):not(.tone-error):not(.tone-warning) { --tone-bg: color-mix(in srgb, var(--accent) 14%, var(--eg-surface)); }
+
+/* ---------- Koyu modda beyaz kalan kucuk parcalar ---------- */
+:root, :root[data-theme="dark"] {
+    --surface-2: var(--eg-surface-alt);
+    --bs-tertiary-bg: var(--eg-surface-alt);
+    --bs-secondary-bg: var(--eg-surface-alt);
+    --bs-body-bg: var(--eg-bg);
+}
+:root[data-theme] .tpl-pill.is-muted { background: var(--eg-surface-alt); color: var(--eg-text-faint); border-color: var(--eg-border); }
+:root[data-theme] .tpl-actionbar { background: color-mix(in srgb, var(--eg-surface) 94%, transparent); border-top-color: var(--eg-border); }
+:root[data-theme] .input-group-text { background: var(--eg-surface-alt); color: var(--eg-text-muted); border-color: var(--eg-border-strong); }

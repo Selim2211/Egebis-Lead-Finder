@@ -74,6 +74,40 @@ public static class NaceCatalog
         return Exists(n) ? n : null;
     }
 
+    /// <summary>
+    /// 2-5 haneli ("27.51") kodu, ayni onekle baslayan resmi 6 haneli faaliyetlerden firmanin metnine (sektor, urunler,
+    /// gerekce) en cok uyanina indirger. Onekte tek faaliyet varsa o secilir; metinde ayirt edici bir uyum yoksa
+    /// (esitlik ya da hic eslesme) kod oldugu gibi kalir: yanlis alt faaliyet yazmak 4 haneli dogru koddan kotudur.
+    /// </summary>
+    public static string? Refine(string? code, IEnumerable<string?> evidence)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return code;
+        var digits = new string(code.Where(char.IsDigit).ToArray());
+        if (digits.Length is < 4 or >= 6) return code;
+
+        var candidates = ActivitiesUnder(digits);
+        if (candidates.Count == 0) return code;
+        if (candidates.Count == 1) return FormatSixDigit(candidates[0].Key);
+
+        var words = TurkishText.Normalize(string.Join(" ", evidence.Where(e => !string.IsNullOrWhiteSpace(e))))
+            .Split(new[] { ' ', ',', '-', '/', '.', ';', '(', ')' }, StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => w.Length >= 4).Select(Stem).ToHashSet();
+        if (words.Count == 0) return code;
+
+        var scored = candidates
+            .Select(a => (a.Key, Hits: TurkishText.Normalize(a.Value)
+                .Split(new[] { ' ', ',', '-', '/', '.', ';', '(', ')' }, StringSplitOptions.RemoveEmptyEntries)
+                .Where(w => w.Length >= 4).Select(Stem).Distinct().Count(words.Contains)))
+            .OrderByDescending(x => x.Hits).ThenBy(x => x.Key, StringComparer.Ordinal)
+            .ToList();
+
+        if (scored[0].Hits == 0) return code;
+        if (scored.Count > 1 && scored[1].Hits == scored[0].Hits) return code;
+        return FormatSixDigit(scored[0].Key);
+    }
+
+    private static string Stem(string w) => w.Length > 5 ? w[..5] : w;
+
     /// <summary>Kodun okunur adi: 6 haneli resmi faaliyet adi, yoksa bolum adi.</summary>
     public static string? NameOf(string? code) => Activity(code) ?? Division(code)?.Name;
 

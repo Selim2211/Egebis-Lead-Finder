@@ -1374,6 +1374,7 @@ public class CompanyController : Controller
 
             StringLengthGuard.Apply(company);
             await _icp.ScoreAsync(company, aiResult.Analysis, site, ct);
+            await _icp.RefineNaceWithAiAsync(company, ct);
 
             await _db.SaveChangesAsync(ct);
             TempData["EnrichSuccess"] = "Yapay zeka analizi yenilendi.";

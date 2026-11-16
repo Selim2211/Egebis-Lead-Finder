@@ -4625,3 +4625,19 @@ a.pager-btn:hover { border-color: var(--eg-mailed-border); background: var(--eg-
 @media (min-width: 992px) and (max-width: 1260px) {
     html[lang="en"] .eg-navbar .navbar-nav .nav-link { padding: .3rem .24rem; font-size: .78rem; }
 }
+
+/* Ayarlar: yapay zeka saglayici secimi (3 kart) */
+.ai-choice { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .75rem; }
+.ai-opt { position: relative; display: grid; gap: .2rem; padding: .85rem 1rem; border: 1px solid var(--eg-border-strong); border-radius: .6rem; background: var(--eg-surface); cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease; }
+.ai-opt:hover { border-color: var(--eg-amber-500); }
+.ai-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.ai-opt.is-on { border-color: var(--eg-amber-500); box-shadow: 0 0 0 2px color-mix(in srgb, var(--eg-amber-500) 35%, transparent); }
+.ai-opt:has(input:focus-visible) { outline: 2px solid var(--eg-amber-500); outline-offset: 2px; }
+.ai-opt-t { font-weight: 700; color: var(--eg-text); }
+.ai-opt-t::before { content: ""; display: inline-block; width: .8rem; height: .8rem; margin-right: .5rem; vertical-align: -.1em; border-radius: 50%; border: 2px solid var(--eg-border-strong); }
+.ai-opt.is-on .ai-opt-t::before { border-color: var(--eg-amber-500); background: var(--eg-amber-500); box-shadow: inset 0 0 0 2px var(--eg-surface); }
+.ai-opt-s { font-size: .8rem; color: var(--eg-text-muted); }
+.ai-opt-k { font-size: .75rem; font-weight: 600; color: var(--eg-text-muted); }
+.ai-opt-k.is-ok { color: var(--eg-success); }
+.ai-panel { padding: 1rem; border: 1px solid var(--eg-border); border-radius: .6rem; background: var(--eg-surface-alt); }
+.ai-panel[hidden] { display: none; }

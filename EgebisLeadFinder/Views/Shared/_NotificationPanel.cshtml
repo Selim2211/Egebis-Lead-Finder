@@ -11,36 +11,52 @@
 }
 <div class="notif-head">
     <span>Bildirimler</span>
-    @if (Model.Any(n => n.ReadAt is null))
+    @if (Model.Count > 0)
     {
-        <button type="button" class="btn btn-link btn-sm p-0" data-notif-readall>Tümünü okundu say</button>
+        <span class="notif-actions">
+            @if (Model.Any(n => n.ReadAt is null))
+            {
+                <button type="button" class="notif-act" data-notif-readall>Tümünü okundu say</button>
+            }
+            <button type="button" class="notif-act notif-act-danger" data-notif-deleteall data-label="Tümünü sil">Tümünü sil</button>
+        </span>
     }
 </div>
 @if (Model.Count == 0)
 {
     <div class="notif-empty">Henüz bildirim yok. Bir lead mailinize cevap verince burada görünür.</div>
 }
-@foreach (var n in Model)
+else
 {
-    <a class="notif-item @(n.ReadAt is null ? "is-unread" : "")" href="@Url.Action("Open", "Notifications", new { id = n.Id })">
-        <span class="notif-dot" aria-hidden="true"></span>
-        <span class="notif-body">
-            <span class="notif-text">
-                @if (n.Kind == EgebisLeadFinder.Models.NotificationKinds.News)
-                {
-                    <strong class="notif-company">@n.CompanyName</strong> <span>hakkında önemli haber</span>
-                }
-                else
-                {
-                    <strong class="notif-company">@n.CompanyName</strong> <span>firmasındaki</span> <strong class="notif-person">@n.PersonName</strong> <span>mailinize cevap verdi</span>
-                }
-            </span>
-            @if (!string.IsNullOrWhiteSpace(n.Preview))
-            {
-                <span class="notif-preview" translate="no">“@n.Preview”</span>
-            }
-            <time class="notif-time">@Ago(n.CreatedAt)</time>
-        </span>
-    </a>
+    <div class="notif-list">
+        @foreach (var n in Model)
+        {
+            <div class="notif-row" data-notif-row="@n.Id" data-unread="@(n.ReadAt is null ? "1" : "0")">
+                <a class="notif-item @(n.ReadAt is null ? "is-unread" : "")" href="@Url.Action("Open", "Notifications", new { id = n.Id })">
+                    <span class="notif-dot" aria-hidden="true"></span>
+                    <span class="notif-body">
+                        <span class="notif-text">
+                            @if (n.Kind == EgebisLeadFinder.Models.NotificationKinds.News)
+                            {
+                                <strong class="notif-company">@n.CompanyName</strong> <span>hakkında önemli haber</span>
+                            }
+                            else
+                            {
+                                <strong class="notif-company">@n.CompanyName</strong> <span>firmasındaki</span> <strong class="notif-person">@n.PersonName</strong> <span>mailinize cevap verdi</span>
+                            }
+                        </span>
+                        @if (!string.IsNullOrWhiteSpace(n.Preview))
+                        {
+                            <span class="notif-preview" translate="no">“@n.Preview”</span>
+                        }
+                        <time class="notif-time">@Ago(n.CreatedAt)</time>
+                    </span>
+                </a>
+                <button type="button" class="notif-del" data-notif-del="@n.Id" title="Bu bildirimi sil" aria-label="Bu bildirimi sil">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+                </button>
+            </div>
+        }
+    </div>
 }
 <a class="notif-all" asp-controller="Inbox" asp-action="Index">Tüm mesajlar</a>

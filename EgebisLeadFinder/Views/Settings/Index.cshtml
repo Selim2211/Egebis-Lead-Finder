@@ -436,70 +436,85 @@
                     </div>
                 </div>
 
-                <div class="mb-4">
-                    <label class="form-label d-flex align-items-center gap-2">
-                        Gemini API Key
-                        <span class="tag tag-danger">zorunlu</span>
-                    </label>
-                    <input class="form-control font-monospace" asp-for="GeminiApiKey"
-                           autocomplete="off" placeholder="@(Model.GeminiFromConfig ? "(yapılandırmadan geliyor)" : "")" />
+                @{
+                    var provider = Model.AiProvider is "nvidia" or "groq" ? Model.AiProvider : "";
+                    var providers = new[]
+                    {
+                        (Value: "", Title: "Google Gemini", Sub: "Varsayılan · ücretli, en güçlü", Saved: !string.IsNullOrWhiteSpace(Model.GeminiApiKey) || Model.GeminiFromConfig),
+                        (Value: "nvidia", Title: "NVIDIA", Sub: "Ücretsiz deneme", Saved: !string.IsNullOrWhiteSpace(Model.NvidiaApiKey)),
+                        (Value: "groq", Title: "Groq", Sub: "Ücretsiz katman · hızlı", Saved: !string.IsNullOrWhiteSpace(Model.GroqApiKey))
+                    };
+                }
+                <div class="mb-4" id="aiPicker">
+                    <label class="form-label">Yapay zekâ sağlayıcısı</label>
+                    <div class="ai-choice" role="radiogroup" aria-label="Yapay zekâ sağlayıcısı">
+                        @foreach (var p in providers)
+                        {
+                            <label class="ai-opt @(provider == p.Value ? "is-on" : "")">
+                                <input type="radio" name="AiProvider" value="@p.Value" checked="@(provider == p.Value)" />
+                                <span class="ai-opt-t">@p.Title</span>
+                                <span class="ai-opt-s">@p.Sub</span>
+                                <span class="ai-opt-k @(p.Saved ? "is-ok" : "")">@(p.Saved ? "Anahtar kayıtlı" : "Anahtar yok")</span>
+                            </label>
+                        }
+                    </div>
                     <div class="form-text">
-                        Firma analizi için zorunlu. Yalnızca buraya girilen anahtar kullanılır; boş bırakılırsa
-                        yapay zeka analizi çalışmaz.
+                        Tüm yapay zekâ işleri (analiz, puanlama, e-posta, çeviri, haber özeti) yalnızca seçtiğiniz sağlayıcıyla yapılır.
+                        Seçmediğiniz sağlayıcıların anahtarları silinmez, kayıtlı kalır; istediğiniz zaman geri dönebilirsiniz.
                     </div>
                 </div>
 
-                <div class="mb-4">
-                    <label class="form-label d-flex align-items-center gap-2" for="geminiModel">
-                        Gemini modeli
-                        <span class="tag tag-muted">şu an: @Model.GeminiCurrentModel</span>
-                    </label>
-                    @if (Model.GeminiModels.Count > 0)
-                    {
-                        var current = Model.GeminiCurrentModel;
-                        <select class="form-select font-monospace" name="GeminiModel" id="geminiModel">
-                            @if (!Model.GeminiModels.Any(m => m.Id == current))
-                            {
-                                @* Kayitli model listede yoksa (kaldirilmis/erisilemiyor) yine de gorunsun. *@
-                                <option value="@current" selected>@current (listede yok)</option>
-                            }
-                            @foreach (var m in Model.GeminiModels)
-                            {
-                                <option value="@m.Id" selected="@(m.Id == current)" title="@m.Description">
-                                    @m.Id@(m.Id == Model.GeminiDefaultModel ? "  (varsayılan)" : "")@(m.DisplayName != m.Id ? $" — {m.DisplayName}" : "")
-                                </option>
-                            }
-                        </select>
-                        <div class="form-text">
-                            Liste, API anahtarınızın erişebildiği modellerden Google'dan canlı alınır.
-                            Firma analizi ve ön araştırma bu modelle yapılır. "Pro" modeller daha isabetli ama
-                            daha yavaş ve pahalıdır; "Flash" hızlı ve ucuzdur.
-                        </div>
-                    }
-                    else
-                    {
-                        <input class="form-control font-monospace" name="GeminiModel" id="geminiModel"
-                               value="@(Model.GeminiModel ?? Model.GeminiCurrentModel)" placeholder="@Model.GeminiDefaultModel" />
-                        <div class="form-text text-warning">
-                            @(Model.GeminiModelsError ?? "Model listesi alınamadı.") Model adını elle yazabilirsiniz.
-                        </div>
-                    }
+                <div class="ai-panel mb-4" data-ai-panel="">
+                    <div class="mb-3">
+                        <label class="form-label d-flex align-items-center gap-2">
+                            Gemini API Key
+                            <span class="tag tag-danger">seçili sağlayıcı için zorunlu</span>
+                        </label>
+                        <input class="form-control font-monospace" asp-for="GeminiApiKey"
+                               autocomplete="off" placeholder="@(Model.GeminiFromConfig ? "(yapılandırmadan geliyor)" : "")" />
+                        <div class="form-text">Yalnızca buraya girilen anahtar kullanılır; boş bırakılırsa yapay zekâ analizi çalışmaz.</div>
+                    </div>
+                    <div>
+                        <label class="form-label d-flex align-items-center gap-2" for="geminiModel">
+                            Gemini modeli
+                            <span class="tag tag-muted">şu an: @Model.GeminiCurrentModel</span>
+                        </label>
+                        @if (Model.GeminiModels.Count > 0)
+                        {
+                            var current = Model.GeminiCurrentModel;
+                            <select class="form-select font-monospace" name="GeminiModel" id="geminiModel">
+                                @if (!Model.GeminiModels.Any(m => m.Id == current))
+                                {
+                                    @* Kayitli model listede yoksa (kaldirilmis/erisilemiyor) yine de gorunsun. *@
+                                    <option value="@current" selected>@current (listede yok)</option>
+                                }
+                                @foreach (var m in Model.GeminiModels)
+                                {
+                                    <option value="@m.Id" selected="@(m.Id == current)" title="@m.Description">
+                                        @m.Id@(m.Id == Model.GeminiDefaultModel ? "  (varsayılan)" : "")@(m.DisplayName != m.Id ? $" — {m.DisplayName}" : "")
+                                    </option>
+                                }
+                            </select>
+                            <div class="form-text">
+                                Liste, API anahtarınızın erişebildiği modellerden Google'dan canlı alınır.
+                                "Pro" modeller daha isabetli ama daha yavaş ve pahalıdır; "Flash" hızlı ve ucuzdur.
+                            </div>
+                        }
+                        else
+                        {
+                            <input class="form-control font-monospace" name="GeminiModel" id="geminiModel"
+                                   value="@(Model.GeminiModel ?? Model.GeminiCurrentModel)" placeholder="@Model.GeminiDefaultModel" />
+                            <div class="form-text text-warning">
+                                @(Model.GeminiModelsError ?? "Model listesi alınamadı.") Model adını elle yazabilirsiniz.
+                            </div>
+                        }
+                    </div>
                 </div>
 
-                <div class="mb-4">
-                    <label class="form-label" for="aiProvider">Yapay zekâ sağlayıcısı</label>
-                    <select class="form-select" name="AiProvider" id="aiProvider">
-                        <option value="" selected="@(Model.AiProvider != "nvidia")">Google Gemini (varsayılan)</option>
-                        <option value="nvidia" selected="@(Model.AiProvider == "nvidia")">NVIDIA (ücretsiz deneme)</option>
-                        <option value="groq" selected="@(Model.AiProvider == "groq")">Groq (ücretsiz katman)</option>
-                    </select>
-                    <div class="form-text">
-                        Tüm yapay zekâ işleri (analiz, puanlama, e-posta, çeviri) seçilen sağlayıcıyla yapılır.
-                        NVIDIA ve Groq seçenekleri ücretsiz/deneme amaçlıdır; hız sınırı olabilir ve sonuçlar Gemini'den farklı olabilir.
-                    </div>
-                    <div class="row g-3 mt-1">
+                <div class="ai-panel mb-4" data-ai-panel="nvidia" hidden>
+                    <div class="row g-3">
                         <div class="col-md-7">
-                            <label class="form-label">NVIDIA API Key</label>
+                            <label class="form-label d-flex align-items-center gap-2">NVIDIA API Key <span class="tag tag-danger">seçili sağlayıcı için zorunlu</span></label>
                             <input class="form-control font-monospace" asp-for="NvidiaApiKey" autocomplete="off" />
                         </div>
                         <div class="col-md-5">
@@ -507,8 +522,14 @@
                             <input class="form-control font-monospace" asp-for="NvidiaModel"
                                    placeholder="nvidia/nemotron-3.5-lightning-30b-a3b" autocomplete="off" />
                         </div>
+                        <div class="col-12 form-text mt-0">Ücretsiz deneme amaçlıdır; hız sınırı olabilir ve sonuçlar Gemini'den farklı olabilir.</div>
+                    </div>
+                </div>
+
+                <div class="ai-panel mb-4" data-ai-panel="groq" hidden>
+                    <div class="row g-3">
                         <div class="col-md-7">
-                            <label class="form-label">Groq API Key</label>
+                            <label class="form-label d-flex align-items-center gap-2">Groq API Key <span class="tag tag-danger">seçili sağlayıcı için zorunlu</span></label>
                             <input class="form-control font-monospace" asp-for="GroqApiKey" autocomplete="off" />
                         </div>
                         <div class="col-md-5">
@@ -517,6 +538,7 @@
                                    placeholder="openai/gpt-oss-120b, openai/gpt-oss-20b" autocomplete="off" />
                             <div class="form-text">Virgülle sıralı model listesi; biri sınıra takılınca sıradakine geçilir. Boşsa varsayılan liste kullanılır.</div>
                         </div>
+                        <div class="col-12 form-text mt-0">Ücretsiz katmandır; hız sınırı (429) olabilir ve sonuçlar Gemini'den farklı olabilir.</div>
                     </div>
                 </div>
 
@@ -627,6 +649,25 @@
 </div>
 
 @section Scripts {
+<script>
+    // Yapay zeka saglayicisi: yalnizca secilenin anahtar/model alani gorunur; digerleri gizli ama formda kalir (kayitli anahtar silinmez).
+    (function () {
+        var picker = document.getElementById('aiPicker');
+        if (!picker) return;
+        function sync() {
+            var checked = picker.querySelector('input[name="AiProvider"]:checked');
+            var value = checked ? checked.value : '';
+            picker.querySelectorAll('.ai-opt').forEach(function (o) {
+                o.classList.toggle('is-on', o.querySelector('input').checked);
+            });
+            document.querySelectorAll('[data-ai-panel]').forEach(function (p) {
+                p.hidden = p.getAttribute('data-ai-panel') !== value;
+            });
+        }
+        picker.addEventListener('change', sync);
+        sync();
+    })();
+</script>
 <script>
     // Bilinen e-posta saglayicilarinda sunucu bilgisini otomatik doldur.
     (function () {

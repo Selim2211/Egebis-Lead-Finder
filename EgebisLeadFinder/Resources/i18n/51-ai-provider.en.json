@@ -1,0 +1,15 @@
+{
+  "Varsayılan · ücretli, en güçlü": "Default · paid, most capable",
+  "Ücretsiz deneme": "Free trial",
+  "Ücretsiz katman · hızlı": "Free tier · fast",
+  "Anahtar kayıtlı": "Key saved",
+  "Anahtar yok": "No key",
+  "Tüm yapay zekâ işleri (analiz, puanlama, e-posta, çeviri, haber özeti) yalnızca seçtiğiniz sağlayıcıyla yapılır. Seçmediğiniz sağlayıcıların anahtarları silinmez, kayıtlı kalır; istediğiniz zaman geri dönebilirsiniz.": "All AI tasks (analysis, scoring, email, translation, news summaries) use only the provider you select. Keys of the providers you do not select are not deleted; they stay saved and you can switch back any time.",
+  "seçili sağlayıcı için zorunlu": "required for the selected provider",
+  "Yalnızca buraya girilen anahtar kullanılır; boş bırakılırsa yapay zekâ analizi çalışmaz.": "Only the key entered here is used; if left empty, AI analysis will not work.",
+  "Liste, API anahtarınızın erişebildiği modellerden Google'dan canlı alınır. \"Pro\" modeller daha isabetli ama daha yavaş ve pahalıdır; \"Flash\" hızlı ve ucuzdur.": "The list is fetched live from Google from the models your API key can access. \"Pro\" models are more accurate but slower and more expensive; \"Flash\" is fast and cheap.",
+  "Ücretsiz deneme amaçlıdır; hız sınırı olabilir ve sonuçlar Gemini'den farklı olabilir.": "Meant for free trial; it may be rate-limited and results can differ from Gemini.",
+  "Ücretsiz katmandır; hız sınırı (429) olabilir ve sonuçlar Gemini'den farklı olabilir.": "This is a free tier; it may be rate-limited (429) and results can differ from Gemini.",
+  "NVIDIA API Key": "NVIDIA API Key",
+  "Groq API Key": "Groq API Key"
+}

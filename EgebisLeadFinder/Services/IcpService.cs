@@ -299,6 +299,38 @@ public class IcpService
         return _fitCached.Value;
     }
 
+    /// <summary>
+    /// NACE kodu 4 haneli kalmissa (metinden ayirt edilemedi), yapay zekaya o siniftaki resmi 6 haneli faaliyetleri
+    /// aday olarak verip birini sectirir. Tek kucuk cagri; yalnizca tek firma islemlerinde (yeniden analiz) kullanilir.
+    /// Gelen kod ayni 4 haneli siniftan degilse ya da resmi listede yoksa kod degismez. Kaydetmez.
+    /// </summary>
+    public async Task RefineNaceWithAiAsync(Company company, CancellationToken ct = default)
+    {
+        var digits = new string((company.NaceCode ?? string.Empty).Where(char.IsDigit).ToArray());
+        if (digits.Length != 4) return;
+
+        var candidates = NaceCatalog.ActivitiesUnder(digits);
+        if (candidates.Count < 2) return;
+
+        var options = string.Join("; ", candidates.Select(a =>
+            $"{NaceCatalog.FormatSixDigit(a.Key)} {(a.Value.Length > 110 ? a.Value[..110] + "…" : a.Value)}"));
+        var brief = NaceBrief(company.Name, company.Industry, company.Description, company.AiAnalysis) +
+                    $" | Yalnızca şu 6 haneli kodlardan birini seç: {options}";
+
+        try
+        {
+            var result = await _naceAi.ClassifyNaceAsync(new List<(int, string)> { (company.Id, brief) }, ct);
+            if (!result.TryGetValue(company.Id, out var raw)) return;
+            var code = NaceCatalog.ResolveCode(raw);
+            var picked = new string((code ?? string.Empty).Where(char.IsDigit).ToArray());
+            if (picked.Length == 6 && picked.StartsWith(digits, StringComparison.Ordinal)) company.NaceCode = code;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Iyilestirme istege bagli: yapay zeka hatasinda 4 haneli kod korunur.
+        }
+    }
+
     /// <summary>Kaydetmeden puan dokumu (firma detayi icin).</summary>
     public async Task<ScoreBreakdown> BreakdownAsync(Company company, CompanyAnalysis? analysis, CancellationToken ct = default)
     {
@@ -341,6 +373,9 @@ public class IcpService
             var proposed = NaceCatalog.ResolveCode(analysis.NaceCode);
             if (proposed is not null) company.NaceCode = proposed;
         }
+        // 4 haneli kalan kodu (yapay zeka 6 haneliyi bilemediyse ya da uydurduysa) resmi listeden 6 haneliye indir.
+        company.NaceCode = NaceCatalog.Refine(company.NaceCode,
+            new[] { analysis?.Industry, company.Industry, analysis?.Reason }.Concat(analysis?.Products ?? new List<string>()));
 
         return breakdown;
     }

@@ -38,6 +38,33 @@ public class InboxTests
         Assert.EndsWith("…", ReplyText.Preview(new string('x', 400)));
     }
 
+    // ---------------- Bildirim silme (carpi / tumunu sil)
+
+    [Fact]
+    public async Task Bildirim_silme_yalnizca_kendi_bildirimini_siler_tumunu_sil_digerlerine_dokunmaz()
+    {
+        var w = await Setup();
+        w.Db.Notifications.AddRange(
+            new Notification { UserId = w.Sender.Id, CompanyName = "A" },
+            new Notification { UserId = w.Sender.Id, CompanyName = "B" },
+            new Notification { UserId = w.Other.Id, CompanyName = "C" });
+        await w.Db.SaveChangesAsync();
+        var mine = await w.Db.Notifications.Where(n => n.UserId == w.Sender.Id).ToListAsync();
+        var theirs = await w.Db.Notifications.FirstAsync(n => n.UserId == w.Other.Id);
+        var before = await w.Db.Notifications.CountAsync(n => n.UserId == w.Sender.Id);
+
+        // Baskasinin bildirimini silemez.
+        Assert.False(await w.Notifications.DeleteAsync(w.Sender.Id, theirs.Id));
+        Assert.True(await w.Notifications.DeleteAsync(w.Sender.Id, mine[0].Id));
+        Assert.Equal(before - 1, await w.Db.Notifications.CountAsync(n => n.UserId == w.Sender.Id));
+
+        var removed = await w.Notifications.DeleteAllAsync(w.Sender.Id);
+        Assert.Equal(before - 1, removed);
+        Assert.Equal(0, await w.Db.Notifications.CountAsync(n => n.UserId == w.Sender.Id));
+        Assert.Equal(1, await w.Db.Notifications.CountAsync(n => n.UserId == w.Other.Id));
+        Assert.Equal(0, await w.Notifications.UnreadCountAsync(w.Sender.Id));
+    }
+
     // ---------------- Gelen cevap: sohbete kayit + bildirim
 
     private sealed record World(ApplicationDbContext Db, ReplyDetectionService Replies, NotificationService Notifications, InboxService Inbox, Lead Lead, AppUser Sender, AppUser Other);
