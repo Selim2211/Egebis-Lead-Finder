@@ -39,6 +39,7 @@ public class AuditActionFilter : IAsyncActionFilter
             ["Company.RevealContactEmail"] = ("contact.reveal", "Kişi e-postası açıldı (kredi)"),
             ["Company.CreateLead"] = ("lead.create", "Lead oluşturuldu"),
             ["Company.Export"] = ("export.companies", "Firmalar dışa aktarıldı"),
+            ["DataTransfer.Export"] = ("export.company", "Firma Excel olarak dışa aktarıldı"),
             ["Email.Send"] = ("email.send", "E-posta gönderildi"),
             ["Email.MarkSent"] = ("email.marksent", "E-posta gönderildi olarak işaretlendi"),
             ["Email.Draft"] = ("email.aidraft", "AI ile e-posta taslağı yazıldı"),

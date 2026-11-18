@@ -642,6 +642,8 @@ public class CompanyController : Controller
         int page = 1, string? run = null, bool notEvaluated = false, bool fav = false,
         CancellationToken ct = default)
     {
+        // Liste puan/uygunluk gosterir: yeniden analizden sonra "geri" ya da yenileme eski kopyayi gostermesin.
+        Response.Headers.CacheControl = "no-store";
         var geo = GeoFilter.From(regions, cities, countries);
         if (signal is not ("guclu" or "incelenmeli" or "riskli" or "none")) signal = null;
         sort = CompanySort.Options.Any(o => o.Key == sort) ? sort! : CompanySort.Default;
@@ -806,9 +808,30 @@ public class CompanyController : Controller
     /// <summary>Secili aramanin firmalari; arama secili degilse kullanicinin gorebildigi tum firmalar.</summary>
     private IQueryable<Company> ScopeToRun(IQueryable<Company> query, int? runId)
     {
+        // Black List'e alinan firmalar listelerde gorunmez (kayit silinmez; listeden cikarilinca geri gelir).
+        var hidden = _blacklistedIds;
+        if (hidden is { Count: > 0 }) query = query.Where(c => !hidden.Contains(c.Id));
+
         if (runId is int id)
             return query.Where(c => _db.SearchRunCompanies.Any(x => x.SearchRunId == id && x.CompanyId == c.Id));
         return query.VisibleTo(_db, User.UserId(), User.IsAdmin());
+    }
+
+    /// <summary>Bu istekte hesaplanan, Black List'e uyan firma numaralari (null = henuz hesaplanmadi).</summary>
+    private List<int>? _blacklistedIds;
+
+    /// <summary>
+    /// Black List'teki alan adi veya firma adina uyan firmalarin numaralari. Eslesme aramadakiyle aynidir
+    /// (<see cref="SearchBlacklist.Matches"/>); bellekte yapilir, cunku ad eslesmesi Turkce normallestirme gerektirir.
+    /// </summary>
+    private async Task EnsureBlacklistedIdsAsync(CancellationToken ct)
+    {
+        if (_blacklistedIds is not null) return;
+        var blacklist = SearchBlacklist.Parse(await _settings.GetAsync(SettingKeys.ExtraBlockedDomains, ct));
+        if (blacklist.IsEmpty) { _blacklistedIds = new List<int>(); return; }
+
+        var rows = await _db.Companies.AsNoTracking().Select(c => new { c.Id, c.Name, c.Domain }).ToListAsync(ct);
+        _blacklistedIds = rows.Where(c => blacklist.Matches(c.Domain, c.Name)).Select(c => c.Id).ToList();
     }
 
     /// <summary>Firmalar listesi ve disa aktarim ayni suzgeci kullanir: ekranda ne varsa o iner.</summary>
@@ -816,6 +839,7 @@ public class CompanyController : Controller
         int? profileId, string? stage, string? signal, GeoFilter geo, string? nace, bool icp, CancellationToken ct,
         int? runId = null, bool notEvaluated = false, bool favorites = false)
     {
+        await EnsureBlacklistedIdsAsync(ct);
         var query = ScopeToRun(_db.Companies.AsNoTracking(), runId).Where(c => c.Score >= minScore);
 
         if (favorites)
@@ -1207,6 +1231,7 @@ public class CompanyController : Controller
     [HttpGet]
     public async Task<IActionResult> Compare(int? a, int? b, [FromServices] CompanyComparisonService comparer, CancellationToken ct)
     {
+        await EnsureBlacklistedIdsAsync(ct);
         var model = new CompareViewModel
         {
             A = a,
