@@ -464,6 +464,39 @@
                     </div>
                 </div>
 
+                @if (Model.GeminiFallbackActive)
+                {
+                    <div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+                        <div>
+                            <strong>Gemini sorunu nedeniyle geçici olarak Groq kullanılıyor.</strong>
+                            Uygulama her açıldığında Gemini kontrol edilir; anahtar ya da lisans düzelince otomatik Gemini'ye dönülür.
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-outline-secondary" formmethod="post"
+                                formaction="@Url.Action("GeminiFallback", "Settings", new { on = false })" formnovalidate>Şimdi Gemini'ye dön</button>
+                    </div>
+                }
+
+                <div class="mb-4" id="newsAiPicker">
+                    <label class="form-label">Haber akışı yapay zekâsı</label>
+                    <div class="ai-choice" role="radiogroup" aria-label="Haber akışı yapay zekâsı">
+                        <label class="ai-opt @(Model.NewsAiSource != "main" ? "is-on" : "")">
+                            <input type="radio" name="NewsAiSource" value="" checked="@(Model.NewsAiSource != "main")" />
+                            <span class="ai-opt-t">Groq</span>
+                            <span class="ai-opt-s">Varsayılan · Gemini'den bağımsız</span>
+                            <span class="ai-opt-k @(!string.IsNullOrWhiteSpace(Model.GroqApiKey) ? "is-ok" : "")">@(!string.IsNullOrWhiteSpace(Model.GroqApiKey) ? "Anahtar kayıtlı" : "Anahtar yok")</span>
+                        </label>
+                        <label class="ai-opt @(Model.NewsAiSource == "main" ? "is-on" : "")">
+                            <input type="radio" name="NewsAiSource" value="main" checked="@(Model.NewsAiSource == "main")" />
+                            <span class="ai-opt-t">Ana sağlayıcı</span>
+                            <span class="ai-opt-s">Yukarıda seçtiğiniz</span>
+                        </label>
+                    </div>
+                    <div class="form-text">
+                        Haber akışı (özet, kategori, önem) Gemini anahtarı ya da lisansı olsa bile varsayılan olarak yalnızca Groq ile çalışır;
+                        Groq anahtarı yoksa ana sağlayıcıya düşer. Firma analizi ise yukarıdaki seçime göre yapılır.
+                    </div>
+                </div>
+
                 <div class="ai-panel mb-4" data-ai-panel="">
                     <div class="mb-3">
                         <label class="form-label d-flex align-items-center gap-2">

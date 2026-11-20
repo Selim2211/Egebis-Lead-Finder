@@ -473,11 +473,11 @@ namespace EgebisLeadFinder.Migrations
 
                     b.Property<string>("Headline")
                         .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Location")
                         .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .HasMaxLength(200)
@@ -809,7 +809,7 @@ namespace EgebisLeadFinder.Migrations
 
                     b.Property<string>("Notes")
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("RepliedAt")
                         .HasColumnType("timestamp with time zone");
@@ -945,6 +945,11 @@ namespace EgebisLeadFinder.Migrations
 
                     b.Property<int?>("RadarTopicId")
                         .HasColumnType("integer");
+
+                    b.Property<string>("Region")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
 
                     b.Property<string>("SourceName")
                         .HasMaxLength(150)

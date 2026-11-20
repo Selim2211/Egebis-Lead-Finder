@@ -108,6 +108,65 @@ public static class NaceCatalog
 
     private static string Stem(string w) => w.Length > 5 ? w[..5] : w;
 
+    private static readonly char[] Separators = { ' ', ',', '-', '/', '.', ';', '(', ')', '\'' };
+
+    private static HashSet<string> Stems(string? text) =>
+        TurkishText.Normalize(text).Split(Separators, StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => w.Length >= 4).Select(Stem).ToHashSet();
+
+    /// <summary>Kök nadirliği (resmi faaliyet adları üzerinden): "elektrik" sık, "kablo" nadir.</summary>
+    private static readonly Lazy<Dictionary<string, double>> StemIdf = new(() =>
+    {
+        var df = new Dictionary<string, int>();
+        foreach (var a in Activities.Values)
+            foreach (var s in Stems(a)) df[s] = df.GetValueOrDefault(s) + 1;
+        var n = Math.Max(1, Activities.Count);
+        return df.ToDictionary(kv => kv.Key, kv => Math.Log((double)n / kv.Value));
+    });
+
+    private static double Overlap(HashSet<string> evidence, string activityName)
+    {
+        var idf = StemIdf.Value;
+        return Stems(activityName).Where(evidence.Contains).Sum(s => idf.GetValueOrDefault(s));
+    }
+
+    /// <summary>
+    /// Yapay zekânın verdiği kod firmanın sektör/ürün metniyle uyuşuyor mu? Uyuşmuyorsa (ör. kablo üreticisine "ev tipi
+    /// beyaz eşya" 27.51.08) resmi 6 haneli listeden metne açıkça daha iyi uyan faaliyet döner. Eşleşme kelime köklerinin
+    /// nadirliğine göre ağırlıklıdır: "elektrik" gibi yaygın kelime yetmez, "kablo" gibi ayırt edici kelime gerekir.
+    /// Belirgin bir üstün aday yoksa kod olduğu gibi kalır.
+    /// </summary>
+    public static string? Verify(string? code, IEnumerable<string?> evidence)
+    {
+        var stems = Stems(string.Join(" ", evidence.Where(e => !string.IsNullOrWhiteSpace(e))));
+        if (stems.Count == 0) return code;
+
+        var digits = new string((code ?? string.Empty).Where(char.IsDigit).ToArray());
+        var current = digits.Length == 6 ? Overlap(stems, Activity(digits) ?? string.Empty)
+            : digits.Length >= 2 ? ActivitiesUnder(digits).Select(a => Overlap(stems, a.Value)).DefaultIfEmpty(0).Max()
+            : 0;
+
+        // Firma "üretim/imalat/fabrika" diyorsa yalnızca imalat bölümlerine (10-33) bakılır: aynı ürünün toptan/perakende
+        // ticaret kodu seçilmez.
+        var manufacturing = stems.Overlaps(new[] { "uretim", "uretic", "imala", "fabri", "uretil" }.Select(Stem));
+        bool Allowed(string key) => !manufacturing || (int.TryParse(key[..2], out var div) && div is >= 10 and <= 33);
+
+        // Eşitlikte kelimenin faaliyet adında kaç kez geçtiği ayırır (ör. "kablo" asıl konu mu, yan söz mü).
+        int Frequency(string name) => TurkishText.Normalize(name).Split(Separators, StringSplitOptions.RemoveEmptyEntries)
+            .Count(w => w.Length >= 4 && stems.Contains(Stem(w)));
+
+        var ranked = Activities.Where(a => Allowed(a.Key))
+            .Select(a => (a.Key, Score: Overlap(stems, a.Value), Tf: Frequency(a.Value)))
+            .OrderByDescending(x => x.Score).ThenByDescending(x => x.Tf).ThenBy(x => x.Key, StringComparer.Ordinal).Take(2).ToList();
+        if (ranked.Count == 0) return code;
+        var best = ranked[0];
+        var unique = ranked.Count < 2 || ranked[1].Score < best.Score || ranked[1].Tf < best.Tf;
+        // Açık üstünlük: en iyi aday ayırt edici bir kelime taşıyor (puan > 4) ve mevcut koddan belirgin şekilde iyi.
+        if (unique && best.Score > 4 && best.Score >= current * 1.5 + 1 && best.Key != digits)
+            return FormatSixDigit(best.Key);
+        return code;
+    }
+
     /// <summary>Kodun okunur adi: 6 haneli resmi faaliyet adi, yoksa bolum adi.</summary>
     public static string? NameOf(string? code) => Activity(code) ?? Division(code)?.Name;
 

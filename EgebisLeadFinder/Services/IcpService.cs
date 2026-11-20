@@ -376,6 +376,10 @@ public class IcpService
         // 4 haneli kalan kodu (yapay zeka 6 haneliyi bilemediyse ya da uydurduysa) resmi listeden 6 haneliye indir.
         company.NaceCode = NaceCatalog.Refine(company.NaceCode,
             new[] { analysis?.Industry, company.Industry, analysis?.Reason }.Concat(analysis?.Products ?? new List<string>()));
+        // Küçük modeller bazen yanlış sınıf seçiyor (kablo üreticisine beyaz eşya kodu): kod sektör/ürünlerle uyuşmuyorsa düzeltilir.
+        if (analysis is not null)
+            company.NaceCode = NaceCatalog.Verify(company.NaceCode,
+                new[] { analysis.Industry, company.Industry }.Concat(analysis.Products)) ?? company.NaceCode;
 
         return breakdown;
     }

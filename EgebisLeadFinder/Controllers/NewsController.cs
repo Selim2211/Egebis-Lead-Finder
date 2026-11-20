@@ -30,10 +30,35 @@ public class NewsController : Controller
     private int Me => User.UserId() ?? 0;
     private bool Admin => User.IsAdmin();
 
+    /// <summary>Haber Akışı'ndaki TR / Global seçimi (çerezde saklanır); null = tümü.</summary>
+    public const string RegionCookie = "news-region";
+    private string? Region => NewsRegions.Normalize(Request.Cookies[RegionCookie]);
+
     private IQueryable<NewsFeedItem> VisibleItems(int me, bool admin)
     {
         var visible = _db.Companies.VisibleTo(_db, me, admin).Select(c => c.Id);
-        return _db.NewsItems.AsNoTracking().Where(n => n.CompanyId == null || visible.Contains(n.CompanyId.Value));
+        var query = _db.NewsItems.AsNoTracking().Where(n => n.CompanyId == null || visible.Contains(n.CompanyId.Value));
+        return InRegion(query);
+    }
+
+    /// <summary>TR / Global seçimi tüm bölümlere (akış, liderlik tablosu, şirketler, sektörler) uygulanır.</summary>
+    private IQueryable<NewsFeedItem> InRegion(IQueryable<NewsFeedItem> query)
+    {
+        var region = Region;
+        return region is null ? query : query.Where(n => n.Region == region);
+    }
+
+    /// <summary>TR / Global / Tümü seçimini kaydeder ve geldiği sayfaya döner.</summary>
+    [HttpGet]
+    public IActionResult SetRegion(string? value, string? returnUrl)
+    {
+        var region = NewsRegions.Normalize(value);
+        if (region is null) Response.Cookies.Delete(RegionCookie);
+        else Response.Cookies.Append(RegionCookie, region, new CookieOptions
+        {
+            Expires = DateTimeOffset.UtcNow.AddYears(1), HttpOnly = true, SameSite = SameSiteMode.Lax, IsEssential = true
+        });
+        return Url.IsLocalUrl(returnUrl) ? LocalRedirect(returnUrl!) : RedirectToAction(nameof(Index));
     }
 
     private IQueryable<int> WatchedIds() =>
@@ -55,7 +80,7 @@ public class NewsController : Controller
 
         var ids = companies.Select(c => c.Id).ToList();
         var since30 = now.AddDays(-30);
-        var items = await _db.NewsItems.AsNoTracking()
+        var items = await InRegion(_db.NewsItems.AsNoTracking())
             .Where(n => n.CompanyId != null && ids.Contains(n.CompanyId.Value) && n.PublishedAt >= since30)
             .Select(n => new { CompanyId = n.CompanyId!.Value, n.PublishedAt, n.Category, n.Title, n.Url, n.Importance })
             .ToListAsync(ct);
@@ -84,7 +109,7 @@ public class NewsController : Controller
         var since = NewsSlots.TodayStartUtc(now).AddDays(-6);
         var visible = _db.Companies.VisibleTo(_db, me, Admin);
         var visibleIds = visible.Select(c => c.Id);
-        var news = await _db.NewsItems.AsNoTracking()
+        var news = await InRegion(_db.NewsItems.AsNoTracking())
             .Where(n => n.PublishedAt >= since &&
                 ((n.CompanyId != null && visibleIds.Contains(n.CompanyId.Value)) ||
                  (n.CompanyId == null && n.MentionedCompany != null && n.MentionedCompany != "")))
@@ -161,7 +186,7 @@ public class NewsController : Controller
         var now = DateTime.UtcNow;
         var since = now.AddDays(-7);
         var topics = await _db.RadarTopics.AsNoTracking().OrderBy(t => t.Id).ToListAsync(ct);
-        var hits = await _db.NewsItems.AsNoTracking().Where(n => n.RadarTopicId != null && n.PublishedAt >= since)
+        var hits = await InRegion(_db.NewsItems.AsNoTracking()).Where(n => n.RadarTopicId != null && n.PublishedAt >= since)
             .Select(n => new { TopicId = n.RadarTopicId!.Value, n.PublishedAt }).ToListAsync(ct);
         var scans = await _db.NewsScanCursors.AsNoTracking().Where(c => c.Kind == NewsCursorKinds.Topic)
             .ToDictionaryAsync(c => c.RefId, c => c.LastScannedAt, ct);
@@ -268,7 +293,9 @@ public class NewsController : Controller
     {
         var pulses = await LoadPulsesAsync(ct);
         var shell = await BuildShellAsync("companies", null, false, ct);
-        return View(new NewsCompaniesViewModel { Shell = shell, Rows = pulses });
+        // En çok haberi olan üstte; eşitse puanı yüksek olan, sonra ada göre.
+        var rows = pulses.OrderByDescending(p => p.Count7).ThenByDescending(p => p.Count30).ThenByDescending(p => p.Score).ThenBy(p => p.Name).ToList();
+        return View(new NewsCompaniesViewModel { Shell = shell, Rows = rows });
     }
 
     /// <summary>Sektörler: firmaların sektörüne göre haber dağılımı; radar haberleri ayrı grup.</summary>
@@ -284,7 +311,7 @@ public class NewsController : Controller
             .OrderByDescending(s => s.Count).ThenBy(s => s.Name).ToList();
 
         var since = DateTime.UtcNow.AddDays(-30);
-        var radar = await _db.NewsItems.AsNoTracking().Where(n => n.CompanyId == null && n.PublishedAt >= since)
+        var radar = await InRegion(_db.NewsItems.AsNoTracking()).Where(n => n.CompanyId == null && n.PublishedAt >= since)
             .OrderByDescending(n => n.PublishedAt).Take(400)
             .Select(n => new { n.Category, n.Title, n.Url, n.Importance }).ToListAsync(ct);
         if (radar.Count > 0)

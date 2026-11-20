@@ -39,6 +39,12 @@ public static class SettingKeys
     public const string GroqApiKey = "Ai:GroqApiKey";
     public const string GroqModel = "Ai:GroqModel";
 
+    /// <summary>Haber akisinin yapay zekasi: bos/"groq" = her zaman Groq (varsayilan), "main" = secili ana saglayici.</summary>
+    public const string NewsAiSource = "Ai:NewsSource";
+
+    /// <summary>"1" = Gemini sorunlu oldugu icin yonetici Groq'a gecti; her acilista Gemini yoklanir, duzelince kalkar.</summary>
+    public const string AiGeminiFallback = "Ai:GeminiFallback";
+
     /// <summary>Lead ararken kullanilacak unvan anahtar kelimeleri (virgulle ayrilmis).</summary>
     public const string LeadTitleKeywords = "Enrichment:TitleKeywords";
 
@@ -164,7 +170,7 @@ public static class SettingKeys
     /// <summary>Ayarlar ekranindaki tum anahtarlar.</summary>
     public static readonly string[] All =
     {
-        LeadTitleKeywords, SerperApiKey, GeminiApiKey, GeminiModel, AiProvider, NvidiaApiKey, NvidiaModel, GroqApiKey, GroqModel, ApolloApiKey, SerperCreditLimit,
+        LeadTitleKeywords, SerperApiKey, GeminiApiKey, GeminiModel, AiProvider, NvidiaApiKey, NvidiaModel, GroqApiKey, GroqModel, NewsAiSource, AiGeminiFallback, ApolloApiKey, SerperCreditLimit,
         GeminiCostPerCallTry, LastKnownUsdTryRate, UsdTryRate, SearchMaxCompanies, SearchDefaultCountry, SearchRegion, FollowUpAfterDays, IcpProfile, BusinessProfile, ExtraBlockedDomains,
         SmtpFromAddress, SmtpFromName, SmtpHost, SmtpPort, SmtpUsername, SmtpPassword, SmtpSecurity,
         SalesforceConsumerKey, SalesforceConsumerSecret, SalesforceUsername, SalesforcePassword,

@@ -22,6 +22,8 @@
     };
 }
 
+<link rel="stylesheet" href="~/css/transfer.css" asp-append-version="true" />
+
 <div class="page-head">
     <div>
         <h1>@Model.Company.Name</h1>
@@ -48,7 +50,13 @@
             }
         </div>
     </div>
-    <div class="d-flex align-items-center gap-3">
+    <div class="d-flex align-items-center gap-3 flex-wrap justify-content-end">
+        @* Yesil Excel dugmesi: firma bilgisi + kisiler + leadler. *@
+        <a class="btn btn-sm btn-transfer d-inline-flex align-items-center gap-1" title="Bu firmanın tüm bilgisini, kişileri ve lead'leriyle Excel olarak indir"
+           asp-controller="DataTransfer" asp-action="Export" asp-route-companyId="@Model.Company.Id">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></svg>
+            Excel'e aktar
+        </a>
         <partial name="_FavoriteStar" model="new FavoriteStar(Model.Company.Id, Model.IsFavorite, WithLabel: true)" />
         <button type="button" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
                 data-compare-add="@Model.Company.Id" data-company-name="@Model.Company.Name"
@@ -70,6 +78,15 @@
         </div>
     </div>
 </div>
+
+@if (TempData["SettingsSaved"] is string transferOk)
+{
+    <div class="alert alert-success" data-flash="success">@transferOk</div>
+}
+@if (TempData["SettingsError"] is string transferErr)
+{
+    <div class="alert alert-danger" data-flash="error">@transferErr</div>
+}
 
 @if (Model.Company.ProcessingError is not null)
 {

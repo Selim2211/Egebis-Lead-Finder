@@ -52,6 +52,109 @@ public static class ExportService
         return new List<ExportTable> { firms, people };
     }
 
+    /// <summary>
+    /// Tek firmanin tum bilgisi: "Firma" (Alan/Deger listesi), "Kisiler" ve "Leadler" sayfalari.
+    /// Her satirin hucre sayisi basligin sutun sayisina esittir (kayma olmaz); kisi ve lead yoksa baslik satiri yine yazilir.
+    /// </summary>
+    public static List<ExportTable> CompanyDetailTables(Company c)
+    {
+        var a = Parse<CompanyAnalysis>(c.AiAnalysis);
+        var r = Parse<CompanyRating>(c.RatingJson);
+        string? Join(IEnumerable<string?>? items) =>
+            items is null ? null : string.Join("; ", items.Where(x => !string.IsNullOrWhiteSpace(x)));
+        DateTime? Local(DateTime? d) => d?.ToLocalTime();
+
+        var rows = new List<object?[]>();
+        void Add(string field, object? value) => rows.Add(new object?[] { field, value });
+
+        Add("Firma adı", c.Name);
+        Add("Web sitesi", c.Website);
+        Add("Alan adı", c.Domain);
+        Add("Sektör", a?.Industry ?? c.Industry);
+        Add("NACE kodu", c.NaceCode);
+        Add("NACE faaliyet adı", NaceCatalog.NameOf(c.NaceCode));
+        Add("Şehir", c.City);
+        Add("Ülke", c.Country);
+        Add("Adres", c.Address);
+        Add("Lead puanı", c.Score);
+        Add("Haber puanı (son 30 gün)", c.NewsBoost);
+        Add("Uygunluk (%)", c.FitScore);
+        Add("Uygunluk segmenti", c.FitSegment);
+        Add("Uygunluk gerekçesi", c.FitReason);
+        Add("Aşama", SalesforceRecordMapper.StageLabel(c));
+        Add("İdeal müşteri profiline uyuyor", c.IcpMatch ? "Evet" : "Hayır");
+        Add("Değerlendirme durumu", c.EvaluationStatus switch
+        {
+            EvaluationStatus.Evaluated => "Değerlendirildi",
+            EvaluationStatus.Disqualified => "Elendi",
+            _ => "İncelenemedi"
+        });
+        Add("Değerlendirme notu", c.EvaluationNote);
+        Add("İşleme hatası", c.ProcessingError);
+        Add("Açıklama", c.Description);
+
+        Add("Yapay zekâ: üretici firma", a is null ? null : a.Manufacturer ? "Evet" : "Hayır");
+        Add("Yapay zekâ: ürünler", Join(a?.Products));
+        Add("Yapay zekâ: SAP durumu", a?.Sap switch
+        {
+            null => null,
+            "yes" => "SAP kullanıyor",
+            "likely" => "SAP kullanma ihtimali yüksek",
+            "no" => "SAP kullanmıyor",
+            _ => "Bilinmiyor"
+        });
+        Add("Yapay zekâ: SAP kanıtı", a?.SapEvidence);
+        Add("Yapay zekâ: SAP hizmeti satıyor (rakip)", a is null ? null : a.SapVendor ? "Evet" : "Hayır");
+        Add("Yapay zekâ: çalışan tahmini", a?.EmployeeSizeHint);
+        Add("Yapay zekâ: potansiyel", a is null ? null : a.Potential ? "Evet" : "Hayır");
+        Add("Yapay zekâ: değerlendirme", a?.Reason);
+        Add("Yapay zekâ: eşleşen kriterler", Join(a?.MatchedSignals));
+        Add("Yapay zekâ: modeli", a?.AiModel);
+
+        Add("Ön araştırma: sinyal", RatingSignalDisplay.HasSignal(c.RatingSignal) ? RatingSignalDisplay.Label(c.RatingSignal) : null);
+        Add("Ön araştırma: özet", r?.Summary);
+        Add("Ön araştırma: kuruluş", r?.FoundingInfo);
+        Add("Ön araştırma: ölçek", r?.ScaleInfo);
+        Add("Ön araştırma: finansal bilgi", r?.FinancialInfo);
+        Add("Ön araştırma: ortaklar / yöneticiler", r?.Owners);
+        Add("Ön araştırma: müşteriler", Join(r?.Customers));
+        Add("Ön araştırma: projeler", Join(r?.Projects));
+        Add("Ön araştırma: büyüme işaretleri", Join(r?.GrowthSignals));
+        Add("Ön araştırma: risk işaretleri", Join(r?.RiskSignals.Select(x => $"{x.Text} ({x.Severity})")));
+        Add("Ön araştırma: satış önerisi", r?.SalesApproach);
+        Add("Ön araştırma: tarih", Local(c.RatedAt));
+
+        Add("İletişim kuruldu", Local(c.ContactedAt));
+        Add("E-posta gönderildi", Local(c.EmailSentAt));
+        Add("Proje başladı", Local(c.ProjectStartedAt));
+        Add("Eklenme tarihi", Local(c.CreatedAt));
+
+        var firm = new ExportTable("Firma", new[] { "Alan", "Değer" }, rows);
+
+        var people = new ExportTable("Kişiler",
+            new[] { "Ad soyad", "Ünvan", "E-posta", "E-posta durumu", "Telefon", "Konum", "Başlık", "Kaynak", "Profil bağlantısı", "Çalışma süresi", "Lead var mı" },
+            c.Contacts.OrderByDescending(p => p.TitleScore).ThenBy(p => p.Id).Select(p => new object?[]
+            {
+                p.Name, p.Title, p.Email, EmailStatusDisplay.Label(p.EmailStatus, p.Email), p.Phone, p.Location, p.Headline,
+                p.Source.ToString(), p.SourceUrl, p.TenureText(), c.Leads.Any(l => l.ContactId == p.Id) ? "Evet" : "Hayır"
+            }).ToList());
+
+        var leads = new ExportTable("Leadler",
+            new[] { "Kişi", "Ünvan", "E-posta", "Durum", "Puan", "Gönderilen mail", "Son mail", "İletişim", "Cevap", "Notlar", "Oluşturma" },
+            c.Leads.OrderByDescending(l => l.CreatedAt).Select(l =>
+            {
+                var person = c.Contacts.FirstOrDefault(p => p.Id == l.ContactId);
+                var lastMail = l.SentEmails.Count > 0 ? l.SentEmails.Max(e => e.SentAt) : l.SentAt;
+                return new object?[]
+                {
+                    person?.Name, person?.Title, person?.Email, LeadStatusDisplay.Label(l.Status), l.Score, l.SentEmails.Count,
+                    Local(lastMail), Local(l.ContactedAt), Local(l.RepliedAt), l.Notes, l.CreatedAt.ToLocalTime()
+                };
+            }).ToList());
+
+        return new List<ExportTable> { firm, people, leads };
+    }
+
     public static ExportTable SearchProfileTable(IEnumerable<SearchProfile> profiles, int? me) => new("Arama Profilleri",
         new[] { "Profil", "Sektör", "NACE", "Ürünler", "Ülke / bölge", "İl / bölge", "En fazla firma", "Paylaşım", "Oluşturma" },
         profiles.Select(p =>
@@ -123,6 +226,13 @@ public static class ExportService
             sheet.SheetView.FreezeRows(1);
             if (table.Rows.Count > 0) sheet.Range(1, 1, table.Rows.Count + 1, table.Headers.Length).SetAutoFilter();
             sheet.Columns().AdjustToContents(1, Math.Min(table.Rows.Count + 1, 200), 8, 60);
+            // Uzun metinler (ozet, gerekce, notlar) hucre icinde satira sarilir; sutunlar kaymaz.
+            if (table.Rows.Count > 0)
+            {
+                var body = sheet.Range(2, 1, table.Rows.Count + 1, table.Headers.Length);
+                body.Style.Alignment.WrapText = true;
+                body.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
+            }
         }
 
         using var stream = new MemoryStream();

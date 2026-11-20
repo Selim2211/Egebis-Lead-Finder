@@ -132,8 +132,12 @@ public class ApplicationDbContext : DbContext
             e.Property(x => x.Email).HasConversion(Encrypted).HasColumnType("text");
             e.Property(x => x.Phone).HasConversion(Encrypted).HasColumnType("text");
             e.Property(x => x.SourceUrl).HasConversion(Encrypted).HasColumnType("text");
+            e.Property(x => x.Location).HasConversion(Encrypted).HasColumnType("text");
+            e.Property(x => x.Headline).HasConversion(Encrypted).HasColumnType("text");
             e.HasIndex(x => x.EmailHash);
         });
+        // Lead notlari serbest metin: kisisel bilgi icerebilir.
+        b.Entity<Lead>().Property(x => x.Notes).HasConversion(Encrypted).HasColumnType("text");
         b.Entity<SentEmail>(e =>
         {
             e.Property(x => x.ToAddress).HasConversion(EncryptedRequired).HasColumnType("text");

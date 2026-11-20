@@ -67,6 +67,8 @@ public class SettingsController : Controller
             [SettingKeys.NvidiaModel] = Clean(form.NvidiaModel),
             [SettingKeys.GroqApiKey] = form.GroqApiKey?.Trim(),
             [SettingKeys.GroqModel] = Clean(form.GroqModel),
+            // Bos = haber akisi Groq (varsayilan); "main" = ana saglayici.
+            [SettingKeys.NewsAiSource] = form.NewsAiSource?.Trim().ToLowerInvariant() == "main" ? "main" : null,
             [SettingKeys.SerperCreditLimit] = form.SerperCreditLimit > 0
                 ? form.SerperCreditLimit.ToString()
                 : null,
@@ -133,6 +135,29 @@ public class SettingsController : Controller
         return RedirectToAction(nameof(Index));
 
         static string? Clean(string? v) => string.IsNullOrWhiteSpace(v) ? null : v.Trim();
+    }
+
+    /// <summary>
+    /// Gemini sorunluyken yoneticinin secimi: on=true Groq'a gec (yalniz Groq anahtari varsa), on=false Gemini'ye don / gecme.
+    /// Gecildiyse her acilista Gemini yoklanir; duzelince kendiliginden Gemini'ye donulur.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GeminiFallback(bool on, string? returnUrl, CancellationToken ct)
+    {
+        if (on && string.IsNullOrWhiteSpace(await _settings.GetAsync(SettingKeys.GroqApiKey, ct)))
+        {
+            TempData["SettingsError"] = "Önce Ayarlar'a Groq API anahtarını girip kaydedin.";
+        }
+        else
+        {
+            await _settings.SetManyAsync(new Dictionary<string, string?> { [SettingKeys.AiGeminiFallback] = on ? "1" : null }, ct);
+            TempData["SettingsSaved"] = on
+                ? "Yapay zekâ geçici olarak Groq'a geçirildi. Uygulama her açıldığında Gemini kontrol edilir; düzelince otomatik Gemini'ye dönülür."
+                : "Gemini'ye dönüldü.";
+            EgebisLeadFinder.Services.Auth.AuditActionFilter.SetAuditSummary(HttpContext, on ? "Gemini sorunu: Groq'a geçildi" : "Gemini'ye dönüldü");
+        }
+        return Url.IsLocalUrl(returnUrl) ? LocalRedirect(returnUrl!) : RedirectToAction(nameof(Index));
     }
 
     /// <summary>Kayitli SMTP ayarlariyla gonderen adresin KENDISINE deneme e-postasi atar.</summary>
@@ -259,6 +284,8 @@ public class SettingsController : Controller
             NvidiaModel = Stored(SettingKeys.NvidiaModel),
             GroqApiKey = Stored(SettingKeys.GroqApiKey),
             GroqModel = Stored(SettingKeys.GroqModel),
+            NewsAiSource = Stored(SettingKeys.NewsAiSource),
+            GeminiFallbackActive = Stored(SettingKeys.AiGeminiFallback) == "1",
 
             SerperFromConfig = FromConfig(SettingKeys.SerperApiKey),
             GeminiFromConfig = FromConfig(SettingKeys.GeminiApiKey),

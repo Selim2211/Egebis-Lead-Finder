@@ -23,6 +23,8 @@ public sealed record StoryItem(long Id, DateTime PublishedAt, NewsPrint Print);
 public static class NewsSimilarity
 {
     public const double Threshold = 0.45;
+    /// <summary>En az 4 ortak kelimeyle (ve ortak özel isim ya da genel başlık) aranan alt ağırlık.</summary>
+    public const double LooseWeight = 0.27;
     public static readonly TimeSpan Window = TimeSpan.FromHours(72);
 
     private static readonly HashSet<string> Stop = new(StringComparer.Ordinal)
@@ -38,7 +40,9 @@ public static class NewsSimilarity
     public static NewsPrint Print(string? title, string? summary)
     {
         title ??= string.Empty;
-        var extra = string.IsNullOrWhiteSpace(summary) || summary.Trim() == title.Trim() ? string.Empty : summary;
+        // Özet başlığın aynısıysa ya da "başlık + site adı" ise (Google News biçimi) yeni bilgi taşımaz; site adı karşılaştırmayı bozar.
+        var extra = string.IsNullOrWhiteSpace(summary)
+            || summary.Trim().StartsWith(title.Trim(), StringComparison.OrdinalIgnoreCase) ? string.Empty : summary;
         var tokens = Tokens(title + " " + extra);
         var proper = Propers(title);
         proper.UnionWith(Propers(extra));
@@ -108,10 +112,19 @@ public static class NewsSimilarity
         var shared = a.Tokens.Where(b.Tokens.Contains).ToList();
         if (shared.Count < 3) return 0;
         var sharedProper = shared.Count(t => a.Proper.Contains(t) && b.Proper.Contains(t));
-        if (sharedProper == 0) return 0;
-
         var w = shared.Sum(t => Weight(t, idf)) /
                 Math.Min(a.Tokens.Sum(t => Weight(t, idf)), b.Tokens.Sum(t => Weight(t, idf)));
+
+        if (sharedProper == 0)
+        {
+            // Ortak özel isim yok. Yalnızca biri özel isim vermeyen genel bir başlıksa ("Alman otomotiv devi frene bastı")
+            // ve ortak kelimeler yeterince çoksa aynı haber sayılır. İkisinde de farklı özel isimler varsa farklı haberdir.
+            var oneGeneric = a.Proper.Count == 0 || b.Proper.Count == 0;
+            return oneGeneric && shared.Count >= 4 && w >= LooseWeight ? Threshold : 0;
+        }
+
+        // Özel isim ortak ve ortak kelime çok: ağırlıklı skor düşük kalsa da aynı olaydır (kopya başlıklar farklı sözcüklerle yazılır).
+        if (shared.Count >= 4 && w >= LooseWeight) return Math.Max(w, Threshold);
         var sharedNumber = shared.Any(t => t[0] == '#');
         if (sharedProper >= 2 && shared.Count >= 4 && (sharedNumber || w >= 0.3)) return Math.Max(w, Threshold);
         return Math.Min(1, w);

@@ -387,6 +387,12 @@ public class NewsOptions
 
     public string SerperNewsEndpoint { get; set; } = "https://google.serper.dev/news";
 
+    /// <summary>Ek ücretsiz akışlar (AA, Dünya, Ekonomim, Bloomberg HT RSS + Resmî Gazete) her turda okunsun mu?</summary>
+    public bool ExtraFeeds { get; set; } = true;
+
+    /// <summary>Tur başına en fazla bu kadar firma GDELT'te de aranır (sağlayıcı 5 sn'de 1 istek ister). 0 = kapalı.</summary>
+    public int GdeltPerRun { get; set; } = 3;
+
     /// <summary>Tur basina yapay zekaya gonderilecek toplu cagri sayisi.</summary>
     public int MaxAiBatchesPerRun { get; set; } = 1;
 

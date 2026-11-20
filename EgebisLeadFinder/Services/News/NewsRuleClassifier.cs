@@ -16,8 +16,17 @@ public static class NewsRuleClassifier
         "kapasite artır", "kapasite artış", "yatırım yap", "yatırıma başl", "yatırım teşvik", "organize sanayi"
     };
 
+    /// <summary>Yatırım durdurma/fabrika kapatma gibi kötü haberler: "yatırım" kelimesi geçse de olumlu sayılmaz.</summary>
+    private static readonly string[] HaltRisk =
+    {
+        "yatırımları durdur", "yatırımlar durdur", "yatırımı durdur", "yatırım durdur", "askıya al", "askıya alın",
+        "fabrikasını kapat", "fabrikayı kapat", "fabrikaları kapat", "fabrika kapat", "kapanabilir", "kapatmayı değerlendir",
+        "üretime ara ver", "üretimi durdur", "fabrikalar tehlikede", "fabrika riskte", "fabrikalar riskte"
+    };
+
     public static (string Category, int Importance) Classify(string text, ResearchOptions options)
     {
+        if (ContainsAny(text, HaltRisk)) return (NewsCategories.Risk, 4);
         if (ContainsAny(text, options.HighRiskKeywords)) return (NewsCategories.Risk, 4);
         if (ContainsAny(text, options.RiskKeywords)) return (NewsCategories.Risk, 3);
 

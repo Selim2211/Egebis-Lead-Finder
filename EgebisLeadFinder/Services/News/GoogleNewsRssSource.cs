@@ -30,7 +30,7 @@ public class GoogleNewsRssSource : INewsSource
     }
 
     /// <summary>RSS metnini haberlere çevirir. Başlık "Haber başlığı - Kaynak" biçimindeyse kaynak ayrılır.</summary>
-    public static List<NewsHit> ParseRss(string xml)
+    public static List<NewsHit> ParseRss(string xml, bool splitSource = true)
     {
         var hits = new List<NewsHit>();
         XDocument doc;
@@ -46,7 +46,7 @@ public class GoogleNewsRssSource : INewsSource
             var source = (string?)item.Element("source");
             var title = rawTitle;
             var dash = rawTitle.LastIndexOf(" - ", StringComparison.Ordinal);
-            if (dash > 10)
+            if (splitSource && dash > 10)
             {
                 source ??= rawTitle[(dash + 3)..].Trim();
                 title = rawTitle[..dash].Trim();
@@ -60,7 +60,8 @@ public class GoogleNewsRssSource : INewsSource
             var description = Regex.Replace(WebUtility.HtmlDecode((string?)item.Element("description") ?? string.Empty), "<[^>]+>", " ");
             description = Regex.Replace(description, @"\s+", " ").Trim();
 
-            hits.Add(new NewsHit(title, link!, source?.Trim(), published, description.Length == 0 ? null : description));
+            // Google Haberler TR baskısı ve Türk gazetelerinin akışları: Türkiye haberi.
+            hits.Add(new NewsHit(title, link!, source?.Trim(), published, description.Length == 0 ? null : description, Models.NewsRegions.Tr));
         }
         return hits;
     }

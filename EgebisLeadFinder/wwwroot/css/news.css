@@ -34,6 +34,11 @@ main#main:has(> .nx) + .eg-footer { display: none; }
 .nx-tab { padding: .4rem .85rem; font-size: .88rem; font-weight: 600; color: var(--nx-dim); text-decoration: none; border-bottom: 2px solid transparent; }
 .nx-tab:hover { color: #fff; }
 .nx-tab.is-on { color: #fff; border-bottom-color: var(--nx-accent); }
+/* TR / Global / Tümü seçimi */
+.nx-region { display: inline-flex; flex: 0 0 auto; padding: 3px; gap: 2px; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: rgba(255,255,255,.04); }
+.nx-region-opt { padding: .28rem .8rem; border-radius: 999px; font-size: .78rem; font-weight: 700; letter-spacing: .04em; color: var(--nx-dim); text-decoration: none; transition: background-color .15s ease, color .15s ease; }
+.nx-region-opt:hover { color: #fff; }
+.nx-region-opt.is-on { background: var(--nx-accent); color: #04140c; }
 .nx-search input { width: 15rem; max-width: 100%; padding: .38rem .75rem; border-radius: .45rem; background: var(--nx-panel); border: 1px solid var(--nx-line); color: #fff; font-size: .85rem; }
 .nx-search input::placeholder { color: var(--nx-dim); }
 .nx-search input:focus, .nx-filter-row input:focus, .nx-filter-row select:focus, .nx-addtopic input:focus { outline: 2px solid rgba(91, 157, 255, .5); outline-offset: 1px; }
@@ -175,20 +180,25 @@ a.nm-tag:hover { color: #fff; background: #243042; }
 @container (max-width: 760px) { .nx-filter-row { grid-template-columns: 1fr 1fr; } .nx-filter-row label:first-child { grid-column: 1 / -1; } }
 
 /* ---------- Şirketler tablosu ---------- */
-.nx-table { display: grid; gap: 0; }
-.nx-tr { display: grid; grid-template-columns: minmax(12rem, 2.2fr) .6fr .9fr 1.2fr 1.3fr 1fr auto; align-items: center; gap: .7rem; padding: .6rem .5rem; border-top: 1px solid var(--nx-line); }
-.nx-th { border-top: 0; font-size: .74rem; color: var(--nx-dim); padding-top: 0; }
+/* Tüm satırlar tablonun ortak sütunlarını paylaşır (subgrid): düğme sayısı farklı olsa da sütunlar hizalı kalır. */
+.nx-table { display: grid; grid-template-columns: minmax(14rem, 2.4fr) 4.5rem 6.5rem 9rem minmax(6rem, 1fr) 7rem 14rem; column-gap: 1rem; }
+.nx-tr { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; padding: .7rem .75rem; border-top: 1px solid var(--nx-line); border-radius: 10px; transition: background-color .15s ease; }
+.nx-tr:not(.nx-th):hover { background: rgba(255,255,255,.03); }
+.nx-tr > .nx-c { text-align: center; justify-content: center; }
+.nx-th { border-top: 0; font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--nx-dim); padding-top: 0; }
 .nx-cell-name { display: flex; align-items: center; gap: .6rem; min-width: 0; }
 .nx-cell-name a { font-weight: 650; text-decoration: none; } .nx-cell-name a:hover { color: var(--nx-accent); }
 .nx-cell-name small { display: block; color: var(--nx-dim); font-size: .72rem; }
 .nx-num { font-weight: 700; font-size: 1rem; font-variant-numeric: tabular-nums; }
 .nx-cell-spark { display: flex; align-items: center; gap: .4rem; }
-.nx-cell-act { display: flex; gap: .35rem; flex-wrap: wrap; justify-content: flex-end; }
+.nx-cell-act { display: flex; gap: .35rem; flex-wrap: wrap; justify-content: flex-start; }
 .nx-balance { display: flex; height: 7px; border-radius: 7px; overflow: hidden; background: var(--nx-line); min-width: 5rem; }
 .nx-balance i { display: block; height: 100%; } .nx-balance .pos { background: var(--nx-pos); } .nx-balance .neu { background: #5b6a85; } .nx-balance .neg { background: var(--nx-neg); }
 @container (max-width: 900px) {
     .nx-th { display: none; }
-    .nx-tr { grid-template-columns: 1fr 1fr; }
+    .nx-table { grid-template-columns: 1fr 1fr; }
+    .nx-tr { grid-template-columns: 1fr 1fr; row-gap: .5rem; }
+    .nx-tr > .nx-c { text-align: left; justify-content: flex-start; }
     .nx-cell-name, .nx-cell-act { grid-column: 1 / -1; }
     .nx-tr [data-label]::before { content: attr(data-label); display: block; font-size: .68rem; color: var(--nx-dim); margin-bottom: .1rem; }
 }

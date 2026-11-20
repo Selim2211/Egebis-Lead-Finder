@@ -32,7 +32,14 @@ public class NewsSimilarityTests
         (18, 25, "Güney Koreli bir gıda devi, Vietnam'da bir fabrika kurmak için 4,2 trilyon VND yatırım yapmaya hazırlanıyor.", ""),
         (19, 26, "Tesla Türkiye’ye Fabrika Kurar mı? BYD ve Chery İçin Fırsat-Risk Hesabı", ""),
         (20, 20, "Türkiye'nin Tekstil Devi İflas Etti! Çok Sayıda Ülkeye İhracat Yapıyordu!", ""),
-        (21, -30, "Satışları düşen PepsiCo, yaklaşık 1000 kişinin işine son verecek", "")
+        (21, -30, "Satışları düşen PepsiCo, yaklaşık 1000 kişinin işine son verecek", ""),
+        (30, 30, "Alman otomotiv devinden kritik karar! Yatırımlar durduruldu, fabrikalar tehlikede", "Alman otomotiv devinden kritik karar! Yatırımlar durduruldu, fabrikalar tehlikede Bursada Bugün"),
+        (31, 30, "Otomotiv devi Mercedes'ten şok karar! Yeni yatırımlar durduruldu: Fabrikalar kapanabilir", "Mercedes, yeni yatırımları durdurdu ve fabrikaların kapanma ihtimali ortaya çıktı."),
+        (32, 33, "Alman otomotiv devi frene bastı! Tüm yeni yatırımlar durduruldu", "Alman otomotiv devi frene bastı! Tüm yeni yatırımlar durduruldu Bursa Hayat Gazetesi"),
+        (33, 40, "Mercedes - Benz Almanya'daki tüm yeni yatırımları durdurdu: Fabrika kapatmaları gündemde", ""),
+        (34, 42, "Dünyaca ünlü otomotiv devinden flaş karar! Yeni yatırımlar askıya alındı", "Dünyaca ünlü otomotiv devinden flaş karar! Yeni yatırımlar askıya alındı kayserihaber.com"),
+        (35, 42, "Mercedes Almanya'da yatırımları durdurdu: İki fabrika riskte", ""),
+        (36, 43, "Mercedes-Benz iki fabrikasını kapatmayı değerlendiriyor: Yeni yatırımlar askıya alındı", "")
     };
 
     private static List<StoryItem> Items() =>
@@ -44,9 +51,10 @@ public class NewsSimilarityTests
         var groups = NewsSimilarity.Clusters(Items())
             .Select(g => g.Select(s => s.Id).OrderBy(i => i).ToArray()).OrderBy(g => g[0]).ToList();
 
-        Assert.Equal(2, groups.Count);
+        Assert.Equal(3, groups.Count);
         Assert.Equal(new long[] { 1, 2, 4, 5 }, groups[0]);                               // Honda ABD fabrikası
         Assert.Equal(new long[] { 7, 8, 9, 10, 11, 13, 14, 15, 16 }, groups[1]);           // ASELSAN Malatya
+        Assert.Equal(new long[] { 30, 31, 32, 33, 34, 35, 36 }, groups[2]);                // Mercedes: bazı başlıklarda şirket adı hiç geçmez
     }
 
     [Fact]
@@ -58,6 +66,18 @@ public class NewsSimilarityTests
         Assert.False(NewsSimilarity.SameStory(Get(3), Get(10), idf));   // Uludağ Malatya ≠ ASELSAN Malatya
         Assert.False(NewsSimilarity.SameStory(Get(2), Get(3), idf));    // Honda istihdam ≠ Uludağ istihdam
         Assert.False(NewsSimilarity.SameStory(Get(12), Get(15), idf));  // Bursa yatırımı ≠ ASELSAN
+    }
+
+    [Theory]
+    [InlineData("Otomotiv devi Mercedes'ten şok karar! Yeni yatırımlar durduruldu: Fabrikalar kapanabilir")]
+    [InlineData("Dünyaca ünlü otomotiv devinden flaş karar! Yeni yatırımlar askıya alındı")]
+    [InlineData("Mercedes-Benz iki fabrikasını kapatmayı değerlendiriyor: Yeni yatırımlar askıya alındı")]
+    public void Yatirimi_durduran_fabrika_kapatan_haber_olumlu_sayilmaz(string title)
+    {
+        var (category, importance) = NewsRuleClassifier.Classify(title, new EgebisLeadFinder.Configuration.ResearchOptions());
+        Assert.Equal(NewsCategories.Risk, category);
+        Assert.Equal(4, importance);
+        Assert.Equal(NewsCategories.Negative, NewsCategories.Sentiment(category));
     }
 
     [Fact]

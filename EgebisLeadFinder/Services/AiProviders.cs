@@ -33,14 +33,47 @@ public static class AiProviders
         // Ucretsiz katman dakikada 8000 token; tek istek (girdi + cikti payi) bunu asarsa 413 doner.
         RequestTokenBudget: 7000);
 
-    /// <summary>Secili OpenAI uyumlu saglayici; Gemini seciliyse null.</summary>
-    public static async Task<ChatProvider?> ChatProviderAsync(ISettingsService settings, CancellationToken ct) =>
-        (await settings.GetAsync(SettingKeys.AiProvider, ct))?.Trim().ToLowerInvariant() switch
+    private static readonly AsyncLocal<ChatProvider?> Forced = new();
+
+    /// <summary>Bu cagri zinciri boyunca saglayiciyi zorlar (ör. haber akisi her zaman Groq). Dispose ile kalkar.</summary>
+    public static IDisposable Force(ChatProvider provider)
+    {
+        var previous = Forced.Value;
+        Forced.Value = provider;
+        return new Scope(() => Forced.Value = previous);
+    }
+
+    private sealed class Scope(Action undo) : IDisposable
+    {
+        public void Dispose() => undo();
+    }
+
+    /// <summary>
+    /// Secili OpenAI uyumlu saglayici; Gemini seciliyse null. Gemini sorunlu oldugu icin yonetici Groq'a gectiyse
+    /// (AiGeminiFallback) ve Groq anahtari varsa Groq doner.
+    /// </summary>
+    public static async Task<ChatProvider?> ChatProviderAsync(ISettingsService settings, CancellationToken ct)
+    {
+        if (Forced.Value is { } forced) return forced;
+
+        var chosen = (await settings.GetAsync(SettingKeys.AiProvider, ct))?.Trim().ToLowerInvariant() switch
         {
             Nvidia => NvidiaProvider,
             Groq => GroqProvider,
             _ => null
         };
+        if (chosen is null && await settings.GetAsync(SettingKeys.AiGeminiFallback, ct) == "1"
+            && !string.IsNullOrWhiteSpace(await settings.GetAsync(SettingKeys.GroqApiKey, ct)))
+            return GroqProvider;
+        return chosen;
+    }
+
+    /// <summary>Haber akisinin saglayicisi: varsayilan Groq (anahtari varsa); "main" secilirse null (ana saglayici).</summary>
+    public static async Task<ChatProvider?> NewsProviderAsync(ISettingsService settings, CancellationToken ct)
+    {
+        if (await settings.GetAsync(SettingKeys.NewsAiSource, ct) == "main") return null;
+        return string.IsNullOrWhiteSpace(await settings.GetAsync(SettingKeys.GroqApiKey, ct)) ? null : GroqProvider;
+    }
 
     /// <summary>Secili saglayicinin API anahtari (yalnizca Ayarlar ekranindan).</summary>
     public static async Task<string?> ActiveKeyAsync(ISettingsService settings, CancellationToken ct) =>

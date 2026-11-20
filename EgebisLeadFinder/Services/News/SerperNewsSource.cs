@@ -41,7 +41,7 @@ public class SerperNewsSource : INewsSource
         return (payload?.News ?? new List<Item>())
             .Where(n => !string.IsNullOrWhiteSpace(n.Title) && !string.IsNullOrWhiteSpace(n.Link))
             // Serper tarihi "2 hours ago" gibi görelidir; güvenilir ayrıştırılamadığı için toplanma zamanı kullanılır.
-            .Select(n => new NewsHit(n.Title!.Trim(), n.Link!.Trim(), n.Source, null, n.Snippet))
+            .Select(n => new NewsHit(n.Title!.Trim(), n.Link!.Trim(), n.Source, null, n.Snippet, Models.NewsRegions.Tr))
             .ToList();
     }
 

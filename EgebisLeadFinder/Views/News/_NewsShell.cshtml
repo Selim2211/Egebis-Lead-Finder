@@ -71,6 +71,15 @@
                 <a class="nx-tab @(Model.Active == key ? "is-on" : "")" asp-controller="News" asp-action="@action" aria-current="@(Model.Active == key ? "page" : null)">@label</a>
             }
         </nav>
+        @{
+            var region = EgebisLeadFinder.Models.NewsRegions.Normalize(Context.Request.Cookies[EgebisLeadFinder.Controllers.NewsController.RegionCookie]);
+            var here = Context.Request.Path + Context.Request.QueryString;
+        }
+        <div class="nx-region" role="group" aria-label="Haber bölgesi">
+            <a class="nx-region-opt @(region == "tr" ? "is-on" : "")" href="@Url.Action("SetRegion", "News", new { value = "tr", returnUrl = here })" title="Yalnızca Türkiye haberleri">TR</a>
+            <a class="nx-region-opt @(region == "global" ? "is-on" : "")" href="@Url.Action("SetRegion", "News", new { value = "global", returnUrl = here })" title="Yalnızca yurt dışı haberleri">Global</a>
+            <a class="nx-region-opt @(region is null ? "is-on" : "")" href="@Url.Action("SetRegion", "News", new { value = "all", returnUrl = here })" title="Tüm haberler">Tümü</a>
+        </div>
         <form method="get" asp-controller="News" asp-action="List" class="nx-search" role="search">
             <input name="q" value="@Model.Q" placeholder="Şirket veya haber ara…" autocomplete="off" aria-label="Haber ara" />
         </form>

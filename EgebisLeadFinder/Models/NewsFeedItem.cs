@@ -54,6 +54,35 @@ public class NewsFeedItem
 
     [MaxLength(10)]
     public string Origin { get; set; } = NewsOrigins.Watch;
+
+    /// <summary>"tr" = Türkiye haberi, "global" = yurt dışı (Haber Akışı'ndaki TR / Global seçimi).</summary>
+    [MaxLength(10)]
+    public string Region { get; set; } = NewsRegions.Tr;
+}
+
+public static class NewsRegions
+{
+    public const string Tr = "tr";
+    public const string Global = "global";
+
+    /// <summary>Henüz karar verilmedi (yapay zekâ sınıflayacak); TR ve Global seçiminde görünmez, Tümü'nde görünür.</summary>
+    public const string Pending = "";
+
+    /// <summary>Kaynak bölge bildirmediyse: .tr alan adı ya da Türkçe harf içeren başlık TR, diğerleri Global.</summary>
+    public static string Classify(string? url, string? title)
+    {
+        var host = Uri.TryCreate(url, UriKind.Absolute, out var u) ? u.Host.ToLowerInvariant() : string.Empty;
+        if (host.EndsWith(".tr", StringComparison.Ordinal)) return Tr;
+        return (title ?? string.Empty).IndexOfAny("çğıöşüÇĞİÖŞÜ".ToCharArray()) >= 0 ? Tr : Global;
+    }
+
+    /// <summary>Çerez/sorgu değeri: "tr", "global" ya da null (tümü).</summary>
+    public static string? Normalize(string? value) => value?.Trim().ToLowerInvariant() switch
+    {
+        Tr => Tr,
+        Global => Global,
+        _ => null
+    };
 }
 
 public static class NewsOrigins

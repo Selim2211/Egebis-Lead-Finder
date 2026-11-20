@@ -66,6 +66,7 @@ builder.Services.AddSingleton<ApiHealthService>();
 builder.Services.AddSingleton<EgebisLeadFinder.Services.Diagnostics.RequestTimings>();
 builder.Services.AddScoped<EgebisLeadFinder.Services.Diagnostics.DiagnosticsService>();
 builder.Services.AddHostedService<EgebisLeadFinder.Services.Diagnostics.StartupWarmup>();
+builder.Services.AddHostedService<EgebisLeadFinder.Services.AiFallbackRecheck>();
 builder.Services.AddScoped<SearchRunService>();
 builder.Services.AddScoped<FavoriteService>();
 builder.Services.AddSingleton<IAuditLogger, AuditLogger>();
@@ -278,6 +279,10 @@ builder.Services.AddScoped<ICompanyResearchService, CompanyResearchService>();
 builder.Services.Configure<NewsOptions>(builder.Configuration.GetSection(NewsOptions.Section));
 builder.Services.AddHttpClient<EgebisLeadFinder.Services.News.GoogleNewsRssSource>(c => c.Timeout = TimeSpan.FromSeconds(15));
 builder.Services.AddHttpClient<EgebisLeadFinder.Services.News.SerperNewsSource>(c => c.Timeout = TimeSpan.FromSeconds(20));
+// Ek ücretsiz haber kaynakları: gazete RSS akışları + Resmî Gazete, ve GDELT haber araması.
+builder.Services.AddHttpClient("news-feeds", c => c.Timeout = TimeSpan.FromSeconds(15));
+builder.Services.AddScoped<EgebisLeadFinder.Services.News.NewsFeedReader>();
+builder.Services.AddHttpClient<EgebisLeadFinder.Services.News.GdeltNewsSource>(c => c.Timeout = TimeSpan.FromSeconds(20));
 builder.Services.AddScoped<EgebisLeadFinder.Services.News.INewsSource>(sp => sp.GetRequiredService<EgebisLeadFinder.Services.News.GoogleNewsRssSource>());
 builder.Services.AddScoped<EgebisLeadFinder.Services.News.INewsSource>(sp => sp.GetRequiredService<EgebisLeadFinder.Services.News.SerperNewsSource>());
 builder.Services.AddSingleton<EgebisLeadFinder.Services.News.NewsSourceHealth>();

@@ -1,4 +1,6 @@
 @inject EgebisLeadFinder.Services.UsageService AlertUsage
+@inject EgebisLeadFinder.Services.ISettingsService AlertSettings
+@using EgebisLeadFinder.Models
 @using EgebisLeadFinder.Services
 @{
     // Acilis uyarisi: ulasilamayan, kredisi/kotasi biten ya da anahtari girilmemis API'ler.
@@ -10,6 +12,16 @@
     catch { problems = new(); }
 
     var blocking = problems.Where(p => p.InUse).ToList();
+
+    // Gemini kullanilan saglayiciysa ve sorunluysa: yoneticiye Groq'a gecme secenegi (Groq anahtari varsa).
+    var offerGroq = false;
+    try
+    {
+        offerGroq = User.IsInRole("Admin")
+            && problems.Any(p => p.InUse && p.Key == "gemini" && (p.LiveError is not null || p.Level == UsageLevel.Exhausted))
+            && !string.IsNullOrWhiteSpace(await AlertSettings.GetAsync(SettingKeys.GroqApiKey));
+    }
+    catch { }
 }
 @if (blocking.Count > 0)
 {
@@ -84,6 +96,19 @@
                             </li>
                         }
                     </ul>
+
+                    @if (offerGroq)
+                    {
+                        <div class="api-alert-choice">
+                            <strong>Gemini çalışmıyor.</strong> Firma analizi için geçici olarak Groq'a geçmek ister misiniz?
+                            Geçmezseniz firma analizi durur (haber akışı Groq ile çalışmaya devam eder). Geçerseniz uygulama her açıldığında Gemini kontrol edilir; düzelince otomatik Gemini'ye döner.
+                            <form method="post" asp-controller="Settings" asp-action="GeminiFallback" asp-route-on="true" asp-route-returnUrl="@Context.Request.Path" class="mt-2">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-primary">Groq'a geç</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Geçme</button>
+                            </form>
+                        </div>
+                    }
 
                     <p class="api-alert-foot">
                         Sorun giderildiğinde (bağlantı düzelince, kredi yüklenince ya da anahtar yenilenince) bu uyarı kendiliğinden kalkar.

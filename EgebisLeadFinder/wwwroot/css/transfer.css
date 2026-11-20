@@ -1,0 +1,28 @@
+/* ===== Disa / ice aktar: yesil dugme (iki modda da okunur) ===== */
+:root[data-theme] .btn-transfer {
+    background: linear-gradient(180deg, #16a34a, #15803d);
+    border: 1px solid #166534;
+    color: #fff;
+    font-weight: 600;
+    transition: box-shadow .15s ease, filter .15s ease;
+}
+:root[data-theme] .btn-transfer:hover,
+:root[data-theme] .btn-transfer:focus-visible,
+:root[data-theme] .btn-transfer.show {
+    background: linear-gradient(180deg, #22c55e, #16a34a);
+    border-color: #15803d;
+    color: #fff;
+    box-shadow: 0 6px 16px -8px rgba(22, 163, 74, .7);
+}
+:root[data-theme="dark"] .btn-transfer {
+    background: linear-gradient(180deg, #22c55e, #16a34a);
+    border-color: #4ade80;
+    color: #04210f;
+}
+:root[data-theme="dark"] .btn-transfer:hover,
+:root[data-theme="dark"] .btn-transfer:focus-visible,
+:root[data-theme="dark"] .btn-transfer.show {
+    background: linear-gradient(180deg, #4ade80, #22c55e);
+    color: #04210f;
+}
+.transfer-group .btn-transfer + .btn-transfer { margin-left: -1px; }

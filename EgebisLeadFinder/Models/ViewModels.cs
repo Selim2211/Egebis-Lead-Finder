@@ -488,6 +488,12 @@ public class SettingsViewModel
     public string? GroqApiKey { get; set; }
     public string? GroqModel { get; set; }
 
+    /// <summary>Haber akisinin yapay zekasi: "main" = ana saglayici; bos = Groq (varsayilan).</summary>
+    public string? NewsAiSource { get; set; }
+
+    /// <summary>Gemini sorunu nedeniyle gecici olarak Groq kullaniliyor mu?</summary>
+    public bool GeminiFallbackActive { get; set; }
+
     // --- Firma arama parametreleri ---
 
     /// <summary>Arama basina getirilecek azami firma (skoru en yuksekten).</summary>

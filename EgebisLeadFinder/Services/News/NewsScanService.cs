@@ -28,13 +28,16 @@ public class NewsScanService
     private readonly INewsAi? _ai;
     private readonly Services.Inbox.NotificationService? _notifications;
     private readonly NewsSourceHealth _health;
+    private readonly NewsFeedReader? _feeds;
+    private readonly GdeltNewsSource? _gdelt;
     private readonly NewsAgentStatus _status;
     private readonly IcpService? _icp;
 
     public NewsScanService(ApplicationDbContext db, IEnumerable<INewsSource> sources, ISettingsService settings,
         IOptions<NewsOptions> news, IOptions<ResearchOptions> research, ILogger<NewsScanService> logger,
         INewsAi? ai = null, Services.Inbox.NotificationService? notifications = null,
-        NewsSourceHealth? health = null, NewsAgentStatus? status = null, IcpService? icp = null)
+        NewsSourceHealth? health = null, NewsAgentStatus? status = null, IcpService? icp = null,
+        NewsFeedReader? feeds = null, GdeltNewsSource? gdelt = null)
     {
         _db = db;
         _sources = sources;
@@ -45,6 +48,8 @@ public class NewsScanService
         _ai = ai;
         _notifications = notifications;
         _health = health ?? new NewsSourceHealth();
+        _feeds = feeds;
+        _gdelt = gdelt;
         _status = status ?? new NewsAgentStatus();
         _icp = icp;
     }
@@ -123,6 +128,58 @@ public class NewsScanService
             var serperThisRun = 0;
             var added = new List<NewsFeedItem>();
             var done = 0;
+            var gdeltThisRun = 0;
+
+            // Bir haberi (firma ya da radar konusu için) eler, kopyaysa atlar, değilse kaydedilecekler listesine ekler.
+            void Consider(NewsHit hit, Company? company, RadarTopic? topic)
+            {
+                run.Found++;
+                var text = $"{hit.Title}. {hit.Snippet}".Trim();
+                if (company is not null && !SnippetRelevance.IsAbout(company, text, hit.Url)) return;
+                if (topic is not null && blacklist.Matches(DomainOf(hit.Url), hit.Title)) return;
+
+                var hash = NewsDedup.UrlHash(hit.Url);
+                var titleKey = NewsDedup.TitleKey(hit.Title);
+                if (hash.Length == 0 || titleKey.Length < 8) return;
+                if (!knownHashes.Add(hash) || !knownTitles.Add(titleKey)) return;
+
+                var story = new StoryItem(-1 - added.Count, hit.PublishedUtc ?? DateTime.UtcNow, NewsSimilarity.Print(hit.Title, hit.Snippet));
+                if (NewsSimilarity.FindSame(story, stories, storyIdf) is { } same)
+                {
+                    // Aynı olay zaten kayıtlı: kopya eklenmez. Kayıtlı haber radardan geldiyse bu firmaya bağlanır.
+                    duplicates++;
+                    if (company is not null && same.Id > 0 && recentStories.FirstOrDefault(s => s.Story.Id == same.Id).CompanyId is null)
+                        linkToCompany.TryAdd(same.Id, company.Id);
+                    return;
+                }
+
+                var (category, importance) = NewsRuleClassifier.Classify(text, _research);
+                var item = new NewsFeedItem
+                {
+                    CompanyId = company?.Id,
+                    RadarTopicId = topic?.Id,
+                    Title = Trim(hit.Title, 500)!,
+                    Summary = Trim(hit.Snippet, 1000),
+                    Url = Trim(hit.Url, 2000)!,
+                    UrlHash = hash,
+                    TitleKey = titleKey,
+                    SourceName = Trim(hit.Source, 150),
+                    PublishedAt = hit.PublishedUtc ?? DateTime.UtcNow,
+                    FetchedAt = DateTime.UtcNow,
+                    Category = category,
+                    Importance = importance,
+                    City = topic?.City,
+                    Origin = company is not null ? NewsOrigins.Watch : NewsOrigins.Radar,
+                    // Bölge haberin konusuna göre: kesin işaret yoksa boş kalır, yapay zekâ karar verir (ClassifyRegionsAsync).
+                    Region = hit.Region == NewsRegions.Global ? NewsRegions.Global
+                        : NewsRegionRules.Decide(text, company?.Country, topic?.City) ?? NewsRegions.Pending
+                };
+                _db.NewsItems.Add(item);
+                added.Add(item);
+                stories.Add(story);
+                run.NewCount++;
+            }
+
             foreach (var target in picked)
             {
                 ct.ThrowIfCancellationRequested();
@@ -156,60 +213,41 @@ public class NewsScanService
                     }
                 }
 
+                // Ek kaynak: firmayı GDELT'te de ara (tur başına sınırlı; hata taramayı durdurmaz).
+                if (company is not null && _gdelt is not null && gdeltThisRun < _news.GdeltPerRun && !GdeltNewsSource.IsPaused(DateTime.UtcNow))
+                {
+                    gdeltThisRun++;
+                    var extra = await _gdelt.SearchCompanyAsync(company.Name, ct);
+                    if (extra.Count > 0) hits = (hits ?? new List<NewsHit>()).Concat(extra).ToList();
+                }
+
                 if (hits is not null)
                 {
                     Touch(cursors, target, DateTime.UtcNow);
-                    foreach (var hit in hits)
-                    {
-                        run.Found++;
-                        var text = $"{hit.Title}. {hit.Snippet}".Trim();
-                        if (company is not null && !SnippetRelevance.IsAbout(company, text, hit.Url)) continue;
-                        if (topic is not null && blacklist.Matches(DomainOf(hit.Url), hit.Title)) continue;
-
-                        var hash = NewsDedup.UrlHash(hit.Url);
-                        var titleKey = NewsDedup.TitleKey(hit.Title);
-                        if (hash.Length == 0 || titleKey.Length < 8) continue;
-                        if (!knownHashes.Add(hash) || !knownTitles.Add(titleKey)) continue;
-
-                        var story = new StoryItem(-1 - added.Count, hit.PublishedUtc ?? DateTime.UtcNow, NewsSimilarity.Print(hit.Title, hit.Snippet));
-                        if (NewsSimilarity.FindSame(story, stories, storyIdf) is { } same)
-                        {
-                            // Aynı olay zaten kayıtlı: kopya eklenmez. Kayıtlı haber radardan geldiyse bu firmaya bağlanır.
-                            duplicates++;
-                            if (company is not null && same.Id > 0 && recentStories.FirstOrDefault(s => s.Story.Id == same.Id).CompanyId is null)
-                                linkToCompany.TryAdd(same.Id, company.Id);
-                            continue;
-                        }
-
-                        var (category, importance) = NewsRuleClassifier.Classify(text, _research);
-                        var item = new NewsFeedItem
-                        {
-                            CompanyId = company?.Id,
-                            RadarTopicId = topic?.Id,
-                            Title = Trim(hit.Title, 500)!,
-                            Summary = Trim(hit.Snippet, 1000),
-                            Url = Trim(hit.Url, 2000)!,
-                            UrlHash = hash,
-                            TitleKey = titleKey,
-                            SourceName = Trim(hit.Source, 150),
-                            PublishedAt = hit.PublishedUtc ?? DateTime.UtcNow,
-                            FetchedAt = DateTime.UtcNow,
-                            Category = category,
-                            Importance = importance,
-                            City = topic?.City,
-                            Origin = company is not null ? NewsOrigins.Watch : NewsOrigins.Radar
-                        };
-                        _db.NewsItems.Add(item);
-                        added.Add(item);
-                        stories.Add(story);
-                        run.NewCount++;
-                    }
+                    foreach (var hit in hits) Consider(hit, company, topic);
                 }
 
                 done++;
                 _status.Progress(company?.Name ?? topic!.Query, done);
                 if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync(ct);
                 if (_news.RequestDelayMs > 0) await Task.Delay(_news.RequestDelayMs, ct);
+            }
+
+            // Ek akışlar: ekonomi gazetelerinin RSS'leri ve Resmî Gazete. Takip edilen firmaya ya da radar konusuna uyanlar alınır.
+            if (_feeds is not null && _news.ExtraFeeds && run.Error is null)
+            {
+                foreach (var (feed, feedHits) in await _feeds.FetchAllAsync(ct))
+                {
+                    var before = run.NewCount;
+                    foreach (var hit in feedHits)
+                    {
+                        var (c, t) = NewsFeedMatcher.Match(hit, companies, topics);
+                        if (c is not null || t is not null) Consider(hit, c, t);
+                    }
+                    if (run.NewCount > before)
+                        _logger.LogInformation("Haber akışı {Feed}: {Count} yeni haber.", feed.Name, run.NewCount - before);
+                }
+                if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync(ct);
             }
 
             if (duplicates > 0) _logger.LogInformation("Haber turu: {Count} kopya haber (aynı olay) atlandı.", duplicates);
@@ -225,6 +263,7 @@ public class NewsScanService
             }
 
             await EnrichAsync(added, companies, run, ct);
+            await ClassifyRegionsAsync(run, ct);
             await RefreshBoostsAsync(added, ct);
             await NotifyAsync(added, companies, ct);
             await CleanupAsync(started, ct);
@@ -319,6 +358,35 @@ public class NewsScanService
     /// Yeni haberleri toplu yapay zekâ çağrısıyla özetler/sınıflar (tur başına en fazla <see cref="NewsOptions.MaxAiBatchesPerRun"/> çağrı).
     /// Günlük çağrı tavanı dolduysa ya da yapay zekâ hata verirse atlanır: haberler kural tabanlı kategori ve önemle görünmeye devam eder.
     /// </summary>
+    /// <summary>
+    /// Bölgesi belli olmayan haberler (TR mi Global mi): önce kurallar (firma ülkesi, şehir, ülke adları), kalanlar için
+    /// tek küçük yapay zekâ çağrısı (tur başına en fazla 40 haber). Yapay zekâ yoksa ya da hata verirse sonraki tura kalır.
+    /// </summary>
+    private async Task ClassifyRegionsAsync(NewsScanRun run, CancellationToken ct)
+    {
+        var since = DateTime.UtcNow.AddDays(-30);
+        var pending = await _db.NewsItems.Include(n => n.Company)
+            .Where(n => n.Region == NewsRegions.Pending && n.PublishedAt >= since)
+            .OrderByDescending(n => n.PublishedAt).Take(200).ToListAsync(ct);
+        if (pending.Count == 0) return;
+
+        foreach (var n in pending)
+            if (NewsRegionRules.Decide($"{n.Title}. {n.Summary}", n.Company?.Country, n.City) is { } decided) n.Region = decided;
+
+        var unknown = pending.Where(n => n.Region == NewsRegions.Pending).Take(40).ToList();
+        var todayStart = NewsSlots.TodayStartUtc(DateTime.UtcNow);
+        var usedToday = unknown.Count == 0 ? 0
+            : await _db.NewsScanRuns.AsNoTracking().Where(r => r.StartedAt >= todayStart && r.Id != run.Id).SumAsync(r => r.AiCalls, ct);
+        if (unknown.Count > 0 && _ai is not null && usedToday + run.AiCalls < _news.MaxAiCallsPerDay)
+        {
+            run.AiCalls++;
+            var answers = await _ai.ClassifyRegionsAsync(unknown.Select((n, i) => (i, $"{n.Title}. {n.Summary}")).ToList(), ct);
+            foreach (var (i, region) in answers)
+                if (i >= 0 && i < unknown.Count) unknown[i].Region = region;
+        }
+        if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync(ct);
+    }
+
     private async Task EnrichAsync(List<NewsFeedItem> added, List<Company> companies, NewsScanRun run, CancellationToken ct)
     {
         if (_ai is null || added.Count == 0 || _news.AiBatchSize <= 0) return;
@@ -347,6 +415,7 @@ public class NewsScanService
                 if (!string.IsNullOrWhiteSpace(r.Summary)) n.Summary = Trim(r.Summary, 300);
                 if (r.Category is not null && NewsCategories.All.Contains(r.Category)) n.Category = r.Category;
                 n.Importance = r.Importance;
+                if (n.Region == NewsRegions.Pending && r.Region is not null) n.Region = r.Region;
                 if (n.Origin == NewsOrigins.Radar)
                 {
                     n.MentionedCompany = Trim(r.MentionedCompany, 200);

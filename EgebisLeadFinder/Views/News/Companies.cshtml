@@ -10,6 +10,7 @@
 
     <section class="nx-card">
         <h2 class="nx-card-h">Takip edilen şirketler <span class="nx-count">@Model.Rows.Count</span></h2>
+        <p class="nx-dim" style="margin:-.25rem 0 .75rem;font-size:.82rem">Haber ajanının taradığı firmalar: sizin ve ekibin takip ettiği ya da favoriye eklediği firmalar. En çok haberi olan üstte.</p>
         @if (Model.Rows.Count == 0)
         {
             <div class="nx-empty">Henüz takip edilen firma yok. Firma kartındaki <b>Takip et</b> düğmesini ya da favori yıldızını kullanın.</div>
@@ -18,8 +19,8 @@
         {
             <div class="nx-table" role="table" aria-label="Takip edilen şirketler">
                 <div class="nx-tr nx-th" role="row">
-                    <span role="columnheader">Şirket</span><span role="columnheader">Puan</span><span role="columnheader">Haber etkisi</span>
-                    <span role="columnheader">7 gün</span><span role="columnheader">Denge</span><span role="columnheader">Son haber</span><span role="columnheader"></span>
+                    <span role="columnheader">Şirket</span><span class="nx-c" role="columnheader">Puan</span><span class="nx-c" role="columnheader">Haber etkisi</span>
+                    <span class="nx-c" role="columnheader">7 gün</span><span class="nx-c" role="columnheader">Denge (30 gün)</span><span class="nx-c" role="columnheader">Son haber</span><span role="columnheader"></span>
                 </div>
                 @foreach (var p in Model.Rows)
                 {
@@ -30,17 +31,17 @@
                             <span class="nm-ava">@NewsFormat.Initials(p.Name)</span>
                             <span><a asp-controller="Company" asp-action="Details" asp-route-id="@p.CompanyId">@p.Name</a><small>@(string.IsNullOrWhiteSpace(p.Industry) ? "Sektör belirtilmemiş" : p.Industry)</small></span>
                         </span>
-                        <span class="nx-num" role="cell" data-label="Puan">@p.Score</span>
-                        <span role="cell" data-label="Haber etkisi">@if (p.Boost > 0) { <b class="is-up">▲ +@p.Boost</b> } else { <span class="nx-dim">—</span> }</span>
-                        <span class="nx-cell-spark" role="cell" data-label="7 gün"><partial name="_Spark" model="p.Spark" /> <b>@p.Count7</b></span>
-                        <span role="cell" data-label="Denge" title="Olumlu @p.Positive · Olumsuz @p.Negative · Diğer @other (son 30 gün)">
+                        <span class="nx-num nx-c" role="cell" data-label="Puan">@p.Score</span>
+                        <span class="nx-c" role="cell" data-label="Haber etkisi">@if (p.Boost > 0) { <b class="is-up">▲ +@p.Boost</b> } else { <span class="nx-dim">—</span> }</span>
+                        <span class="nx-cell-spark nx-c" role="cell" data-label="7 gün"><partial name="_Spark" model="p.Spark" /> <b>@p.Count7</b></span>
+                        <span class="nx-c" role="cell" data-label="Denge" title="Olumlu @p.Positive · Olumsuz @p.Negative · Diğer @other (son 30 gün)">
                             @if (p.Count30 == 0) { <span class="nx-dim">—</span> }
                             else
                             {
                                 <span class="nx-balance"><i class="pos" style="width:@(100 * p.Positive / tot)%"></i><i class="neu" style="width:@(100 * other / tot)%"></i><i class="neg" style="width:@(100 * p.Negative / tot)%"></i></span>
                             }
                         </span>
-                        <span class="nx-dim" role="cell" data-label="Son haber">@(p.LastAt is { } la ? NewsFormat.Ago(la) : "—")</span>
+                        <span class="nx-dim nx-c" role="cell" data-label="Son haber">@(p.LastAt is { } la ? NewsFormat.Ago(la) : "—")</span>
                         <span class="nx-cell-act" role="cell">
                             <a class="nx-btn is-ghost" asp-action="List" asp-route-company="@p.CompanyId">Haberleri</a>
                             @if (p.IsMine)

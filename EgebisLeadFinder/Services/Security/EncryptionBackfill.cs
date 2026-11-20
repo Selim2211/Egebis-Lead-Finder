@@ -18,7 +18,8 @@ public static class EncryptionBackfill
 
     private static readonly Target[] Targets =
     {
-        new("Contacts", new[] { "Email", "Phone", "SourceUrl" }, "Email", "EmailHash"),
+        new("Contacts", new[] { "Email", "Phone", "SourceUrl", "Location", "Headline" }, "Email", "EmailHash"),
+        new("Leads", new[] { "Notes" }),
         new("SentEmails", new[] { "ToAddress" }, "ToAddress", "ToAddressHash"),
         new("Users", new[] { "Email", "FullName" })
     };
