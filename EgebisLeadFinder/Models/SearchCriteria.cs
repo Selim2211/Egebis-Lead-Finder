@@ -21,6 +21,29 @@ public class SearchCriteria
 
     /// <summary>Arama bolgesi anahtari (bkz. SearchRegions); bos ise Türkiye.</summary>
     public string? RegionKey { get; set; }
+
+    /// <summary>Birden çok ülke (virgüllü anahtarlar, ör. "DE,FR,IT"); boş ya da tek ülke ise RegionKey kullanılır.</summary>
+    public string? RegionKeys { get; set; }
+
+    /// <summary>Aranacak ülkeler: RegionKeys'teki birden çok ülke, yoksa tek RegionKey (ya da ülke adından).</summary>
+    public List<Data.SearchRegion> Regions()
+    {
+        var many = Data.SearchRegions.ParseKeys(RegionKeys);
+        return many.Count > 0 ? many : new List<Data.SearchRegion> { Data.SearchRegions.Get(RegionKey ?? Data.SearchRegions.ByCountry(Country)?.Key) };
+    }
+
+    /// <summary>Tek ülkelik kopya: çok ülkeli aramada her ülke bununla ayrı taranır (il/bölge yok, firma hedefi paylaştırılır).</summary>
+    public SearchCriteria ForCountry(Data.SearchRegion region, int maxCompanies)
+    {
+        var copy = (SearchCriteria)MemberwiseClone();
+        copy.RegionKey = region.Key;
+        copy.RegionKeys = null;
+        copy.Country = region.Country;
+        copy.City = null;
+        copy.CollectTarget = CollectTarget is int t ? Math.Max(maxCompanies, (int)Math.Ceiling(t * (double)maxCompanies / Math.Max(1, MaxCompanies))) : null;
+        copy.MaxCompanies = maxCompanies;
+        return copy;
+    }
     public string? City { get; set; }
     public string? CompanySize { get; set; }
     public string? TargetPosition { get; set; }
@@ -131,6 +154,9 @@ public class SearchResult
 
     /// <summary>Haritalar kaydindaki acik adres.</summary>
     public string? Address { get; set; }
+
+    /// <summary>Çok ülkeli aramada sonucun geldiği ülke (firmanın Country alanına yazılır); tek ülkede boş.</summary>
+    public string? Country { get; set; }
 
     /// <summary>
     /// Haritalar isletme kategorisi ("Otomobil Parcasi Ureticisi", "Oto Tamircisi" vb.).

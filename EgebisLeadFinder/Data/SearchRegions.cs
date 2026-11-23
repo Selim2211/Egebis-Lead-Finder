@@ -151,7 +151,6 @@ public static class SearchRegions
     public static readonly IReadOnlyList<SearchRegion> All = new List<SearchRegion>
     {
         new("TR", "Türkiye", "Türkiye", "tr", "tr", "tr", "Türkiye", HasProvinces: true),
-
         new("DE", "Almanya", "Deutschland", "de", "de", "de", "Avrupa"),
         new("AT", "Avusturya", "Österreich", "at", "de", "de", "Avrupa"),
         new("CH", "İsviçre", "Schweiz", "ch", "de", "de", "Avrupa"),
@@ -160,30 +159,92 @@ public static class SearchRegions
         new("FR", "Fransa", "France", "fr", "fr", "en", "Avrupa"),
         new("IT", "İtalya", "Italy", "it", "it", "en", "Avrupa"),
         new("ES", "İspanya", "Spain", "es", "es", "en", "Avrupa"),
+        new("PT", "Portekiz", "Portugal", "pt", "pt", "en", "Avrupa"),
         new("GB", "Birleşik Krallık", "United Kingdom", "gb", "en", "en", "Avrupa"),
+        new("IE", "İrlanda", "Ireland", "ie", "en", "en", "Avrupa"),
         new("PL", "Polonya", "Poland", "pl", "pl", "en", "Avrupa"),
         new("CZ", "Çekya", "Czechia", "cz", "cs", "en", "Avrupa"),
+        new("SK", "Slovakya", "Slovakia", "sk", "sk", "en", "Avrupa"),
+        new("HU", "Macaristan", "Hungary", "hu", "hu", "en", "Avrupa"),
+        new("SI", "Slovenya", "Slovenia", "si", "sl", "en", "Avrupa"),
+        new("HR", "Hırvatistan", "Croatia", "hr", "hr", "en", "Avrupa"),
+        new("RS", "Sırbistan", "Serbia", "rs", "sr", "en", "Avrupa"),
         new("RO", "Romanya", "Romania", "ro", "ro", "en", "Avrupa"),
         new("BG", "Bulgaristan", "Bulgaria", "bg", "bg", "en", "Avrupa"),
         new("GR", "Yunanistan", "Greece", "gr", "el", "en", "Avrupa"),
         new("SE", "İsveç", "Sweden", "se", "sv", "en", "Avrupa"),
-
-        new("AE", "Birleşik Arap Emirlikleri", "United Arab Emirates", "ae", "en", "en", "Orta Doğu & Afrika"),
-        new("SA", "Suudi Arabistan", "Saudi Arabia", "sa", "en", "en", "Orta Doğu & Afrika"),
-        new("QA", "Katar", "Qatar", "qa", "en", "en", "Orta Doğu & Afrika"),
-        new("EG", "Mısır", "Egypt", "eg", "en", "en", "Orta Doğu & Afrika"),
-        new("MA", "Fas", "Morocco", "ma", "fr", "en", "Orta Doğu & Afrika"),
-
-        new("AZ", "Azerbaycan", "Azerbaijan", "az", "az", "en", "Asya & Avrasya"),
-        new("KZ", "Kazakistan", "Kazakhstan", "kz", "ru", "en", "Asya & Avrasya"),
-        new("RU", "Rusya", "Russia", "ru", "ru", "en", "Asya & Avrasya"),
-        new("IN", "Hindistan", "India", "in", "en", "en", "Asya & Avrasya"),
-
-        new("US", "Amerika Birleşik Devletleri", "United States", "us", "en", "en", "Amerika"),
-        new("CA", "Kanada", "Canada", "ca", "en", "en", "Amerika"),
-        new("MX", "Meksika", "Mexico", "mx", "es", "en", "Amerika"),
-        new("BR", "Brezilya", "Brazil", "br", "pt", "en", "Amerika")
+        new("DK", "Danimarka", "Denmark", "dk", "da", "en", "Avrupa"),
+        new("NO", "Norveç", "Norway", "no", "no", "en", "Avrupa"),
+        new("FI", "Finlandiya", "Finland", "fi", "fi", "en", "Avrupa"),
+        new("UA", "Ukrayna", "Ukraine", "ua", "uk", "en", "Avrupa"),
+        new("RU", "Rusya", "Russia", "ru", "ru", "en", "Avrupa"),
+        new("AZ", "Azerbaycan", "Azerbaijan", "az", "az", "en", "Asya"),
+        new("GE", "Gürcistan", "Georgia", "ge", "ka", "en", "Asya"),
+        new("KZ", "Kazakistan", "Kazakhstan", "kz", "ru", "en", "Asya"),
+        new("UZ", "Özbekistan", "Uzbekistan", "uz", "ru", "en", "Asya"),
+        new("IN", "Hindistan", "India", "in", "en", "en", "Asya"),
+        new("PK", "Pakistan", "Pakistan", "pk", "en", "en", "Asya"),
+        new("CN", "Çin", "China", "cn", "en", "en", "Asya"),
+        new("JP", "Japonya", "Japan", "jp", "en", "en", "Asya"),
+        new("KR", "Güney Kore", "South Korea", "kr", "en", "en", "Asya"),
+        new("VN", "Vietnam", "Vietnam", "vn", "en", "en", "Asya"),
+        new("TH", "Tayland", "Thailand", "th", "en", "en", "Asya"),
+        new("MY", "Malezya", "Malaysia", "my", "en", "en", "Asya"),
+        new("ID", "Endonezya", "Indonesia", "id", "en", "en", "Asya"),
+        new("SG", "Singapur", "Singapore", "sg", "en", "en", "Asya"),
+        new("AE", "Birleşik Arap Emirlikleri", "United Arab Emirates", "ae", "en", "en", "Orta Doğu"),
+        new("SA", "Suudi Arabistan", "Saudi Arabia", "sa", "en", "en", "Orta Doğu"),
+        new("QA", "Katar", "Qatar", "qa", "en", "en", "Orta Doğu"),
+        new("KW", "Kuveyt", "Kuwait", "kw", "en", "en", "Orta Doğu"),
+        new("OM", "Umman", "Oman", "om", "en", "en", "Orta Doğu"),
+        new("JO", "Ürdün", "Jordan", "jo", "en", "en", "Orta Doğu"),
+        new("IQ", "Irak", "Iraq", "iq", "en", "en", "Orta Doğu"),
+        new("IL", "İsrail", "Israel", "il", "en", "en", "Orta Doğu"),
+        new("EG", "Mısır", "Egypt", "eg", "en", "en", "Afrika"),
+        new("MA", "Fas", "Morocco", "ma", "fr", "en", "Afrika"),
+        new("DZ", "Cezayir", "Algeria", "dz", "fr", "en", "Afrika"),
+        new("TN", "Tunus", "Tunisia", "tn", "fr", "en", "Afrika"),
+        new("NG", "Nijerya", "Nigeria", "ng", "en", "en", "Afrika"),
+        new("KE", "Kenya", "Kenya", "ke", "en", "en", "Afrika"),
+        new("ZA", "Güney Afrika", "South Africa", "za", "en", "en", "Afrika"),
+        new("US", "Amerika Birleşik Devletleri", "United States", "us", "en", "en", "Kuzey Amerika"),
+        new("CA", "Kanada", "Canada", "ca", "en", "en", "Kuzey Amerika"),
+        new("MX", "Meksika", "Mexico", "mx", "es", "en", "Kuzey Amerika"),
+        new("BR", "Brezilya", "Brazil", "br", "pt", "en", "Güney Amerika"),
+        new("AR", "Arjantin", "Argentina", "ar", "es", "en", "Güney Amerika"),
+        new("CL", "Şili", "Chile", "cl", "es", "en", "Güney Amerika"),
+        new("CO", "Kolombiya", "Colombia", "co", "es", "en", "Güney Amerika"),
+        new("AU", "Avustralya", "Australia", "au", "en", "en", "Okyanusya"),
+        new("NZ", "Yeni Zelanda", "New Zealand", "nz", "en", "en", "Okyanusya")
     };
+
+    /// <summary>Kıtalar (ekrandaki sekmeler), gösterim sırasıyla. Türkiye ayrı sekme.</summary>
+    public static readonly IReadOnlyList<string> Continents = new[]
+    {
+        "Türkiye", "Avrupa", "Asya", "Orta Doğu", "Afrika", "Kuzey Amerika", "Güney Amerika", "Okyanusya"
+    };
+
+    /// <summary>Tek aramada en fazla bu kadar ülke (her ülke ayrı taranır; kredi ülke sayısıyla artar).</summary>
+    public const int MaxCountriesPerSearch = 30;
+
+    /// <summary>Virgüllü ülke anahtarlarını ("DE,FR,IT") bilinen bölgelere çevirir; sıra korunur, tekrarlar ve bilinmeyenler atılır.</summary>
+    public static List<SearchRegion> ParseKeys(string? csv) =>
+        (csv ?? string.Empty).Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(IsKnown).Select(Get).DistinctBy(r => r.Key).ToList();
+
+    /// <summary>
+    /// Seçimin okunur adı: tek ülke → "Almanya"; bir kıtanın tüm ülkeleri → "Avrupa (tüm ülkeler)";
+    /// diğerleri → "Almanya, Fransa, İtalya" (3'ten fazlaysa "+2").
+    /// </summary>
+    public static string Describe(IReadOnlyList<SearchRegion> regions)
+    {
+        if (regions.Count == 0) return Default.Name;
+        if (regions.Count == 1) return regions[0].Name;
+        var groups = regions.Select(r => r.Group).Distinct().ToList();
+        if (groups.Count == 1 && All.Count(r => r.Group == groups[0]) == regions.Count) return $"{groups[0]} (tüm ülkeler)";
+        var names = regions.Select(r => r.Name).ToList();
+        return names.Count <= 3 ? string.Join(", ", names) : $"{string.Join(", ", names.Take(3))} +{names.Count - 3}";
+    }
 
     public static SearchRegion Default => Get(DefaultKey);
 
@@ -204,5 +265,6 @@ public static class SearchRegions
                 || string.Equals(r.Name, country, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Ayarlar ekranindaki gruplu acilir liste icin.</summary>
-    public static IEnumerable<IGrouping<string, SearchRegion>> Grouped() => All.GroupBy(r => r.Group);
+    public static IEnumerable<IGrouping<string, SearchRegion>> Grouped() =>
+        All.GroupBy(r => r.Group).OrderBy(g => Continents.ToList().IndexOf(g.Key));
 }

@@ -33,6 +33,13 @@ public class SearchProfile
     [MaxLength(8)]
     public string? RegionKey { get; set; }
 
+    /// <summary>
+    /// Birden çok ülke seçildiyse (ör. kıtadan "DE,FR,IT") virgüllü anahtarlar; ilk ülke RegionKey'dedir.
+    /// Tek ülkede boş kalır. Her ülke ayrı taranır, il/bölge seçimi yalnız tek ülkede kullanılır.
+    /// </summary>
+    [MaxLength(400)]
+    public string? RegionKeys { get; set; }
+
     /// <summary>Bu profille en fazla kac firma getirilecegi; bossa Ayarlar'daki varsayilan.</summary>
     public int? MaxCompanies { get; set; }
 

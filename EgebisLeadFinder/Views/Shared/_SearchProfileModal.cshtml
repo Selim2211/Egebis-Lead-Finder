@@ -55,8 +55,9 @@
                             <input type="hidden" name="Criteria.NaceProducts" class="nace-products-sync" value="" />
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label" for="spRegion">Ülke / bölge</label>
+                        @* Ana ülke (seçilen ilk ülke): gizli; kıta/ülke seçimi sağdaki bölümden yapılır. *@
+                        <div class="d-none" aria-hidden="true">
+                            <label class="form-label" for="spRegion">Ana ülke</label>
                             <select class="form-select" id="spRegion" name="Criteria.RegionKey">
                                 @foreach (var g in SearchRegions.Grouped())
                                 {
@@ -86,7 +87,46 @@
                         </label>
                     </div>
 
-                    <div class="col-lg-8" id="provincePanel" hidden="@(region.HasProvinces ? null : "hidden")">
+                    <div class="col-lg-8">
+                    <div class="mb-3" id="locationPanel">
+                        <div class="d-flex justify-content-between align-items-baseline mb-2 flex-wrap gap-1">
+                            <span class="form-label mb-0">Kıta ve ülke *</span>
+                            <span class="small">
+                                <span class="tag tag-muted" id="countrySelectedCount">0 ülke seçili</span>
+                                <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="countryAll">Bu kıtanın tümü</button>
+                                <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="countryClear">Temizle</button>
+                            </span>
+                        </div>
+                        <div class="continent-tabs mb-2" role="tablist" aria-label="Kıta">
+                            @foreach (var cont in SearchRegions.Continents)
+                            {
+                                <button type="button" class="continent-tab" role="tab" data-continent="@cont">
+                                    @cont <span class="continent-count" data-continent-count="@cont" hidden></span>
+                                </button>
+                            }
+                        </div>
+                        <input type="text" class="form-control mb-2" id="countrySearchBox" placeholder="Ülke ara (ör. alm)" autocomplete="off" />
+                        <div class="city-picker country-picker" id="countryGrid">
+                            @foreach (var r in SearchRegions.All)
+                            {
+                                <label class="city-check" data-continent="@r.Group">
+                                    <input type="checkbox" class="country-checkbox" value="@r.Key" data-name="@r.Name" />
+                                    <span>@r.Name</span>
+                                </label>
+                            }
+                        </div>
+                        <input type="hidden" name="Criteria.RegionKeys" id="countryKeysField" value="" />
+                        <div class="form-text" id="countryHint">
+                            Tek ülke seçerseniz aşağıdan il / bölge de seçebilirsiniz. Birden çok ülke seçerseniz her ülke kendi dilinde,
+                            ülke geneli ayrı ayrı aranır; firma sayısı ülkelere paylaştırılır (en fazla @SearchRegions.MaxCountriesPerSearch ülke).
+                        </div>
+                        <div class="alert alert-info py-2 px-3 small mt-2 mb-0" id="multiCountryNote" hidden>
+                            <strong><span id="multiCountryCount">0</span> ülke seçili:</strong> il / bölge seçimi yalnızca tek ülkede yapılır.
+                            Arama kredisi ülke sayısıyla artar.
+                        </div>
+                    </div>
+
+                    <div id="provincePanel" hidden="@(region.HasProvinces ? null : "hidden")">
                         <div class="d-flex justify-content-between align-items-baseline mb-2">
                             <span class="form-label mb-0">Bölge / il</span>
                             <span class="small">
@@ -120,7 +160,7 @@
                     </div>
 
                     @* Avrupa ülkeleri: bölge / eyalet / kanton listesi (ör. Almanya'da Bayern). Panel JS ile kurulur. *@
-                    <div class="col-lg-8" id="subPanel" hidden="@(hasSub ? null : "hidden")">
+                    <div id="subPanel" hidden="@(hasSub ? null : "hidden")">
                         <div class="d-flex justify-content-between align-items-baseline mb-2">
                             <span class="form-label mb-0">Bölge / eyalet</span>
                             <span class="small">
@@ -138,7 +178,7 @@
                     </div>
 
                     @* Bölge listesi olmayan ülkelerde şehir adları elle yazılır. *@
-                    <div class="col-lg-8" id="freePanel" hidden="@(region.HasProvinces || hasSub ? "hidden" : null)">
+                    <div id="freePanel" hidden="@(region.HasProvinces || hasSub ? "hidden" : null)">
                         <label class="form-label" for="cityFreeText">Şehir / bölge</label>
                         <input type="text" class="form-control" id="cityFreeText" name="Criteria.City" placeholder="Bavyera, Stuttgart, Köln" autocomplete="off"
                                disabled="@(region.HasProvinces || hasSub ? "disabled" : null)" />
@@ -146,6 +186,7 @@
                             Birden fazla şehri virgülle ayırın. Boş bırakırsanız <span class="region-name">@region.Name</span> geneli taranır.
                             Sorgular seçilen ülkenin dilinde kurulur.
                         </div>
+                    </div>
                     </div>
                 </div>
             </div>

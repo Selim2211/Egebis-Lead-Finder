@@ -157,9 +157,13 @@
                             </form>
                             <button type="button" class="btn btn-sm btn-outline-secondary" data-profile-show data-profile="@dto.ToJson()">Göster</button>
                             <a class="btn btn-sm btn-outline-secondary" asp-controller="Company" asp-action="Index" asp-route-profileId="@p.Id">Firmalar</a>
+                            <form method="post" asp-action="Duplicate" class="d-inline">
+                                <input type="hidden" name="id" value="@p.Id" />
+                                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Bu profilin bir kopyasını oluştur (adı: &quot;@p.Name - Copy&quot;)">Kopyala</button>
+                            </form>
                             @if (dto.CanEdit)
                             {
-                                <button type="button" class="btn btn-sm btn-outline-secondary" data-profile-edit data-profile="@dto.ToJson()">Düzenle</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-profile-edit data-profile-id="@p.Id" data-profile="@dto.ToJson()">Düzenle</button>
                                 <form method="post" asp-action="Delete" class="d-inline">
                                     <input type="hidden" name="id" value="@p.Id" />
                                     <button type="submit" class="btn btn-sm btn-outline-danger"
@@ -181,6 +185,16 @@
 
 @section Scripts {
     <partial name="_SearchProfileModalScript" />
+    @if (TempData["ProfilesEditId"] is int copiedId)
+    {
+        @* Kopyalanan profil düzenleme penceresinde açılır: kullanıcı adını ve içeriğini değiştirip kaydeder. *@
+        <script>
+            (function () {
+                var btn = document.querySelector('[data-profile-edit][data-profile-id="@copiedId"]');
+                if (btn) btn.click();
+            })();
+        </script>
+    }
     <script>
         document.addEventListener('searchprofile:saved', function () { location.reload(); });
 

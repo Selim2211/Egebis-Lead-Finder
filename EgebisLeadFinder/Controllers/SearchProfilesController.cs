@@ -89,6 +89,56 @@ public class SearchProfilesController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    /// <summary>
+    /// Profili kopyalar: "[Profil adı] - Copy" adıyla, kopyalayan kullanıcıya ait ve kişiye özel yeni profil oluşur
+    /// (başkasının paylaştığı profil de kopyalanabilir). Firma bağları kopyalanmaz. Kopya düzenleme penceresinde açılır.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Duplicate(int id, CancellationToken ct)
+    {
+        var me = User.UserId();
+        var source = await _db.SearchProfiles.AsNoTracking().VisibleTo(me).FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (source is null) return NotFound();
+
+        var taken = await _db.SearchProfiles.AsNoTracking().Where(p => p.OwnerUserId == me).Select(p => p.Name).ToListAsync(ct);
+        var copy = new SearchProfile
+        {
+            Name = CopyName(source.Name, taken),
+            Industry = source.Industry,
+            NaceCode = source.NaceCode,
+            NaceProducts = source.NaceProducts,
+            City = source.City,
+            Country = source.Country,
+            RegionKey = source.RegionKey,
+            RegionKeys = source.RegionKeys,
+            MaxCompanies = source.MaxCompanies,
+            OwnerUserId = me,
+            IsPublic = false
+        };
+        _db.SearchProfiles.Add(copy);
+        await _db.SaveChangesAsync(ct);
+
+        AuditActionFilter.SetAuditSummary(HttpContext, $"Arama profili kopyalandı: {source.Name} → {copy.Name}");
+        TempData["ProfilesOk"] = $"\"{source.Name}\" kopyalandı: \"{copy.Name}\". Adını ve içeriğini değiştirip kaydedin.";
+        TempData["ProfilesEditId"] = copy.Id;
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>"Ege Otomotiv" → "Ege Otomotiv - Copy"; o ad da varsa "… - Copy 2", "… - Copy 3". 150 karakteri aşmaz.</summary>
+    public static string CopyName(string name, IEnumerable<string> taken)
+    {
+        var used = new HashSet<string>(taken, StringComparer.OrdinalIgnoreCase);
+        for (var n = 1; ; n++)
+        {
+            var suffix = n == 1 ? " - Copy" : $" - Copy {n}";
+            var baseName = name.Trim();
+            if (baseName.Length + suffix.Length > 150) baseName = baseName[..(150 - suffix.Length)].TrimEnd();
+            var candidate = baseName + suffix;
+            if (!used.Contains(candidate)) return candidate;
+        }
+    }
+
     private const string XlsxType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
     /// <summary>

@@ -52,6 +52,10 @@ public class SearchRun
     [MaxLength(8)]
     public string? RegionKey { get; set; }
 
+    /// <summary>Çok ülkeli aramada virgüllü ülke anahtarları (bkz. SearchProfile.RegionKeys).</summary>
+    [MaxLength(400)]
+    public string? RegionKeys { get; set; }
+
     public string? City { get; set; }
 
     public int? SearchProfileId { get; set; }
@@ -88,7 +92,8 @@ public class SearchRun
         var parts = new List<string>();
         if (!string.IsNullOrWhiteSpace(CompanyName)) parts.Add($"“{CompanyName}”");
         if (!string.IsNullOrWhiteSpace(Industry)) parts.Add(Industry);
-        parts.Add(SearchRegions.Get(RegionKey).Name);
+        var many = SearchRegions.ParseKeys(RegionKeys);
+        parts.Add(many.Count > 1 ? SearchRegions.Describe(many) : SearchRegions.Get(RegionKey).Name);
         if (!string.IsNullOrWhiteSpace(City))
         {
             var cities = City.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);

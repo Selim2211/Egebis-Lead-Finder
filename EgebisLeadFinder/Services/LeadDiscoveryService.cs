@@ -77,7 +77,7 @@ public class LeadDiscoveryService
         List<SearchResult> searchResults;
         try
         {
-            searchResults = await _search.SearchCompaniesAsync(criteria, ct);
+            searchResults = await MultiCountrySearch.RunAsync(_search, criteria, ct);
         }
         catch (SearchProviderException ex) when (ex.Partial.Count > 0)
         {
@@ -365,7 +365,7 @@ public class LeadDiscoveryService
             Description = searchResult.Snippet,
             Industry = criteria.Industry,
             City = CompanyCityResolver.Resolve(searchResult, criteria.City),
-            Country = criteria.Country,
+            Country = searchResult.Country ?? criteria.Country,
             Address = string.IsNullOrWhiteSpace(searchResult.Address) ? null : searchResult.Address.Trim()
         };
 

@@ -23,6 +23,7 @@ public class SearchRunService
             Industry = Trim(criteria.Industry, 150),
             CompanyName = Trim(criteria.CompanyName, 150),
             RegionKey = criteria.RegionKey,
+            RegionKeys = SearchRegions.ParseKeys(criteria.RegionKeys).Count > 1 ? criteria.RegionKeys : null,
             City = string.IsNullOrWhiteSpace(criteria.City) ? null : criteria.City,
             SearchProfileId = profile?.Id,
             ProfileName = profile?.Name

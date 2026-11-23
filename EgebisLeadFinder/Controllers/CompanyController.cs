@@ -206,10 +206,12 @@ public class CompanyController : Controller
             return "Seçilen arama profili bulunamadı; listeden başka bir profil seçin.";
 
         ApplyRegion(model, ProfileRegion(profile, defaultRegion));
+        // Çok ülkeli profil: ülkeler sırayla taranır (LeadDiscoveryService), il/bölge kullanılmaz.
+        c.RegionKeys = SearchRegions.ParseKeys(profile.RegionKeys).Count > 1 ? profile.RegionKeys : null;
         c.Industry = profile.Industry ?? string.Empty;
         c.NaceCode = profile.NaceCode;
         c.NaceProducts = profile.NaceProducts;
-        c.City = string.IsNullOrWhiteSpace(profile.City) ? null : profile.City;
+        c.City = c.RegionKeys is not null || string.IsNullOrWhiteSpace(profile.City) ? null : profile.City;
         c.MaxCompanies = profile.MaxCompanies is > 0
             ? Math.Min(profile.MaxCompanies.Value, SettingKeys.SearchMaxCompaniesUpperLimit)
             : maxCompanies;
@@ -361,6 +363,7 @@ public class CompanyController : Controller
         profile.City = criteria.City;
         profile.Country = criteria.Country;
         profile.RegionKey = criteria.RegionKey;
+        profile.RegionKeys = criteria.RegionKeys;
         profile.MaxCompanies = maxCompanies;
         profile.IsPublic = criteria.ProfilePublic;
 
@@ -373,7 +376,8 @@ public class CompanyController : Controller
         && string.Equals(p.NaceCode ?? "", c.NaceCode ?? "", StringComparison.OrdinalIgnoreCase)
         && string.Equals(p.NaceProducts ?? "", c.NaceProducts ?? "", StringComparison.OrdinalIgnoreCase)
         && string.Equals(p.City ?? "", c.City ?? "", StringComparison.OrdinalIgnoreCase)
-        && string.Equals(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key, c.RegionKey, StringComparison.OrdinalIgnoreCase);
+        && string.Equals(p.RegionKey ?? SearchRegions.ByCountry(p.Country)?.Key, c.RegionKey, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(p.RegionKeys ?? "", c.RegionKeys ?? "", StringComparison.OrdinalIgnoreCase);
 
     private async Task TryFailRunAsync(SearchRunService runs, int runId, string error, UsageScope usage)
     {
@@ -391,8 +395,14 @@ public class CompanyController : Controller
             return BadRequest(new { error = "Arama profili için bir ad girin." });
 
         var (_, defaultRegion) = await GetSearchLimitsAsync(ct);
-        ApplyRegion(model, SearchRegions.IsKnown(c.RegionKey) ? SearchRegions.Get(c.RegionKey) : defaultRegion);
-        c.City = string.IsNullOrWhiteSpace(c.City) ? null : c.City.Trim();
+        // Kıtadan birden çok ülke seçilebilir: ilk ülke ana ülke olur, il/bölge yalnızca tek ülkede saklanır.
+        var countries = SearchRegions.ParseKeys(c.RegionKeys);
+        if (countries.Count > SearchRegions.MaxCountriesPerSearch)
+            return BadRequest(new { error = $"Tek profilde en fazla {SearchRegions.MaxCountriesPerSearch} ülke seçilebilir (her ülke ayrı aranır)." });
+        var primary = countries.Count > 0 ? countries[0] : SearchRegions.IsKnown(c.RegionKey) ? SearchRegions.Get(c.RegionKey) : defaultRegion;
+        ApplyRegion(model, primary);
+        c.RegionKeys = countries.Count > 1 ? string.Join(",", countries.Select(r => r.Key)) : null;
+        c.City = c.RegionKeys is not null || string.IsNullOrWhiteSpace(c.City) ? null : c.City.Trim();
 
         var error = await ResolveNaceAsync(c, ct);
         if (error is not null)
@@ -1054,7 +1064,7 @@ public class CompanyController : Controller
         var parts = new List<string>();
         if (!string.IsNullOrWhiteSpace(c.CompanyName)) parts.Add($"firma adı “{c.CompanyName}”");
         if (!string.IsNullOrWhiteSpace(c.Industry)) parts.Add(c.Industry);
-        parts.Add(SearchRegions.Get(c.RegionKey).Name);
+        parts.Add(SearchRegions.Describe(c.Regions()));
         if (!string.IsNullOrWhiteSpace(c.City))
         {
             var cities = c.City.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);

@@ -35,6 +35,102 @@
         var regionNames = {};
         Array.prototype.forEach.call(region.options, function (o) { regionNames[o.value] = o.textContent; });
 
+        // ---- Kıta + ülke seçimi (birden çok ülke). İlk seçilen ülke "ana ülke" olur (gizli spRegion). ----
+        var MAX_COUNTRIES = @SearchRegions.MaxCountriesPerSearch;
+        var countryGrid = document.getElementById('countryGrid');
+        var countryBoxes = Array.prototype.slice.call(countryGrid.querySelectorAll('.country-checkbox'));
+        var countryField = document.getElementById('countryKeysField');
+        var countryCount = document.getElementById('countrySelectedCount');
+        var countrySearch = document.getElementById('countrySearchBox');
+        var multiNote = document.getElementById('multiCountryNote');
+        var continentTabs = Array.prototype.slice.call(document.querySelectorAll('.continent-tab'));
+        var currentContinent = 'Türkiye';
+        var singleKey = null;   // il/bölge panelinin kurulduğu ülke (tek ülke seçiliyken)
+        var order = [];         // seçim sırası: ilk seçilen ana ülke olur
+
+        function continentOf(key) {
+            var box = countryBoxes.find(function (b) { return b.value === key; });
+            return box ? box.closest('.city-check').getAttribute('data-continent') : 'Türkiye';
+        }
+
+        function showContinent(name) {
+            currentContinent = name;
+            continentTabs.forEach(function (t) {
+                var on = t.getAttribute('data-continent') === name;
+                t.classList.toggle('is-on', on);
+                t.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            filterCountries();
+        }
+
+        function filterCountries() {
+            var q = (countrySearch.value || '').toLocaleLowerCase('tr').trim();
+            countryGrid.querySelectorAll('.city-check').forEach(function (label) {
+                var name = label.textContent.toLocaleLowerCase('tr');
+                // Arama yazılınca tüm kıtalarda aranır; boşken yalnız seçili kıta görünür.
+                label.hidden = q ? name.indexOf(q) === -1 : label.getAttribute('data-continent') !== currentContinent;
+            });
+        }
+
+        function selectedCountries() {
+            var checked = countryBoxes.filter(function (b) { return b.checked; }).map(function (b) { return b.value; });
+            order = order.filter(function (k) { return checked.indexOf(k) !== -1; });
+            checked.forEach(function (k) { if (order.indexOf(k) === -1) order.push(k); });
+            return order.slice();
+        }
+
+        function syncCountries() {
+            var keys = selectedCountries();
+            countryField.value = keys.join(',');
+            countryCount.textContent = keys.length + ' ülke seçili';
+            countryCount.classList.toggle('tag-danger', keys.length > MAX_COUNTRIES);
+            document.querySelectorAll('[data-continent-count]').forEach(function (badge) {
+                var cont = badge.getAttribute('data-continent-count');
+                var n = keys.filter(function (k) { return continentOf(k) === cont; }).length;
+                badge.textContent = n;
+                badge.hidden = n === 0;
+            });
+
+            var multi = keys.length > 1;
+            multiNote.hidden = !multi;
+            document.getElementById('multiCountryCount').textContent = keys.length;
+            if (keys.length === 1) {
+                // Aynı ülke zaten kuruluysa panele dokunulmaz (bölge/il seçimi silinmesin).
+                if (singleKey !== keys[0]) { singleKey = keys[0]; setRegion(keys[0]); syncCities(); }
+            } else {
+                // Çok ülke ya da hiç ülke: il/bölge panelleri kapanır, şehir alanları gönderilmez.
+                if (keys.length > 1) region.value = keys[0];
+                singleKey = null;
+                provincePanel.hidden = true; subPanel.hidden = true; freePanel.hidden = true;
+                hiddenCity.disabled = true; subHidden.disabled = true; freeText.disabled = true;
+            }
+        }
+
+        function setCountries(keys) {
+            order = keys.slice();
+            countryBoxes.forEach(function (b) { b.checked = keys.indexOf(b.value) !== -1; });
+            singleKey = null;
+            countrySearch.value = '';
+            showContinent(continentOf(keys[0] || 'TR'));
+            syncCountries();
+        }
+
+        continentTabs.forEach(function (t) {
+            t.addEventListener('click', function () { countrySearch.value = ''; showContinent(t.getAttribute('data-continent')); });
+        });
+        countryBoxes.forEach(function (b) { b.addEventListener('change', syncCountries); });
+        countrySearch.addEventListener('input', filterCountries);
+        document.getElementById('countryClear').addEventListener('click', function () {
+            countryBoxes.forEach(function (b) { b.checked = false; });
+            syncCountries();
+        });
+        document.getElementById('countryAll').addEventListener('click', function () {
+            var inContinent = countryBoxes.filter(function (b) { return b.closest('.city-check').getAttribute('data-continent') === currentContinent; });
+            var allOn = inContinent.every(function (b) { return b.checked; });
+            inContinent.forEach(function (b) { b.checked = !allOn; });
+            syncCountries();
+        });
+
         function setRegion(key) {
             if (!regionNames[key]) key = modalEl.getAttribute('data-default-region');
             region.value = key;
@@ -311,7 +407,10 @@
             naceLookup(naceInput.value);
             var list = (p.city || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
             subKey = null;
-            setRegion(p.regionKey || modalEl.getAttribute('data-default-region'));
+            var keys = (p.regionKeys && p.regionKeys.length) ? p.regionKeys : [p.regionKey || modalEl.getAttribute('data-default-region')];
+            setCountries(keys);
+            setRegion(keys[0]);
+            if (keys.length > 1) syncCountries();
             if (region.value === 'TR') { setCities(list); freeText.value = ''; }
             else if (SUBS[region.value]) { setCities([]); buildSub(region.value, list); freeText.value = ''; }
             else { setCities([]); freeText.value = list.join(', '); }
@@ -327,6 +426,10 @@
             syncCities();
             if (!nameInput.value.trim()) { nameInput.focus(); showStatus('Profil adı girin.', true); return; }
             if (!industry.value.trim() && !naceInput.value.trim()) { industry.focus(); showStatus('Sektör ya da NACE kodu girin.', true); return; }
+            var chosen = selectedCountries();
+            if (chosen.length === 0) { showStatus('En az bir ülke seçin.', true); return; }
+            if (chosen.length > MAX_COUNTRIES) { showStatus('En fazla ' + MAX_COUNTRIES + ' ülke seçebilirsiniz.', true); return; }
+            syncCountries();
 
             saveBtn.disabled = true;
             fetch(form.getAttribute('data-url'), { method: 'POST', body: new FormData(form), headers: { Accept: 'application/json' } })

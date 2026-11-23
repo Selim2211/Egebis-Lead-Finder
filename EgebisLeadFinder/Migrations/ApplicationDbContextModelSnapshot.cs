@@ -1181,6 +1181,10 @@ namespace EgebisLeadFinder.Migrations
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)");
 
+                    b.Property<string>("RegionKeys")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerUserId", "Name")
@@ -1242,6 +1246,10 @@ namespace EgebisLeadFinder.Migrations
                     b.Property<string>("RegionKey")
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)");
+
+                    b.Property<string>("RegionKeys")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
 
                     b.Property<int?>("SearchProfileId")
                         .HasColumnType("integer");
