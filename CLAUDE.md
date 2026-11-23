@@ -44,5 +44,5 @@ ASP.NET Core 10 MVC + EF Core/PostgreSQL. Repo: Selim2211/Egebis-Lead-Finder (br
 - Apollo anahtarı geçersiz; Groq ücretsiz kotası 429 verebilir; Gemini ücretli sürüme geçiş bekliyor.
 - Global haber az: yurt dışı kaynak yalnız GDELT (429). Öneri: Google Haberler İngilizce baskısı eklemek.
 - MEKA GRUP gibi eski firmaların yanlış NACE'si yeniden analiz/yeniden puanlamada düzelir (kayıtlı kod kendiliğinden değişmez).
-- "Yeniden analiz sonrası puan Firmalar'a yansımıyor" şikâyeti (Gürcan Bey) yerelde yeniden üretilemedi; Firmalar listesine `no-store` eklendi. Tekrar ederse önce/sonra puanları istenecek.
+- "Yeniden analiz sonrası puan Firmalar'a yansımıyor" şikâyeti (yönetici) yerelde yeniden üretilemedi; Firmalar listesine `no-store` eklendi. Tekrar ederse önce/sonra puanları istenecek.
 - Kullanım kılavuzu ve teknik doküman (Word) masaüstünde; haber akışı ve sonraki eklemeler bu belgelerde yok.
