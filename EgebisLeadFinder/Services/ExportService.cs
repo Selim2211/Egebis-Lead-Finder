@@ -46,7 +46,7 @@ public static class ExportService
             list.SelectMany(c => c.Contacts.Select(p => new object?[]
             {
                 c.Name, p.Name, p.Title, p.Email, EmailStatusDisplay.Label(p.EmailStatus, p.Email), p.Phone,
-                p.Location, p.Source.ToString(), p.SourceUrl
+                p.Location, SourceLabel(p.Source), p.SourceUrl
             })).ToList());
 
         return new List<ExportTable> { firms, people };
@@ -136,7 +136,7 @@ public static class ExportService
             c.Contacts.OrderByDescending(p => p.TitleScore).ThenBy(p => p.Id).Select(p => new object?[]
             {
                 p.Name, p.Title, p.Email, EmailStatusDisplay.Label(p.EmailStatus, p.Email), p.Phone, p.Location, p.Headline,
-                p.Source.ToString(), p.SourceUrl, p.TenureText(), c.Leads.Any(l => l.ContactId == p.Id) ? "Evet" : "Hayır"
+                SourceLabel(p.Source), p.SourceUrl, p.TenureText(), c.Leads.Any(l => l.ContactId == p.Id) ? "Evet" : "Hayır"
             }).ToList());
 
         var leads = new ExportTable("Leadler",
@@ -162,7 +162,7 @@ public static class ExportService
             var dto = SearchProfileDto.From(p, me, false);
             return new object?[]
             {
-                p.Name, p.Industry, p.NaceCode, p.NaceProducts, dto.RegionName, p.City, p.MaxCompanies,
+                p.Name, p.Industry, p.NaceCode, p.NaceProducts, string.Join(", ", SearchProfileTransfer.RegionsOf(p).Select(r => r.Name)), dto.RegionKeys.Length > 1 ? null : p.City, p.MaxCompanies,
                 dto.OwnerName is not null ? $"Paylaşan: {dto.OwnerName}" : p.IsPublic ? "Herkese açık" : "Size özel",
                 p.CreatedAt.ToLocalTime()
             };
@@ -198,25 +198,18 @@ public static class ExportService
 
         foreach (var table in tables)
         {
-            var sheet = workbook.Worksheets.Add(Loc.T(table.Name));
+            var sheet = workbook.Worksheets.Add(SheetName(Loc.T(table.Name), workbook));
 
+            // Basliklar da temizlenir: karsilastirmada sutun basligi firma adidir.
             for (var c = 0; c < table.Headers.Length; c++)
-                sheet.Cell(1, c + 1).Value = Loc.T(table.Headers[c]);
+                sheet.Cell(1, c + 1).Value = Clean(Loc.T(table.Headers[c]));
 
             for (var r = 0; r < table.Rows.Count; r++)
             {
                 var row = table.Rows[r];
                 for (var c = 0; c < row.Length; c++)
                 {
-                    var cell = sheet.Cell(r + 2, c + 1);
-                    switch (row[c])
-                    {
-                        case null: break;
-                        case int i: cell.Value = i; break;
-                        case DateTime d: cell.Value = d; cell.Style.DateFormat.Format = "dd.MM.yyyy HH:mm"; break;
-                        // Metin her zaman metin olarak yazilir: "=..." ile baslayan deger formul olmaz.
-                        default: cell.Value = Clean(Loc.T(row[c]!.ToString() ?? string.Empty)); break;
-                    }
+                    WriteCell(sheet.Cell(r + 2, c + 1), row[c]);
                 }
             }
 
@@ -240,6 +233,137 @@ public static class ExportService
         return stream.ToArray();
     }
 
+    /// <summary>Toplu firma aktariminda tek dosyaya en fazla bu kadar firma (her biri ayri sayfa).</summary>
+    public const int MaxBulkCompanies = 100;
+
+    /// <summary>
+    /// Secilen firmalar tek Excel dosyasinda: ilk sayfa "Firmalar" (liste, her ad kendi sayfasina baglanti),
+    /// sonra her firma kendi sayfasinda. Firma sayfasi, tek firma "Excel'e aktar"daki bilginin aynisidir:
+    /// Firma (Alan/Deger), Kisiler ve Leadler bolumleri alt alta. Sayfa adi firma adidir (Excel kurali: en fazla 31 karakter, benzersiz).
+    /// </summary>
+    public static byte[] ToXlsxCompanies(IReadOnlyList<Company> companies)
+    {
+        using var workbook = new XLWorkbook();
+        var index = workbook.Worksheets.Add(SheetName(Loc.T("Firmalar"), workbook));
+        string[] indexHeaders = { "Firma", "Web sitesi", "Şehir", "Ülke", "NACE", "Puan", "Uygunluk (%)", "Kişi sayısı", "Lead sayısı" };
+        for (var c = 0; c < indexHeaders.Length; c++) index.Cell(1, c + 1).Value = Loc.T(indexHeaders[c]);
+        StyleHeader(index.Range(1, 1, 1, indexHeaders.Length));
+        index.SheetView.FreezeRows(1);
+
+        for (var i = 0; i < companies.Count; i++)
+        {
+            var company = companies[i];
+            var sheet = workbook.Worksheets.Add(SheetName(string.IsNullOrWhiteSpace(company.Name) ? $"Firma {i + 1}" : company.Name, workbook));
+            WriteCompanySheet(sheet, company);
+
+            var row = i + 2;
+            var link = index.Cell(row, 1);
+            link.Value = Clean(company.Name);
+            link.SetHyperlink(new XLHyperlink($"'{sheet.Name.Replace("'", "''")}'!A1"));
+            object?[] values = { company.Website, company.City, company.Country, company.NaceCode, company.Score, company.FitScore,
+                company.Contacts.Count, company.Leads.Count };
+            for (var c = 0; c < values.Length; c++) WriteCell(index.Cell(row, c + 2), values[c]);
+        }
+
+        if (companies.Count > 0) index.Range(1, 1, companies.Count + 1, indexHeaders.Length).SetAutoFilter();
+        index.Columns().AdjustToContents(1, Math.Min(companies.Count + 1, 200), 8, 60);
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+    /// <summary>Firma sayfasi: baslik, sonra Firma / Kisiler / Leadler bolumleri (her biri bolum adi + baslik satiri + satirlar).</summary>
+    private static void WriteCompanySheet(IXLWorksheet sheet, Company company)
+    {
+        var title = sheet.Cell(1, 1);
+        title.Value = Clean(company.Name);
+        title.Style.Font.Bold = true;
+        title.Style.Font.FontSize = 14;
+
+        var row = 3;
+        var widest = 2;
+        foreach (var table in CompanyDetailTables(company))
+        {
+            var section = sheet.Cell(row, 1);
+            section.Value = Loc.T(table.Name);
+            section.Style.Font.Bold = true;
+            section.Style.Font.FontSize = 12;
+            section.Style.Font.FontColor = XLColor.FromHtml("#0369A1");
+            row++;
+
+            for (var c = 0; c < table.Headers.Length; c++) sheet.Cell(row, c + 1).Value = Clean(Loc.T(table.Headers[c]));
+            StyleHeader(sheet.Range(row, 1, row, table.Headers.Length));
+            row++;
+
+            var first = row;
+            foreach (var values in table.Rows)
+            {
+                for (var c = 0; c < values.Length; c++) WriteCell(sheet.Cell(row, c + 1), values[c]);
+                row++;
+            }
+            if (table.Rows.Count == 0)
+            {
+                sheet.Cell(row, 1).Value = Loc.T("Kayıt yok");
+                sheet.Cell(row, 1).Style.Font.Italic = true;
+                sheet.Cell(row, 1).Style.Font.FontColor = XLColor.FromHtml("#64748B");
+                row++;
+            }
+            else
+            {
+                var body = sheet.Range(first, 1, row - 1, table.Headers.Length);
+                body.Style.Alignment.WrapText = true;
+                body.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
+            }
+            widest = Math.Max(widest, table.Headers.Length);
+            row++; // bolumler arasi bos satir
+        }
+
+        // Sutun genislikleri: A alan/ad, B deger/unvan genis; digerleri icerige gore.
+        sheet.Column(1).Width = 34;
+        sheet.Column(2).Width = 60;
+        for (var c = 3; c <= widest; c++) sheet.Column(c).AdjustToContents(1, Math.Min(row, 300), 10, 40);
+    }
+
+    private static void StyleHeader(IXLRange header)
+    {
+        header.Style.Font.Bold = true;
+        header.Style.Fill.BackgroundColor = XLColor.FromHtml("#E2E8F0");
+    }
+
+    /// <summary>Tek hucreyi turune gore yazar (sayi sayi, tarih tarih, metin her zaman metin).</summary>
+    private static void WriteCell(IXLCell cell, object? value)
+    {
+        switch (value)
+        {
+            case null: break;
+            case int i: cell.Value = i; break;
+            case long l: cell.Value = l; break;
+            // Ondalikli sayilar sayi olarak yazilir (metin degil): Excel'de toplanir, siralanir.
+            case double dbl when double.IsFinite(dbl): cell.Value = Math.Round(dbl, 2, MidpointRounding.AwayFromZero); break;
+            case float f when float.IsFinite(f): cell.Value = Math.Round((double)f, 2, MidpointRounding.AwayFromZero); break;
+            case double or float: break; // NaN / sonsuz: bos hucre
+            case decimal m: cell.Value = Math.Round(m, 2, MidpointRounding.AwayFromZero); break;
+            case bool b: cell.Value = Loc.T(b ? "Evet" : "Hayır"); break;
+            case DateTime d: cell.Value = d; cell.Style.DateFormat.Format = "dd.MM.yyyy HH:mm"; break;
+            case DateOnly day: cell.Value = day.ToDateTime(TimeOnly.MinValue); cell.Style.DateFormat.Format = "dd.MM.yyyy"; break;
+            // Metin her zaman metin olarak yazilir: "=..." ile baslayan deger formul olmaz.
+            default: cell.Value = Clean(Loc.T(value!.ToString() ?? string.Empty)); break;
+        }
+    }
+
+    /// <summary>Excel sayfa adi kurali: en fazla 31 karakter, []:*?/\ yok, ayni ad iki kez olmaz.</summary>
+    private static string SheetName(string name, XLWorkbook workbook)
+    {
+        var clean = new string(Clean(name).Where(ch => "[]:*?/\\".IndexOf(ch) < 0 && ch >= ' ').ToArray()).Trim('\'', ' ');
+        if (clean.Length == 0) clean = "Sayfa";
+        if (clean.Length > 31) clean = clean[..31];
+        var candidate = clean;
+        for (var n = 2; workbook.Worksheets.Contains(candidate); n++)
+            candidate = (clean.Length > 27 ? clean[..27] : clean) + $" ({n})";
+        return candidate;
+    }
+
     /// <summary>Turkce Excel'in dogru acmasi icin UTF-8 BOM ve ";" ayirici.</summary>
     public static byte[] ToCsv(ExportTable table)
     {
@@ -251,10 +375,19 @@ public static class ExportService
         return Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
     }
 
+    // Kultur verisine (ICU) bagli kalmadan ondalik ayirici virgul.
+    private static readonly NumberFormatInfo Tr = new() { NumberDecimalSeparator = ",", NumberGroupSeparator = "" };
+
     private static string Format(object? value) => value switch
     {
         null => string.Empty,
         DateTime d => d.ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture),
+        DateOnly day => day.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+        bool b => Loc.T(b ? "Evet" : "Hayır"),
+        // ";" ayiricili CSV Turkce Excel icindir: ondalik ayirici virgul ("45,5"; "45.5" tarih sanilabilir).
+        double nd when !double.IsFinite(nd) => string.Empty,
+        float nf when !float.IsFinite(nf) => string.Empty,
+        double or float or decimal => Convert.ToDecimal(value, CultureInfo.InvariantCulture).ToString("0.##", Tr),
         IFormattable f => f.ToString(null, CultureInfo.InvariantCulture),
         _ => Clean(value.ToString())
     };
@@ -268,7 +401,42 @@ public static class ExportService
             : value;
     }
 
-    private static string Clean(string? value) => (value ?? string.Empty).Replace("\0", string.Empty);
+    /// <summary>Kisinin nereden bulundugu, ekrandaki adla (Firma sitesi / LinkedIn + Apollo / Apollo).</summary>
+    public static string SourceLabel(ContactSource source) => source switch
+    {
+        ContactSource.ApolloSearch => "Apollo",
+        ContactSource.LinkedInApollo => "LinkedIn + Apollo",
+        _ => "Firma sitesi"
+    };
+
+    /// <summary>Excel hucresine sigan en uzun metin (Excel siniri 32.767 karakter).</summary>
+    public const int MaxCellChars = 32_000;
+
+    /// <summary>
+    /// Web sitesinden gelen metni Excel/CSV icin temizler: XML'de gecersiz kontrol karakterleri (sekme ve satir sonu haric)
+    /// ve yarim kalmis emoji parcalari atilir (aksi halde Excel dosyasi olusmaz ya da "onarilsin mi" der);
+    /// Excel hucre siniri asilmasin diye cok uzun metin kisaltilir.
+    /// </summary>
+    public static string Clean(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+        var sb = new StringBuilder(Math.Min(value.Length, MaxCellChars + 1));
+        for (var i = 0; i < value.Length && sb.Length < MaxCellChars; i++)
+        {
+            var ch = value[i];
+            if (char.IsHighSurrogate(ch))
+            {
+                if (i + 1 < value.Length && char.IsLowSurrogate(value[i + 1])) { sb.Append(ch).Append(value[++i]); }
+                continue;
+            }
+            if (char.IsLowSurrogate(ch)) continue;
+            if (ch < ' ' && ch is not ('\t' or '\n' or '\r')) { sb.Append(' '); continue; }
+            if (ch is '￾' or '￿') continue;
+            sb.Append(ch);
+        }
+        if (sb.Length >= MaxCellChars && value.Length > sb.Length) sb.Append('…');
+        return sb.ToString();
+    }
 
     private static T? Parse<T>(string? json) where T : class
     {

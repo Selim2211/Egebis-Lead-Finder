@@ -63,7 +63,21 @@
         <div class="page-sub">Keşfedilen firmalar ve satış takibi</div>
     </div>
     <div class="d-flex gap-2 align-items-center">
-        <partial name="_ExportMenu" model="@("/Company/Export")" />
+        @* Yesil Excel dugmesi: ekrandaki filtrelerle firmalar + kisiler (.xlsx). CSV yalnizca baska programlar icin. *@
+        <link rel="stylesheet" href="~/css/transfer.css" asp-append-version="true" />
+        <a class="btn btn-sm btn-transfer d-inline-flex align-items-center gap-1" href="@QueryUrl.WithPath(req, "/Company/Export", "format", "xlsx")"
+           title="Ekrandaki filtrelerle firmaları ve kişileri Excel (.xlsx) olarak indir">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></svg>
+            Excel'e aktar
+        </a>
+        <a class="btn btn-sm btn-link px-1" href="@QueryUrl.WithPath(req, "/Company/Export", "format", "csv")"
+           title="Excel dışındaki programlar için (noktalı virgül ayraçlı, UTF-8)">CSV</a>
+        @* Toplu aktarim: kartlarda secim kutusu acilir; secilen firmalar tek dosyada, her biri ayri sayfada. *@
+        <button type="button" class="btn btn-sm btn-bulk-transfer d-inline-flex align-items-center gap-1" id="bulkExportToggle"
+                aria-pressed="false" title="Firmaları seçin; her firma tek Excel dosyasında ayrı bir sayfada olur">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><path d="m14 17 2 2 4-4" /></svg>
+            Toplu Excel'e aktar
+        </button>
         @if (Model.Pool is { Companies: > 0 } pool && User.IsInRole("Admin"))
         {
             <form method="post" asp-action="DeleteAll" class="m-0"
@@ -463,6 +477,10 @@ else
             };
 
             <article class="company-card @(company.ProjectStartedAt is not null ? "is-project" : "")" data-company-id="@company.Id">
+                <label class="bulk-check" title="Toplu Excel'e aktarım için seç">
+                    <input type="checkbox" class="bulk-check-input" value="@company.Id" data-company-name="@company.Name" aria-label="@($"{company.Name} firmasını seç")" />
+                    <span class="bulk-check-box" aria-hidden="true"></span>
+                </label>
                 <div class="company-card-fav"><partial name="_FavoriteStar" model="new FavoriteStar(company.Id, Model.FavoriteIds.Contains(company.Id))" /></div>
                 <a class="company-card-main" asp-action="Details" asp-route-id="@company.Id">
                     <div class="company-card-top">
@@ -605,6 +623,25 @@ else
     <partial name="_Pager" model="Model.Pager" />
 }
 
+@* Toplu Excel'e aktar: secim modunda altta sabit cubuk. Secim sayfalar arasi korunur (oturum boyunca). *@
+<div class="bulk-bar" id="bulkBar" hidden role="region" aria-label="Toplu Excel'e aktarım"
+     data-export-url="@Url.Action("ExportMany", "DataTransfer")" data-max="@ExportService.MaxBulkCompanies">
+    <div class="bulk-bar-info">
+        <strong class="bulk-bar-count" id="bulkCount">0</strong>
+        <span>firma seçildi</span>
+        <span class="bulk-bar-limit" id="bulkLimit" hidden>· en fazla @ExportService.MaxBulkCompanies firma</span>
+    </div>
+    <div class="bulk-bar-actions">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="bulkSelectPage">Bu sayfadakilerin tümünü seç</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="bulkClear">Seçimi temizle</button>
+        <button type="button" class="btn btn-sm btn-transfer d-inline-flex align-items-center gap-1" id="bulkDownload" disabled>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></svg>
+            Excel'e aktar
+        </button>
+        <button type="button" class="btn btn-sm btn-link" id="bulkCancel">Vazgeç</button>
+    </div>
+</div>
+
 <form method="post" id="deleteCompanyForm" class="d-none">
     @Html.AntiForgeryToken()
     <input type="hidden" name="returnUrl" value="@returnUrl" />
@@ -612,6 +649,7 @@ else
 
 @section Scripts {
 <script src="~/js/list-filter.js" asp-append-version="true"></script>
+<script src="~/js/bulk-export.js" asp-append-version="true"></script>
 <script>
     (function () {
         var token = document.querySelector('#stageForm input[name="__RequestVerificationToken"]').value;

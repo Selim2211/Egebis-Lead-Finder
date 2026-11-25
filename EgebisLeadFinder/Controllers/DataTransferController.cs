@@ -35,4 +35,35 @@ public class DataTransferController : Controller
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             $"firma-{(slug.Length > 0 ? slug : companyId.ToString())}-{stamp}.xlsx");
     }
+
+    /// <summary>
+    /// Toplu aktarim: secilen firmalar tek Excel dosyasinda, her firma kendi sayfasinda (tek firma aktarimiyla ayni bilgi).
+    /// Firmalar secim sirasiyla yazilir; olmayan (silinmis) firmalar atlanir.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> ExportMany([FromQuery] int[]? ids, CancellationToken ct)
+    {
+        var wanted = (ids ?? Array.Empty<int>()).Where(id => id > 0).Distinct().ToList();
+        if (wanted.Count == 0)
+            return BadRequest("Excel'e aktarmak için en az bir firma seçin.");
+        if (wanted.Count > ExportService.MaxBulkCompanies)
+            return BadRequest($"Tek seferde en fazla {ExportService.MaxBulkCompanies} firma aktarılabilir.");
+
+        var found = await _db.Companies.AsNoTracking()
+            .Where(c => wanted.Contains(c.Id))
+            .Include(c => c.Contacts)
+            .Include(c => c.Leads).ThenInclude(l => l.SentEmails)
+            .AsSplitQuery()
+            .ToListAsync(ct);
+        if (found.Count == 0) return NotFound();
+
+        var companies = found.OrderBy(c => wanted.IndexOf(c.Id)).ToList();
+        AuditActionFilter.SetAuditSummary(HttpContext,
+            $"Firmalar toplu Excel'e aktarıldı: {companies.Count} firma ({companies.Sum(c => c.Contacts.Count)} kişi, {companies.Sum(c => c.Leads.Count)} lead)");
+
+        var stamp = DateTime.Now.ToString("yyyy-MM-dd-HHmm");
+        return File(ExportService.ToXlsxCompanies(companies),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            $"firmalar-{companies.Count}-firma-{stamp}.xlsx");
+    }
 }

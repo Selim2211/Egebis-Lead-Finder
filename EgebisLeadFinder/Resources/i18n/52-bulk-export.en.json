@@ -1,0 +1,13 @@
+{
+  "Toplu Excel'e aktar": "Bulk export to Excel",
+  "Firmaları seçin; her firma tek Excel dosyasında ayrı bir sayfada olur": "Select companies; each company gets its own sheet in one Excel file",
+  "Toplu Excel'e aktarım için seç": "Select for bulk Excel export",
+  "{0} firmasını seç": "Select {0}",
+  "Toplu Excel'e aktarım": "Bulk Excel export",
+  "firma seçildi": "companies selected",
+  "· en fazla {0} firma": "· at most {0} companies",
+  "Bu sayfadakilerin tümünü seç": "Select all on this page",
+  "Kayıt yok": "No records",
+  "Excel'e aktarmak için en az bir firma seçin.": "Select at least one company to export to Excel.",
+  "Tek seferde en fazla {0} firma aktarılabilir.": "At most {0} companies can be exported at once."
+}

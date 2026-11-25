@@ -14,10 +14,13 @@ public class SearchProfileTransferTests
         var result = SearchProfileTransfer.Parse(new MemoryStream(bytes));
 
         Assert.Null(result.FileError);
-        Assert.Equal(3, result.Rows.Count);
+        Assert.Equal(4, result.Rows.Count);
         Assert.All(result.Rows, r => Assert.Null(r.Error));
         Assert.Equal("US", result.Rows[2].RegionKey);
         Assert.True(result.Rows[2].IsPublic);
+        Assert.Equal("DE,FR,IT", result.Rows[3].RegionKeys);
+        Assert.Equal("buzdolabı, fırın", result.Rows[3].Products);
+        Assert.Equal("27.51", result.Rows[3].Nace);
     }
 
     [Fact]

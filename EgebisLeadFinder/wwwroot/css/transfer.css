@@ -26,3 +26,97 @@
     color: #04210f;
 }
 .transfer-group .btn-transfer + .btn-transfer { margin-left: -1px; }
+
+/* ===== Toplu Excel'e aktar: secim modu ===== */
+:root[data-theme] .btn-bulk-transfer {
+    background: transparent;
+    border: 1px solid #16a34a;
+    color: #15803d;
+    font-weight: 600;
+}
+:root[data-theme] .btn-bulk-transfer:hover,
+:root[data-theme] .btn-bulk-transfer:focus-visible,
+:root[data-theme] .btn-bulk-transfer.is-on {
+    background: rgba(22, 163, 74, .12);
+    border-color: #15803d;
+    color: #166534;
+}
+:root[data-theme="dark"] .btn-bulk-transfer { border-color: #4ade80; color: #86efac; }
+:root[data-theme="dark"] .btn-bulk-transfer:hover,
+:root[data-theme="dark"] .btn-bulk-transfer:focus-visible,
+:root[data-theme="dark"] .btn-bulk-transfer.is-on { background: rgba(74, 222, 128, .14); border-color: #86efac; color: #bbf7d0; }
+
+/* Secim kutusu yalnizca secim modunda gorunur; kartin sag ust kosesinde (bu modda kullanilmayan yildizin yerinde). */
+.company-card .bulk-check { display: none; }
+body.bulk-mode .company-card .bulk-check {
+    display: flex;
+    position: absolute;
+    top: .6rem;
+    right: .6rem;
+    z-index: 3;
+    margin: 0;
+    cursor: pointer;
+}
+.bulk-check-input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.bulk-check-box {
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: .4rem;
+    border: 2px solid var(--eg-border-strong, #94a3b8);
+    background: var(--eg-surface, #fff);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .18);
+    display: grid;
+    place-items: center;
+    transition: background-color .15s ease, border-color .15s ease;
+}
+.bulk-check-input:checked + .bulk-check-box { background: #16a34a; border-color: #16a34a; }
+.bulk-check-input:checked + .bulk-check-box::after {
+    content: "";
+    width: .4rem;
+    height: .7rem;
+    border: solid #fff;
+    border-width: 0 2.5px 2.5px 0;
+    transform: translateY(-1px) rotate(45deg);
+}
+.bulk-check-input:focus-visible + .bulk-check-box { outline: 2px solid var(--accent, #0369a1); outline-offset: 2px; }
+
+body.bulk-mode .company-card { cursor: pointer; user-select: none; }
+body.bulk-mode .company-card .company-card-actions { opacity: .45; pointer-events: none; }
+body.bulk-mode .company-card .company-card-fav { visibility: hidden; }
+:root[data-theme] body.bulk-mode .company-card.is-selected {
+    outline: 2px solid #16a34a;
+    outline-offset: -2px;
+    box-shadow: 0 0 0 4px rgba(22, 163, 74, .18);
+}
+
+/* Alttaki sabit cubuk */
+.bulk-bar {
+    position: fixed;
+    left: 50%;
+    bottom: 1rem;
+    transform: translateX(-50%);
+    z-index: 1030;
+    width: min(56rem, calc(100vw - 2rem));
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .6rem 1rem;
+    padding: .7rem 1rem;
+    border-radius: .9rem;
+    border: 1px solid var(--eg-border-strong, #cbd5e1);
+    background: var(--eg-surface, #fff);
+    color: var(--eg-text, #0f172a);
+    box-shadow: 0 18px 40px -12px rgba(2, 6, 23, .45);
+}
+.bulk-bar[hidden] { display: none; }
+.bulk-bar-info { display: flex; align-items: baseline; gap: .35rem; flex-wrap: wrap; }
+.bulk-bar-count { font-size: 1.15rem; }
+.bulk-bar-limit { color: #dc2626; font-weight: 600; }
+.bulk-bar-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+body.bulk-mode main { padding-bottom: 6rem; }
+@media (max-width: 575.98px) {
+    .bulk-bar { bottom: .5rem; padding: .6rem .75rem; }
+    .bulk-bar-actions { width: 100%; }
+    .bulk-bar-actions .btn-transfer { flex: 1 1 auto; justify-content: center; }
+}
