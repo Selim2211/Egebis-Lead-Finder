@@ -39,7 +39,8 @@ public static partial class PersonExtractor
 
             if (LooksLikeMenu(line)) continue;
 
-            var matchedTitle = TitleKeywords.FirstOrDefault(k => TurkishText.ContainsWord(line, k));
+            // En uzun eslesen unvan: "Genel Müdür Yardımcısı" satirinda "genel müdür" degil tamami alinir.
+            var matchedTitle = TitleKeywords.Where(k => TurkishText.ContainsWord(line, k)).OrderByDescending(k => k.Length).FirstOrDefault();
             if (matchedTitle is null) continue;
 
             // Isim ayni satirda, bir onceki veya bir sonraki satirda olabilir.
@@ -51,19 +52,27 @@ public static partial class PersonExtractor
             foreach (var candidate in candidates)
             {
                 if (candidate.Length > 80) continue;
-                var m = NameRegex().Match(candidate);
-                if (!m.Success) continue;
-                // Unvanin kendisini isim sanmayalim.
-                if (TitleKeywords.Any(k => TurkishText.ContainsWord(m.Value, k))) continue;
-                name = m.Value;
-                break;
+                foreach (Match m in NameRegex().Matches(candidate))
+                {
+                    // Isimden sonra gelen buyuk harfli kelime ("Gökhan Sığın Named ...") isme katilmaz:
+                    // bastan isim olabilecek en uzun kelime dizisi alinir, en az iki kelime olmali.
+                    var words = m.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                        .TakeWhile(w => IsPlausibleName(w)).ToList();
+                    if (words.Count < 2) continue;
+                    var value = string.Join(' ', words);
+                    // Unvanin kendisini ya da sitedeki dugme/baslik metnini ("Sosyal Medyadan Ulaşın") isim sanmayalim.
+                    if (TitleKeywords.Any(k => TurkishText.ContainsWord(value, k))) continue;
+                    name = value;
+                    break;
+                }
+                if (name is not null) break;
             }
 
             // Isimsiz kayit satis icin kullanilamaz ve menu gurultusunun buyuk kismi
             // isimsiz geldigi icin burada eleniyor.
             if (name is null) continue;
 
-            results.Add((name, CleanTitle(line, matchedTitle)));
+            results.Add((name, CleanTitle(line, matchedTitle, name)));
         }
 
         return results
@@ -92,18 +101,55 @@ public static partial class PersonExtractor
     /// Unvan satirini kisaltir. Uzun satirlarda eslesen anahtar kelimenin cevresini alir,
     /// boylece Contact.Title alanina paragraf degil unvan yazilir.
     /// </summary>
-    private static string CleanTitle(string line, string matchedKeyword)
+    private static string CleanTitle(string line, string matchedKeyword, string? name = null)
     {
-        if (line.Length <= 60) return line;
+        // Kisa ve cumle olmayan satir tam unvandir; kisinin adi ayni satirdaysa ayiklanir
+        // ("Ahmet Yılmaz - Bilgi İşlem Müdürü" → "Bilgi İşlem Müdürü").
+        if (line.Length <= 60 && !LooksLikeSentence(line))
+        {
+            var title = line;
+            if (!string.IsNullOrEmpty(name))
+            {
+                var at = title.IndexOf(name, StringComparison.Ordinal);
+                if (at >= 0) title = title.Remove(at, name.Length);
+            }
+            title = title.Trim(' ', '-', '–', '—', '|', ':', ',', '/', '·', '\t');
+            return title.Length >= 2 ? title : matchedKeyword;
+        }
 
-        // Anahtar kelime normalize edilmis halde eslesti; konumu da normalize metinde ara.
+        // Cumle ya da uzun satir: unvan alanina yalnizca unvanin kendisi yazilir (yarim kelimeyle kesilmis cumle degil).
         // Normalize karakter sayisini degistirmedigi icin indeks ham metinde de gecerli.
         var index = TurkishText.Normalize(line)
             .IndexOf(TurkishText.Normalize(matchedKeyword), StringComparison.Ordinal);
-        if (index < 0) return line[..60].Trim();
-
-        var start = Math.Max(0, index - 20);
-        var length = Math.Min(60, line.Length - start);
-        return line.Substring(start, length).Trim();
+        return index < 0 ? matchedKeyword : line.Substring(index, matchedKeyword.Length).Trim();
     }
+
+    // Cumle isaretleri: ünvan satiri degil, anlatim ("... olarak görev yapıyor", "Halen ...").
+    private static readonly string[] SentenceWords =
+        { "olarak", "halen", "görev", "yapıyor", "yapmakta", "sürdürüyor", "beri", "itibaren", "tarafından", "sonra", "önce",
+          "named", "appointed", "joins", "joined", "announces", "welcomes", "promoted", "atandı", "getirildi", "katıldı" };
+
+    private static bool LooksLikeSentence(string line) =>
+        SentenceWords.Any(w => TurkishText.ContainsWord(line, w)) || line.TrimEnd().EndsWith('.');
+
+    // Isim olamayacak kelimeler: site dugmeleri/basliklari, kurum ve yer kelimeleri, unvan parcalari.
+    private static readonly HashSet<string> NonNameWords = new(new[]
+    {
+        "sosyal", "medya", "medyadan", "ulasin", "ulasmak", "bize", "iletisim", "iletisime", "gecin", "takip", "edin", "tiklayin",
+        "devami", "detay", "detaylar", "incele", "hakkimizda", "kurumsal", "haberler", "duyurular", "urunler", "urunlerimiz",
+        "hizmetler", "hizmetlerimiz", "projeler", "projelerimiz", "referanslar", "referanslarimiz", "kariyer", "insan", "kaynaklari",
+        "misyon", "vizyon", "degerlerimiz", "kalite", "politikasi", "politikamiz", "belgeler", "sertifikalar", "galeri", "katalog",
+        "teklif", "online", "destek", "musteri", "adres", "telefon", "faks", "posta", "whatsapp", "instagram", "facebook",
+        "linkedin", "twitter", "youtube", "anasayfa", "ana", "sayfa", "blog", "mesaj", "mesaji", "yonetim", "kurulu", "baskani",
+        "baskan", "mudur", "muduru", "mudurlugu", "genel", "sorumlu", "sorumlusu", "uzman", "uzmani", "ekibimiz", "kadromuz",
+        "halen", "sayin", "degerli", "sirket", "sirketi", "sirketimiz", "firma", "firmamiz", "grup", "grubu", "holding", "sanayi",
+        "ticaret", "anonim", "limited", "fabrika", "fabrikasi", "tesis", "tesisleri", "merkez", "merkezi", "subesi", "bolge",
+        "turkiye", "dunya", "global", "uluslararasi", "yurt", "ici", "disi", "cozum", "cozumler", "teknoloji", "teknolojileri",
+        "bilgi", "islem", "satin", "alma", "uretim", "planlama", "operasyon", "koordinator", "danisman", "danismani",
+        "named", "new", "appointed", "joins", "joined", "announces", "welcomes", "promoted", "the", "of", "and", "at"
+    });
+
+    /// <summary>Kisi adi gibi mi: kelimelerden hicbiri site/kurum/unvan kelimesi olmamali.</summary>
+    public static bool IsPlausibleName(string value) =>
+        value.Split(' ', StringSplitOptions.RemoveEmptyEntries).All(w => !NonNameWords.Contains(TurkishText.Normalize(w)));
 }

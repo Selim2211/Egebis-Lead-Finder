@@ -109,23 +109,27 @@ public class ExportDataMatrixTests
         var listTables = ExportService.CompanyTables(companies);
         using (var wb = new XLWorkbook(new MemoryStream(ExportService.ToXlsx(listTables))))
         {
-            var firms = Reader(wb.Worksheet(1), listTables[0]);
-            foreach (var (c, i) in companies.Select((c, i) => (c, i + 2)))
-            {
-                firms(i, "Firma", c.Name); firms(i, "Web sitesi", c.Website); firms(i, "Adres", c.Address); firms(i, "Şehir", c.City);
-                firms(i, "Ülke", c.Country); firms(i, "NACE", c.NaceCode); firms(i, "Puan", c.Score.ToString());
-                firms(i, "Uygunluk (%)", c.FitScore?.ToString()); firms(i, "Neden", c.FitReason);
-                firms(i, "Kişi sayısı", c.Contacts.Count.ToString()); firms(i, "Lead sayısı", c.Leads.Count.ToString());
-            }
-            var people = Reader(wb.Worksheet(2), listTables[1]);
+            // Tek sayfa: her satır firma + bir kişisi; kişisi olmayan firma tek satır.
+            if (wb.Worksheets.Count != 1) problems.Add($"Liste {wb.Worksheets.Count} sayfa, tek sayfa olmalı");
+            var sheet = Reader(wb.Worksheet(1), listTables[0]);
             var row = 2;
             foreach (var c in companies)
-                foreach (var p in c.Contacts)
+            {
+                var people = c.Contacts.OrderByDescending(p => p.TitleScore).ThenBy(p => p.Id).Cast<Contact?>().ToList();
+                if (people.Count == 0) people.Add(null);
+                foreach (var p in people)
                 {
-                    people(row, "Firma", c.Name); people(row, "Ad soyad", p.Name); people(row, "Ünvan", p.Title); people(row, "E-posta", p.Email);
-                    people(row, "Telefon", p.Phone); people(row, "Konum", p.Location); people(row, "Kaynak", ExportService.SourceLabel(p.Source));
-                    people(row, "Profil", p.SourceUrl); row++;
+                    sheet(row, "Firma", c.Name); sheet(row, "Web sitesi", c.Website); sheet(row, "Adres", c.Address); sheet(row, "Şehir", c.City);
+                    sheet(row, "Ülke", c.Country); sheet(row, "NACE", c.NaceCode); sheet(row, "Puan", c.Score.ToString());
+                    sheet(row, "Uygunluk (%)", c.FitScore?.ToString()); sheet(row, "Neden", c.FitReason);
+                    sheet(row, "Kişi sayısı", c.Contacts.Count.ToString()); sheet(row, "Lead sayısı", c.Leads.Count.ToString());
+                    sheet(row, "Kişi", p?.Name); sheet(row, "Ünvan", p?.Title); sheet(row, "E-posta", p?.Email); sheet(row, "Telefon", p?.Phone);
+                    sheet(row, "Kişi konumu", p?.Location); sheet(row, "Kişi kaynağı", p is null ? null : ExportService.SourceLabel(p.Source));
+                    sheet(row, "Kişi profili", p?.SourceUrl);
+                    row++;
                 }
+            }
+            if (wb.Worksheet(1).LastRowUsed()!.RowNumber() != row - 1) problems.Add($"Liste satır sayısı {wb.Worksheet(1).LastRowUsed()!.RowNumber() - 1} ≠ {row - 2}");
         }
         foreach (var c in companies)
         {
@@ -169,7 +173,8 @@ public class ExportDataMatrixTests
 
         var table = listTables[0];
         var records = CsvRecords(System.Text.Encoding.UTF8.GetString(ExportService.ToCsv(table)).TrimStart((char)0xFEFF));
-        if (records.Count != companies.Count + 1) problems.Add($"CSV kayıt sayısı {records.Count - 1} ≠ {companies.Count}");
+        var expectedRows = companies.Sum(c => Math.Max(1, c.Contacts.Count));
+        if (records.Count != expectedRows + 1) problems.Add($"CSV kayıt sayısı {records.Count - 1} ≠ {expectedRows}");
         foreach (var (r, i) in records.Select((r, i) => (r, i)))
             if (r.Count != table.Headers.Length) problems.Add($"CSV satır {i}: {r.Count} alan ≠ {table.Headers.Length}");
         return problems;

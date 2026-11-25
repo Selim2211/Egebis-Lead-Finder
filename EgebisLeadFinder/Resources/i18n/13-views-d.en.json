@@ -260,6 +260,6 @@
   "Sıfırla": "Reset",
   "Kullanıcı kalıcı olarak silinir. Eklediği firmalar, lead'ler ve gönderdiği mailler kalır; audit kayıtlarında adı görünmeye devam eder.": "The user is deleted permanently. The companies, leads and emails they added remain; their name still appears in audit records.",
   "Kullanıcı silinsin mi?": "Delete the user?",
-  "Ekrandaki filtrelerle firmaları ve kişileri Excel (.xlsx) olarak indir": "Download the companies and contacts matching the current filters as Excel (.xlsx)",
+  "Ekrandaki filtrelerle firmaları ve kişileri tek sayfada Excel (.xlsx) olarak indir": "Download the companies and contacts matching the current filters as one Excel (.xlsx) sheet",
   "Excel dışındaki programlar için (noktalı virgül ayraçlı, UTF-8)": "For programs other than Excel (semicolon-separated, UTF-8)"
 }

@@ -17,39 +17,53 @@ public static class ExportService
 
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
+    /// <summary>Firma listesi Excel/CSV'sinde firma sutunlari (her satirda ayni firma bilgisi tekrar eder).</summary>
+    public static readonly string[] CompanyColumns =
+    {
+        "Firma", "Web sitesi", "Adres", "Şehir", "Ülke", "Sektör", "NACE", "Puan", "Uygunluk (%)", "Neden", "Sinyal", "Aşama",
+        "Kişi sayısı", "Lead sayısı", "AI özeti", "Satış önerisi", "Eklenme"
+    };
+
+    /// <summary>Firma listesi Excel/CSV'sinde kisi sutunlari.</summary>
+    public static readonly string[] ContactColumns =
+        { "Kişi", "Ünvan", "E-posta", "E-posta durumu", "Telefon", "Kişi konumu", "Kişi kaynağı", "Kişi profili" };
+
+    /// <summary>
+    /// Firmalar listesi TEK SAYFADA: her satir bir firma + o firmanin bir kisisi. Birden cok kisisi olan firma her kisi icin
+    /// ayri satirda yer alir (firma bilgileri tekrar eder; Excel'de filtre/siralama bozulmaz). Kisisi olmayan firma tek satir,
+    /// kisi sutunlari bos. Kisiler unvan onemine gore siralanir.
+    /// </summary>
     public static List<ExportTable> CompanyTables(IEnumerable<Company> companies)
     {
-        var list = companies.ToList();
+        var rows = new List<object?[]>();
+        foreach (var c in companies)
+        {
+            var rating = Parse<CompanyRating>(c.RatingJson);
+            var analysis = Parse<CompanyAnalysis>(c.AiAnalysis);
+            object?[] firm =
+            {
+                c.Name, c.Website, c.Address, c.City, c.Country, analysis?.Industry ?? c.Industry, c.NaceCode, c.Score,
+                c.FitScore, c.FitReason,
+                RatingSignalDisplay.HasSignal(c.RatingSignal) ? RatingSignalDisplay.Label(c.RatingSignal) : null,
+                SalesforceRecordMapper.StageLabel(c), c.Contacts.Count, c.Leads.Count,
+                rating?.Summary ?? analysis?.Reason, rating?.SalesApproach, c.CreatedAt.ToLocalTime()
+            };
 
-        var firms = new ExportTable("Firmalar",
-            new[]
+            var people = c.Contacts.OrderByDescending(p => p.TitleScore).ThenBy(p => p.Id).ToList();
+            if (people.Count == 0)
             {
-                "Firma", "Web sitesi", "Adres", "Şehir", "Ülke", "Sektör", "NACE", "Puan", "Uygunluk (%)", "Neden", "Sinyal", "Aşama",
-                "Kişi sayısı", "Lead sayısı", "AI özeti", "Satış önerisi", "Eklenme"
-            },
-            list.Select(c =>
-            {
-                var rating = Parse<CompanyRating>(c.RatingJson);
-                var analysis = Parse<CompanyAnalysis>(c.AiAnalysis);
-                return new object?[]
+                rows.Add(firm.Concat(new object?[ContactColumns.Length]).ToArray());
+                continue;
+            }
+            foreach (var p in people)
+                rows.Add(firm.Concat(new object?[]
                 {
-                    c.Name, c.Website, c.Address, c.City, c.Country, analysis?.Industry ?? c.Industry, c.NaceCode, c.Score,
-                    c.FitScore, c.FitReason,
-                    RatingSignalDisplay.HasSignal(c.RatingSignal) ? RatingSignalDisplay.Label(c.RatingSignal) : null,
-                    SalesforceRecordMapper.StageLabel(c), c.Contacts.Count, c.Leads.Count,
-                    rating?.Summary ?? analysis?.Reason, rating?.SalesApproach, c.CreatedAt.ToLocalTime()
-                };
-            }).ToList());
+                    p.Name, p.Title, p.Email, EmailStatusDisplay.Label(p.EmailStatus, p.Email), p.Phone,
+                    p.Location, SourceLabel(p.Source), p.SourceUrl
+                }).ToArray());
+        }
 
-        var people = new ExportTable("Kişiler",
-            new[] { "Firma", "Ad soyad", "Ünvan", "E-posta", "E-posta durumu", "Telefon", "Konum", "Kaynak", "Profil" },
-            list.SelectMany(c => c.Contacts.Select(p => new object?[]
-            {
-                c.Name, p.Name, p.Title, p.Email, EmailStatusDisplay.Label(p.EmailStatus, p.Email), p.Phone,
-                p.Location, SourceLabel(p.Source), p.SourceUrl
-            })).ToList());
-
-        return new List<ExportTable> { firms, people };
+        return new List<ExportTable> { new("Firmalar", CompanyColumns.Concat(ContactColumns).ToArray(), rows) };
     }
 
     /// <summary>

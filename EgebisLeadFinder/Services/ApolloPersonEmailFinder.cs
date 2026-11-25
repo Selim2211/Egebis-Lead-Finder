@@ -160,8 +160,24 @@ public class ApolloPersonEmailFinder : IPersonEmailFinder
             ProfileUrl = Text(person, "linkedin_url"),
             EmploymentStartDate = CurrentEmploymentStart(person),
             Location = string.IsNullOrWhiteSpace(location) ? null : location,
-            Headline = Text(person, "headline")
+            Headline = Text(person, "headline"),
+            Title = Text(person, "title") ?? CurrentEmploymentTitle(person)
         };
+    }
+
+    /// <summary>employment_history icinde current=true kaydin unvani ("title" alani bos geldiginde yedek).</summary>
+    public static string? CurrentEmploymentTitle(JsonElement person)
+    {
+        if (!person.TryGetProperty("employment_history", out var history) || history.ValueKind != JsonValueKind.Array)
+            return null;
+        foreach (var job in history.EnumerateArray())
+        {
+            if (job.ValueKind != JsonValueKind.Object) continue;
+            if (!job.TryGetProperty("current", out var current) || current.ValueKind != JsonValueKind.True) continue;
+            var title = Text(job, "title");
+            if (!string.IsNullOrWhiteSpace(title)) return title;
+        }
+        return null;
     }
 
     /// <summary>employment_history icinde current=true kaydin start_date'i ("2019-03-01").</summary>

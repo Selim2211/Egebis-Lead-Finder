@@ -50,6 +50,14 @@ public static class LinkedInTitleParser
         // ozette hicbir zaman aynen gecmez, ayirdiktan sonraki cekirdek ("Sap") gecer.
         var (splitTitle, titleCompany) = SplitCompanyPrefix(rawTitle);
 
+        // "Ad Soyad - Firma A.Ş. | LinkedIn": ikinci parca unvan degil firma adidir (unvan yok).
+        // "<Firma> şirketinde <Ünvan>" ayrildiktan SONRA bakilir; o kalipta sagdaki kisim unvandir.
+        if (ContactTitle.LooksLikeCompany(splitTitle))
+        {
+            titleCompany ??= splitTitle!.TrimEnd(' ', '.', '…').TrimEnd();
+            splitTitle = null;
+        }
+
         // Arama motoru basligi kirpmis olabilir ("Sap ..."). Ozet metni ayni
         // unvani cogu zaman tam icerir; oradan tamamlamayi dene.
         var finalTitle = RecoverTruncated(splitTitle, snippet);

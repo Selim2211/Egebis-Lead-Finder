@@ -198,7 +198,8 @@ public class HybridContactEnrichmentService : IContactEnrichmentService
             contacts.Add(new Contact
             {
                 Name = parsed.Name,
-                Title = parsed.Title,
+                // Google basligi kirpmis olabilir; Apollo eslesmesinin tam unvani varsa o yazilir.
+                Title = ContactTitle.Best(parsed.Title, match.Title),
                 Email = match.Email,
                 Phone = match.Phone,
                 SourceUrl = parsed.ProfileUrl,

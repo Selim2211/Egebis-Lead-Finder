@@ -33,7 +33,7 @@ public class CompetitorFeatureTests
     }
 
     [Fact]
-    public void Xlsx_firma_ve_kisi_sayfalarini_uretir()
+    public void Xlsx_firma_ve_kisiyi_tek_sayfada_uretir()
     {
         var company = new Company
         {
@@ -46,7 +46,10 @@ public class CompetitorFeatureTests
         using var wb = new XLWorkbook(new MemoryStream(bytes));
         Assert.Equal("Haksan", wb.Worksheet("Firmalar").Cell(2, 1).GetString());
         Assert.Equal("22.19", wb.Worksheet("Firmalar").Cell(2, 7).GetString());
-        Assert.Equal("Geçerli", wb.Worksheet("Kişiler").Cell(2, 5).GetString());
+        var status = Array.IndexOf(ExportService.CompanyColumns.Concat(ExportService.ContactColumns).ToArray(), "E-posta durumu") + 1;
+        Assert.Equal("Ali Veli", wb.Worksheet("Firmalar").Cell(2, ExportService.CompanyColumns.Length + 1).GetString());
+        Assert.Equal("Geçerli", wb.Worksheet("Firmalar").Cell(2, status).GetString());
+        Assert.Single(wb.Worksheets);
     }
 
     // ---------------- E-posta dogrulama ----------------

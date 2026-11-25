@@ -58,10 +58,13 @@ public class CompanyListExportTests
         Assert.True(sheet.Cell(3, Col("Neden")).GetString().Length <= 32_767);
         Assert.Contains("Satır2", sheet.Cell(3, Col("Adres")).GetString());
 
-        var people = wb.Worksheet(2);
-        Assert.Equal("=HYPERLINK(\"x\")", people.Cell(2, 1).GetString());
-        Assert.Equal("IT; Müdür", people.Cell(2, 3).GetString());
-        Assert.Equal("ali@ege.com", people.Cell(2, 4).GetString());
+        // Kişiler aynı sayfada, firmasının satırında.
+        Assert.Equal(1, wb.Worksheets.Count);
+        Assert.Equal("Ali  Veli", sheet.Cell(3, Col("Kişi")).GetString()); // görünmez karakter boşluk oldu
+        Assert.Equal("IT; Müdür", sheet.Cell(3, Col("Ünvan")).GetString());
+        Assert.Equal("ali@ege.com", sheet.Cell(3, Col("E-posta")).GetString());
+        Assert.Equal("+90 555", sheet.Cell(3, Col("Telefon")).GetString());
+        Assert.True(sheet.Cell(2, Col("Kişi")).IsEmpty());
     }
 
     [Fact]

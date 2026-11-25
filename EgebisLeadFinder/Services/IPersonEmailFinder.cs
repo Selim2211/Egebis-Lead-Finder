@@ -35,6 +35,9 @@ public class PersonMatchResult
     public string? Location { get; init; }
     public string? Headline { get; init; }
 
+    /// <summary>Apollo'daki guncel unvan (tam hali; Google'in kirptigi LinkedIn basligindan guvenilir).</summary>
+    public string? Title { get; init; }
+
     public bool Found => Email is not null;
 
     public static PersonMatchResult NotFound(string? error = null) => new() { Error = error };

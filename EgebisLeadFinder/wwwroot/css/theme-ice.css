@@ -360,3 +360,16 @@ body.eg-app::after, :root[data-theme="dark"] body.eg-app::after { background: no
 :root[data-theme] .name-search-button:disabled { opacity: .55; cursor: not-allowed; transform: none; }
 :root[data-theme] .name-search-hint { color: var(--eg-text-muted); }
 :root[data-theme] .name-search-hint a, :root[data-theme] .name-search-hint strong { color: var(--eg-text); }
+
+/* ===== Kisi unvanlari her yerde tam gorunur (kirpilmaz, gerekirse alt satira gecer) ===== */
+:root[data-theme] .lead-card-title,
+:root[data-theme] .lead-mini-title,
+:root[data-theme] .lead-option-title,
+:root[data-theme] .contact-title {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    -webkit-line-clamp: unset !important;
+    display: block;
+    overflow-wrap: anywhere;
+}

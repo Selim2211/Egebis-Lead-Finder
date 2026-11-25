@@ -770,7 +770,7 @@ public class CompanyController : Controller
         return View(model);
     }
 
-    /// <summary>Firmalar listesindeki filtrelerle Excel (firmalar + kisiler sayfasi) veya CSV indirir.</summary>
+    /// <summary>Firmalar listesindeki filtrelerle tek sayfalik Excel (her satir firma + bir kisisi) veya CSV indirir.</summary>
     [HttpGet]
     public async Task<IActionResult> Export(string format, string? search, int minScore = 0, bool onlyWithoutLead = false,
         int? profileId = null, string? stage = null, string? signal = null, string? sort = null,

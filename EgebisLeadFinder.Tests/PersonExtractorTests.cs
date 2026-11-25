@@ -81,4 +81,48 @@ public class PersonExtractorTests
 
         Assert.Empty(people);
     }
+
+    [Fact]
+    public void Site_dugmesi_isim_cumle_de_unvan_sanilmaz()
+    {
+        // Gercek vaka (MEKA Global): "Sosyal Medyadan Ulaşın" kisi adi, yarim cumle unvan olarak kaydedilmisti.
+        var text = """
+            Sosyal Medyadan Ulaşın
+            Halen Yönetim Kurulu Başkanı olarak MEKA’yı global ölçekte sürdürülebilir büyümeye taşıyor.
+            Bize Ulaşın
+            """;
+
+        Assert.Empty(PersonExtractor.Extract(text));
+    }
+
+    [Fact]
+    public void Cumle_icindeki_unvan_yalnizca_unvan_olarak_yazilir()
+    {
+        var text = """
+            Ali Rıza Kaya
+            Halen Yönetim Kurulu Başkanı olarak MEKA’yı global ölçekte sürdürülebilir büyümeye taşıyor.
+            """;
+
+        var person = Assert.Single(PersonExtractor.Extract(text));
+        Assert.Equal("Ali Rıza Kaya", person.Name);
+        Assert.Equal("Yönetim Kurulu Başkanı", person.Title);
+    }
+
+    [Fact]
+    public void En_uzun_unvan_secilir()
+    {
+        var person = Assert.Single(PersonExtractor.Extract("Zeynep Arslan - Genel Müdür Yardımcısı"));
+        Assert.Equal("Zeynep Arslan", person.Name);
+        Assert.Contains("Genel Müdür Yardımcısı", person.Title);
+    }
+
+    [Theory]
+    [InlineData("Sosyal Medyadan Ulaşın", false)]
+    [InlineData("Bize Ulaşın", false)]
+    [InlineData("Halen Yönetim Kurulu", false)]
+    [InlineData("Meka Grup", false)]
+    [InlineData("Ahmet Yılmaz", true)]
+    [InlineData("Ayşe Nur Öztürk", true)]
+    public void Isim_olabilirlik_kontrolu(string value, bool expected) =>
+        Assert.Equal(expected, PersonExtractor.IsPlausibleName(value));
 }

@@ -65,6 +65,14 @@ public class ContactRevealService
             contact.Location ??= match.Location;
             contact.Headline ??= match.Headline;
 
+            // Apollo'nun tam unvani kirpik / bos / firma adi olan unvanin yerine gecer.
+            var bestTitle = ContactTitle.Best(contact.Title, match.Title);
+            if (bestTitle != contact.Title)
+            {
+                contact.Title = bestTitle;
+                contact.TitleScore = Math.Max(contact.TitleScore, _scoring.ScoreTitle(bestTitle));
+            }
+
             // Gercek isim (soyad artik gizli degil) match'ten gelirse tercih edilir.
             if (!string.IsNullOrWhiteSpace(match.Name))
                 contact.Name = match.Name;
