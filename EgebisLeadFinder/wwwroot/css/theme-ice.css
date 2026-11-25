@@ -373,3 +373,22 @@ body.eg-app::after, :root[data-theme="dark"] body.eg-app::after { background: no
     display: block;
     overflow-wrap: anywhere;
 }
+
+/* ===== Lead sayfasi ust karti: her iki temada koyu zemin + beyaz yazi =====
+   Koyu temada --eg-navy-* degiskenleri acik renge cevrildigi icin (yazi okunsun diye) kart zemini aciliyor,
+   beyaz yazilar kayboluyordu. Zemin sabit renklerle verilir. */
+:root[data-theme] .lead-hero {
+    color: #fff;
+    background:
+        radial-gradient(120% 140% at 100% 0%, rgba(56, 189, 248, .28), transparent 55%),
+        radial-gradient(90% 120% at 0% 100%, rgba(125, 211, 252, .14), transparent 60%),
+        linear-gradient(135deg, #0b1a33, #15325e);
+    border: 1px solid rgba(125, 211, 252, .22);
+}
+:root[data-theme] .lead-hero .lead-hero-name { color: #fff; }
+:root[data-theme] .lead-hero .lead-hero-title { color: rgba(226, 240, 255, .88); }
+:root[data-theme] .lead-hero .lead-hero-company { background: rgba(255, 255, 255, .12); color: #fff; }
+:root[data-theme] .lead-hero .lead-hero-company:hover { background: rgba(255, 255, 255, .2); color: #fff; }
+:root[data-theme] .lead-hero .lead-hero-wait,
+:root[data-theme] .lead-hero .lead-wait { color: rgba(226, 240, 255, .85); }
+:root[data-theme] .lead-hero .avatar-xl { border-color: rgba(255, 255, 255, .85); }
